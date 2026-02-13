@@ -326,8 +326,6 @@ router.put(
         return res.status(404).json({ error: 'Work order not found' });
       }
 
-      const completedAt = status === 'completed' ? 'NOW()' : null;
-
       const result = await query(
         `UPDATE work_orders
          SET title = COALESCE($1, title),
@@ -337,7 +335,7 @@ router.put(
              craft = COALESCE($5, craft),
              assigned_to = COALESCE($6, assigned_to),
              scheduled_date = COALESCE($7, scheduled_date),
-             completed_at = ${completedAt ? completedAt : 'completed_at'},
+             completed_at = CASE WHEN $4 = 'completed' THEN NOW() ELSE completed_at END,
              updated_at = NOW()
          WHERE id = $8
          RETURNING *`,
