@@ -138,6 +138,66 @@ class AsseticClient {
       throw new Error(`Failed to search assets: ${error}`);
     }
   }
+
+  /**
+   * Get work orders from Assetic API
+   */
+  async getWorkOrders(params?: { status?: string; limit?: number; offset?: number }) {
+    try {
+      const response = await this.client.get('/workorders', { params });
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch work orders: ${error}`);
+    }
+  }
+
+  /**
+   * Get a single work order by ID
+   */
+  async getWorkOrder(workOrderId: string) {
+    try {
+      const response = await this.client.get(`/workorders/${workOrderId}`);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch work order ${workOrderId}: ${error}`);
+    }
+  }
+
+  /**
+   * Create a work order in Assetic
+   */
+  async createWorkOrder(data: any) {
+    try {
+      const response = await this.client.post('/workorders', data);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to create work order: ${error}`);
+    }
+  }
+
+  /**
+   * Update a work order in Assetic
+   */
+  async updateWorkOrder(workOrderId: string, data: any) {
+    try {
+      const response = await this.client.put(`/workorders/${workOrderId}`, data);
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to update work order ${workOrderId}: ${error}`);
+    }
+  }
+
+  /**
+   * Get available crafts/trades from Assetic
+   */
+  async getCrafts() {
+    try {
+      const response = await this.client.get('/crafts');
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to fetch crafts: ${error}`);
+    }
+  }
 }
 
 export default new AsseticClient();

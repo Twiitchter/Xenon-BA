@@ -7,6 +7,7 @@ import passport from 'passport';
 import authRoutes from './routes/auth';
 import assetRoutes from './routes/assets';
 import reportRoutes from './routes/reports';
+import maintenanceRoutes from './routes/maintenance';
 import { initializePassport } from './config/passport';
 import { initializeDatabase } from './database';
 
@@ -30,6 +31,7 @@ app.use(passport.initialize());
 app.use('/api/auth', authRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

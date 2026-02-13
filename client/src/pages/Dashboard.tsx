@@ -22,6 +22,8 @@ const Dashboard: React.FC = () => {
         <h3>Quick Actions</h3>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button onClick={() => (window.location.href = '/assets')}>View Assets</button>
+          <button onClick={() => (window.location.href = '/maintenance')}>Maintenance Requests</button>
+          <button onClick={() => (window.location.href = '/work-orders')}>Work Orders</button>
           <button onClick={() => (window.location.href = '/reports')}>Generate Reports</button>
         </div>
       </div>
@@ -34,6 +36,9 @@ const Dashboard: React.FC = () => {
         </p>
         <ul style={{ marginLeft: '20px', marginTop: '10px' }}>
           <li>View and manage assets synced from Assetic</li>
+          <li>Log maintenance requests and track them through to completion</li>
+          <li>View and manage work orders assigned to crafts/trades</li>
+          <li>Message maintenance teams on work orders</li>
           <li>Track asset changes and history</li>
           <li>Generate PDF reports</li>
           <li>Send email notifications with or without attachments</li>
