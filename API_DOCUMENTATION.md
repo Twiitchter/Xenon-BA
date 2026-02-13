@@ -459,6 +459,321 @@ Send an email with optional PDF attachment.
 
 ---
 
+## Maintenance Endpoints
+
+All maintenance endpoints require authentication.
+
+### List Maintenance Requests
+
+Get a list of maintenance requests.
+
+**Endpoint:** `GET /maintenance/requests`
+
+**Query Parameters:**
+- `status` (optional) - Filter by status (`open`, `in_progress`, `completed`, `cancelled`)
+- `priority` (optional) - Filter by priority (`low`, `medium`, `high`, `critical`)
+- `limit` (optional) - Number of results (default: 100)
+- `offset` (optional) - Pagination offset (default: 0)
+
+**Response:**
+```json
+{
+  "requests": [
+    {
+      "id": 1,
+      "asset_id": 5,
+      "requested_by": 1,
+      "requested_by_username": "johndoe",
+      "title": "Broken pipe in restroom",
+      "description": "Water leaking from ceiling pipe.",
+      "priority": "high",
+      "status": "open",
+      "category": "Plumbing",
+      "location": "Building A, Floor 2",
+      "created_at": "2024-02-13T10:30:00Z",
+      "updated_at": "2024-02-13T10:30:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### Get Maintenance Request
+
+Get details of a specific maintenance request.
+
+**Endpoint:** `GET /maintenance/requests/:id`
+
+**Parameters:**
+- `id` - Maintenance request ID (integer)
+
+**Status Codes:**
+- `200` - Success
+- `404` - Request not found
+
+---
+
+### Create Maintenance Request
+
+Log a new maintenance request.
+
+**Endpoint:** `POST /maintenance/requests`
+
+**Body:**
+```json
+{
+  "title": "Broken pipe in restroom",
+  "description": "Water leaking from ceiling pipe.",
+  "priority": "high",
+  "category": "Plumbing",
+  "location": "Building A, Floor 2",
+  "assetId": 5
+}
+```
+
+**Fields:**
+- `title` (required) - Short summary
+- `description` (optional) - Full details
+- `priority` (optional) - `low`, `medium` (default), `high`, `critical`
+- `category` (optional) - Maintenance category
+- `location` (optional) - Physical location
+- `assetId` (optional) - Related asset ID
+
+**Status Codes:**
+- `201` - Created
+- `400` - Validation error
+
+---
+
+### Update Maintenance Request
+
+Update an existing maintenance request.
+
+**Endpoint:** `PUT /maintenance/requests/:id`
+
+**Body:**
+```json
+{
+  "status": "in_progress",
+  "priority": "critical"
+}
+```
+
+**Fields:**
+- `title` (optional)
+- `description` (optional)
+- `priority` (optional) - `low`, `medium`, `high`, `critical`
+- `status` (optional) - `open`, `in_progress`, `completed`, `cancelled`
+- `category` (optional)
+- `location` (optional)
+
+**Status Codes:**
+- `200` - Updated
+- `404` - Request not found
+- `400` - Validation error
+
+---
+
+### List Work Orders
+
+Get a list of work orders.
+
+**Endpoint:** `GET /maintenance/work-orders`
+
+**Query Parameters:**
+- `status` (optional) - Filter by status (`pending`, `in_progress`, `completed`, `cancelled`)
+- `craft` (optional) - Filter by craft/trade
+- `limit` (optional) - Number of results (default: 100)
+- `offset` (optional) - Pagination offset (default: 0)
+
+**Response:**
+```json
+{
+  "workOrders": [
+    {
+      "id": 1,
+      "request_id": 1,
+      "assigned_to": 3,
+      "assigned_to_username": "plumber1",
+      "craft": "Plumbing",
+      "title": "Fix broken pipe",
+      "description": "Replace ceiling pipe section in restroom.",
+      "priority": "high",
+      "status": "in_progress",
+      "scheduled_date": "2024-02-15",
+      "completed_at": null,
+      "request_title": "Broken pipe in restroom",
+      "created_at": "2024-02-13T11:00:00Z",
+      "updated_at": "2024-02-13T11:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### Get Work Order
+
+Get details of a specific work order.
+
+**Endpoint:** `GET /maintenance/work-orders/:id`
+
+**Parameters:**
+- `id` - Work order ID (integer)
+
+**Status Codes:**
+- `200` - Success
+- `404` - Work order not found
+
+---
+
+### Create Work Order
+
+Create a work order from a maintenance request.
+
+**Endpoint:** `POST /maintenance/work-orders`
+
+**Body:**
+```json
+{
+  "requestId": 1,
+  "title": "Fix broken pipe",
+  "description": "Replace ceiling pipe section in restroom.",
+  "priority": "high",
+  "craft": "Plumbing",
+  "assignedTo": 3,
+  "scheduledDate": "2024-02-15"
+}
+```
+
+**Fields:**
+- `requestId` (required) - ID of the maintenance request
+- `title` (required) - Work order title
+- `description` (optional)
+- `priority` (optional) - `low`, `medium` (default), `high`, `critical`
+- `craft` (optional) - Craft/trade to assign
+- `assignedTo` (optional) - User ID of the assignee
+- `scheduledDate` (optional) - Scheduled date (ISO 8601)
+
+**Status Codes:**
+- `201` - Created (also sets maintenance request status to `in_progress`)
+- `400` - Validation error
+- `404` - Maintenance request not found
+
+---
+
+### Update Work Order
+
+Update a work order (status, craft assignment, etc.).
+
+**Endpoint:** `PUT /maintenance/work-orders/:id`
+
+**Body:**
+```json
+{
+  "status": "completed",
+  "craft": "Plumbing"
+}
+```
+
+**Fields:**
+- `title` (optional)
+- `description` (optional)
+- `priority` (optional) - `low`, `medium`, `high`, `critical`
+- `status` (optional) - `pending`, `in_progress`, `completed`, `cancelled`
+- `craft` (optional) - Craft/trade
+- `assignedTo` (optional) - User ID
+- `scheduledDate` (optional) - ISO 8601 date
+
+**Notes:**
+- Setting status to `completed` automatically sets the parent maintenance request status to `completed`
+
+**Status Codes:**
+- `200` - Updated
+- `404` - Work order not found
+- `400` - Validation error
+
+---
+
+### Get Work Order Messages
+
+Get messages for a work order (communication between users and maintenance teams).
+
+**Endpoint:** `GET /maintenance/work-orders/:id/messages`
+
+**Parameters:**
+- `id` - Work order ID (integer)
+
+**Query Parameters:**
+- `limit` (optional) - Number of results (default: 50)
+- `offset` (optional) - Pagination offset (default: 0)
+
+**Response:**
+```json
+{
+  "messages": [
+    {
+      "id": 1,
+      "work_order_id": 1,
+      "sender_id": 1,
+      "sender_username": "johndoe",
+      "message": "Can you provide an ETA?",
+      "created_at": "2024-02-13T12:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### Send Work Order Message
+
+Add a message to a work order.
+
+**Endpoint:** `POST /maintenance/work-orders/:id/messages`
+
+**Parameters:**
+- `id` - Work order ID (integer)
+
+**Body:**
+```json
+{
+  "message": "We will be there by 3pm."
+}
+```
+
+**Fields:**
+- `message` (required) - Message text
+
+**Status Codes:**
+- `201` - Message created
+- `400` - Validation error
+- `404` - Work order not found
+
+---
+
+### List Crafts
+
+Get a list of crafts/trades used in work orders.
+
+**Endpoint:** `GET /maintenance/crafts`
+
+**Response:**
+```json
+{
+  "crafts": ["Electrical", "HVAC", "Plumbing"]
+}
+```
+
+**Status Codes:**
+- `200` - Success
+
+---
+
 ## Error Response Format
 
 All error responses follow this format:

@@ -4,6 +4,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Assets from './pages/Assets';
 import Reports from './pages/Reports';
+import Maintenance from './pages/Maintenance';
+import WorkOrders from './pages/WorkOrders';
 import { authService } from './services/authService';
 
 function App() {
@@ -39,6 +41,8 @@ function App() {
               <nav>
                 <Link to="/dashboard">Dashboard</Link>
                 <Link to="/assets">Assets</Link>
+                <Link to="/maintenance">Maintenance</Link>
+                <Link to="/work-orders">Work Orders</Link>
                 <Link to="/reports">Reports</Link>
                 <button onClick={handleLogout} style={{ marginLeft: '20px' }}>
                   Logout
@@ -70,6 +74,14 @@ function App() {
           <Route
             path="/reports"
             element={isAuthenticated ? <Reports /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/maintenance"
+            element={isAuthenticated ? <Maintenance /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/work-orders"
+            element={isAuthenticated ? <WorkOrders /> : <Navigate to="/login" replace />}
           />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
