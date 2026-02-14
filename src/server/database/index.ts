@@ -1,4 +1,6 @@
 import Knex, { Knex as KnexType } from 'knex';
+import bcrypt from 'bcrypt';
+import path from 'path';
 
 export type DbDialect = 'pg' | 'mssql' | 'mysql2';
 
@@ -122,6 +124,36 @@ async function waitForConnection(maxRetries = 10, delayMs = 3000): Promise<void>
   }
 }
 
+/**
+ * Seed default admin account on first run (if no users exist).
+ */
+async function seedDefaultAdmin(): Promise<void> {
+  try {
+    const hasUsers = await db('users').select('id').first();
+    if (!hasUsers) {
+      const passwordHash = await bcrypt.hash('admin123', 10);
+      await db('users').insert({
+        username: 'admin',
+        email: 'admin@example.com',
+        password_hash: passwordHash,
+        first_name: 'Test',
+        last_name: 'Admin',
+        auth_provider: 'local',
+        is_active: true,
+        role: 'admin',
+      });
+      console.log('Default admin account created (admin@example.com / admin123)');
+    }
+  } catch (error: any) {
+    // Table may not exist yet — seeding will run after migrations
+    if (error.message?.includes('does not exist') || error.message?.includes('no such table') || error.code === '42P01') {
+      console.log('Users table not ready yet, admin seed will run after migrations');
+    } else {
+      console.error('Error seeding admin user:', error);
+    }
+  }
+}
+
 export async function initializeDatabase() {
   try {
     // For MSSQL/MySQL, create the DB if it doesn't exist (connects to system DB)
@@ -130,6 +162,17 @@ export async function initializeDatabase() {
     // Wait for the target database to accept connections
     await waitForConnection();
     console.log(`Database connection established (${dialect})`);
+
+    // Run migrations to ensure tables exist
+    console.log('Running database migrations...');
+    await db.migrate.latest({
+      directory: path.join(__dirname, 'migrations'),
+      extension: 'ts',
+    });
+    console.log('Migrations completed');
+
+    // Seed default admin account if no users exist
+    await seedDefaultAdmin();
   } catch (error) {
     console.error('Database connection failed:', error);
     throw error;

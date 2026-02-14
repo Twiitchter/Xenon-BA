@@ -82,10 +82,10 @@ const Maintenance: React.FC = () => {
 
   return (
     <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Maintenance Requests</h2>
+      <div className="page-header">
+        <h2>Work Requests</h2>
         <button onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : 'New Request'}
+          {showForm ? 'Cancel' : '+ New Request'}
         </button>
       </div>
 
@@ -108,7 +108,6 @@ const Maintenance: React.FC = () => {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
-                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
               />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -181,8 +180,8 @@ const Maintenance: React.FC = () => {
         {loading ? (
           <div className="loading">Loading requests...</div>
         ) : requests.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            No maintenance requests found. Click "New Request" to create one.
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            No work requests found. Click "+ New Request" to create one.
           </div>
         ) : (
           <table>
@@ -225,14 +224,14 @@ const Maintenance: React.FC = () => {
             <div className="loading">Loading messages...</div>
           ) : (
             <>
-              <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '10px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+              <div className="messages-box">
                 {messages.length === 0 ? (
-                  <p style={{ color: '#666' }}>No messages yet.</p>
+                  <p style={{ color: 'var(--text-muted)' }}>No messages yet.</p>
                 ) : (
                   messages.map((msg) => (
-                    <div key={msg.id} style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                    <div key={msg.id} className="message-bubble">
                       <strong>{msg.sender_username || 'Unknown'}</strong>
-                      <span style={{ color: '#666', fontSize: '0.85em', marginLeft: '10px' }}>
+                      <span className="message-meta">
                         {new Date(msg.created_at).toLocaleString()}
                       </span>
                       <p style={{ margin: '4px 0 0 0' }}>{msg.message}</p>

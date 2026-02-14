@@ -7,24 +7,9 @@ interface LoginCredentials {
   password: string;
 }
 
-interface RegisterData extends LoginCredentials {
-  email: string;
-  firstName?: string;
-  lastName?: string;
-}
-
 class AuthService {
   async login(credentials: LoginCredentials) {
     const response = await axios.post(`${API_URL}/auth/login`, credentials);
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
-    return response.data;
-  }
-
-  async register(data: RegisterData) {
-    const response = await axios.post(`${API_URL}/auth/register`, data);
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -44,6 +29,11 @@ class AuthService {
   getUser() {
     const userStr = localStorage.getItem('user');
     return userStr ? JSON.parse(userStr) : null;
+  }
+
+  isAdmin(): boolean {
+    const user = this.getUser();
+    return user?.role === 'admin';
   }
 
   getAuthHeader() {

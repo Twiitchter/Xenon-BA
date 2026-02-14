@@ -32,6 +32,7 @@ export const generateToken = (user: any): string => {
       id: user.id,
       username: user.username,
       email: user.email,
+      role: user.role || 'user',
     },
     secret,
     { expiresIn } as jwt.SignOptions

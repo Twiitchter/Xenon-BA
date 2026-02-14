@@ -8,8 +8,10 @@ import authRoutes from './routes/auth';
 import assetRoutes from './routes/assets';
 import reportRoutes from './routes/reports';
 import maintenanceRoutes from './routes/maintenance';
+import adminRoutes from './routes/admin';
 import { initializePassport } from './config/passport';
 import { initializeDatabase } from './database';
+import settingsService from './services/settingsService';
 
 dotenv.config();
 
@@ -32,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -54,6 +57,10 @@ async function startServer() {
   try {
     await initializeDatabase();
     console.log('Database initialized successfully');
+
+    // Load settings cache
+    await settingsService.loadCache();
+    console.log('Settings cache loaded');
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

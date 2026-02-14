@@ -115,12 +115,27 @@ router.post(
           email: user.email,
           firstName: user.first_name,
           lastName: user.last_name,
+          role: user.role || 'user',
         },
         token,
       });
     })(req, res, next);
   }
 );
+
+/**
+ * GET /api/auth/sso
+ * Unified SSO entry point - redirects to configured SSO provider
+ */
+router.get('/sso', (req: Request, res: Response) => {
+  if (process.env.SSO_ENABLED === 'true' && process.env.OAUTH2_CLIENT_ID) {
+    return res.redirect('/api/auth/oauth2');
+  }
+  if (process.env.SAML_ENABLED === 'true' && process.env.SAML_ENTRY_POINT) {
+    return res.redirect('/api/auth/saml');
+  }
+  return res.status(404).json({ error: 'SSO is not configured. Please contact your administrator.' });
+});
 
 /**
  * GET /api/auth/oauth2
@@ -179,7 +194,7 @@ router.get('/me', async (req: Request, res: Response) => {
     
     const user = await db('users')
       .where('id', decoded.id)
-      .select('id', 'username', 'email', 'first_name', 'last_name')
+      .select('id', 'username', 'email', 'first_name', 'last_name', 'role')
       .first();
 
     if (!user) {
@@ -191,6 +206,7 @@ router.get('/me', async (req: Request, res: Response) => {
       email: user.email,
       firstName: user.first_name,
       lastName: user.last_name,
+      role: user.role || 'user',
     });
   } catch (error) {
     res.status(401).json({ error: 'Invalid token' });

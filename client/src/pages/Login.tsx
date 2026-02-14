@@ -6,13 +6,9 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
-  const [isRegister, setIsRegister] = useState(false);
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
     email: '',
-    firstName: '',
-    lastName: '',
+    password: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,14 +26,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setLoading(true);
 
     try {
-      if (isRegister) {
-        await authService.register(formData);
-      } else {
-        await authService.login({
-          username: formData.username,
-          password: formData.password,
-        });
-      }
+      await authService.login({
+        username: formData.email,
+        password: formData.password,
+      });
       onLoginSuccess();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Authentication failed');
@@ -46,104 +38,84 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  const handleSSOLogin = () => {
+    window.location.href = '/api/auth/sso';
+  };
+
   return (
-    <div className="container" style={{ maxWidth: '400px', marginTop: '50px' }}>
-      <div className="card">
-        <h2 style={{ marginBottom: '20px', textAlign: 'center' }}>
-          {isRegister ? 'Register' : 'Login'}
-        </h2>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Username</label>
-            <input
-              type="text"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              required
-            />
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-header">
+          <div className="login-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
           </div>
-
-          {isRegister && (
-            <>
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>First Name</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Last Name</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                />
-              </div>
-            </>
-          )}
-
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          {error && <div className="error">{error}</div>}
-
-          <button type="submit" disabled={loading} style={{ width: '100%', marginTop: '10px' }}>
-            {loading ? 'Please wait...' : isRegister ? 'Register' : 'Login'}
-          </button>
-        </form>
-
-        <div style={{ marginTop: '20px', textAlign: 'center' }}>
-          <button
-            type="button"
-            onClick={() => setIsRegister(!isRegister)}
-            style={{ background: 'transparent', color: '#007bff', textDecoration: 'underline' }}
-          >
-            {isRegister ? 'Already have an account? Login' : "Don't have an account? Register"}
-          </button>
+          <h1 className="login-title">Facilities Management</h1>
+          <p className="login-subtitle">Sign in to continue</p>
         </div>
 
-        <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #ddd' }}>
-          <h4 style={{ marginBottom: '10px' }}>SSO Login Options</h4>
+        <div className="login-content">
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label>Email</label>
+              <input
+                type="text"
+                name="email"
+                placeholder="your.email@example.com"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                name="password"
+                placeholder="Enter your password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                autoComplete="current-password"
+              />
+            </div>
+
+            {error && <div className="error">{error}</div>}
+
+            <button type="submit" className="btn-primary" disabled={loading}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <polyline points="10 17 15 12 10 7" />
+                <line x1="15" y1="12" x2="3" y2="12" />
+              </svg>
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+
+          <div className="login-divider">
+            <span>OR</span>
+          </div>
+
           <button
             type="button"
-            onClick={() => (window.location.href = '/api/auth/oauth2')}
-            style={{ width: '100%', marginBottom: '10px' }}
+            className="btn-outline"
+            onClick={handleSSOLogin}
           >
-            Login with OAuth2/SSO
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+              <polyline points="10 17 15 12 10 7" />
+              <line x1="15" y1="12" x2="3" y2="12" />
+            </svg>
+            Sign in with SSO
           </button>
-          <button
-            type="button"
-            onClick={() => (window.location.href = '/api/auth/saml')}
-            style={{ width: '100%' }}
-          >
-            Login with SAML
-          </button>
+
+          <p className="login-footer">
+            Contact your administrator if you need access
+          </p>
         </div>
       </div>
     </div>

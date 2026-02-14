@@ -1,32 +1,35 @@
 import axios, { AxiosInstance } from 'axios';
+import settingsService from './settingsService';
 
-interface AsseticConfig {
-  apiUrl: string;
-  apiKey: string;
-  apiVersion: string;
-}
-
+/**
+ * Assetic API client — reads connection details from system_settings (DB)
+ * so admins can reconfigure without restarting the server.
+ */
 class AsseticClient {
-  private client: AxiosInstance;
-  private config: AsseticConfig;
+  private client: AxiosInstance | null = null;
 
-  constructor() {
-    this.config = {
-      apiUrl: process.env.ASSETIC_API_URL || '',
-      apiKey: process.env.ASSETIC_API_KEY || '',
-      apiVersion: process.env.ASSETIC_API_VERSION || 'v1',
-    };
+  /**
+   * Build (or rebuild) the Axios instance from current DB settings.
+   */
+  private async getClient(): Promise<AxiosInstance> {
+    const apiUrl = await settingsService.get('assetic_api_url');
+    const apiKey = await settingsService.get('assetic_api_key');
+    const apiVersion = await settingsService.get('assetic_api_version', 'v1');
 
+    if (!apiUrl || !apiKey) {
+      throw new Error('Assetic API is not configured. Set the API URL and key in Admin > Settings.');
+    }
+
+    // Recreate client each call so setting changes take effect immediately
     this.client = axios.create({
-      baseURL: `${this.config.apiUrl}/${this.config.apiVersion}`,
+      baseURL: `${apiUrl}/${apiVersion}`,
       headers: {
-        'Authorization': `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       timeout: 30000,
     });
 
-    // Add response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -34,170 +37,106 @@ class AsseticClient {
         throw error;
       }
     );
+
+    return this.client;
   }
 
   /**
-   * Get all assets from Assetic API
+   * Check whether Assetic sync is enabled in settings
    */
-  async getAssets(params?: {
-    limit?: number;
-    offset?: number;
-    status?: string;
-    category?: string;
-  }) {
-    try {
-      const response = await this.client.get('/assets', { params });
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch assets: ${error}`);
-    }
+  async isEnabled(): Promise<boolean> {
+    return settingsService.getBool('assetic_sync_enabled');
   }
 
-  /**
-   * Get a single asset by ID
-   */
-  async getAsset(assetId: string) {
-    try {
-      const response = await this.client.get(`/assets/${assetId}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch asset ${assetId}: ${error}`);
-    }
+  // ─── Work Requests ──────────────────────────────────────────────────
+
+  async getWorkRequests(params?: { status?: string; limit?: number; offset?: number }) {
+    const client = await this.getClient();
+    const response = await client.get('/workrequests', { params });
+    return response.data;
   }
 
-  /**
-   * Get asset history/changes
-   */
-  async getAssetHistory(assetId: string) {
-    try {
-      const response = await this.client.get(`/assets/${assetId}/history`);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch asset history for ${assetId}: ${error}`);
-    }
+  async getWorkRequest(id: string) {
+    const client = await this.getClient();
+    const response = await client.get(`/workrequests/${id}`);
+    return response.data;
   }
 
-  /**
-   * Update an asset
-   */
-  async updateAsset(assetId: string, data: any) {
-    try {
-      const response = await this.client.put(`/assets/${assetId}`, data);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to update asset ${assetId}: ${error}`);
-    }
+  async createWorkRequest(data: any) {
+    const client = await this.getClient();
+    const response = await client.post('/workrequests', data);
+    return response.data;
   }
 
-  /**
-   * Create a new asset
-   */
-  async createAsset(data: any) {
-    try {
-      const response = await this.client.post('/assets', data);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to create asset: ${error}`);
-    }
+  async updateWorkRequest(id: string, data: any) {
+    const client = await this.getClient();
+    const response = await client.put(`/workrequests/${id}`, data);
+    return response.data;
   }
 
-  /**
-   * Get asset categories
-   */
-  async getCategories() {
-    try {
-      const response = await this.client.get('/categories');
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch categories: ${error}`);
-    }
-  }
+  // ─── Work Orders ────────────────────────────────────────────────────
 
-  /**
-   * Get asset locations
-   */
-  async getLocations() {
-    try {
-      const response = await this.client.get('/locations');
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch locations: ${error}`);
-    }
-  }
-
-  /**
-   * Search assets
-   */
-  async searchAssets(query: string, filters?: any) {
-    try {
-      const response = await this.client.get('/assets/search', {
-        params: { q: query, ...filters },
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to search assets: ${error}`);
-    }
-  }
-
-  /**
-   * Get work orders from Assetic API
-   */
   async getWorkOrders(params?: { status?: string; limit?: number; offset?: number }) {
-    try {
-      const response = await this.client.get('/workorders', { params });
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch work orders: ${error}`);
-    }
+    const client = await this.getClient();
+    const response = await client.get('/workorders', { params });
+    return response.data;
   }
 
-  /**
-   * Get a single work order by ID
-   */
-  async getWorkOrder(workOrderId: string) {
-    try {
-      const response = await this.client.get(`/workorders/${workOrderId}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch work order ${workOrderId}: ${error}`);
-    }
+  async getWorkOrder(id: string) {
+    const client = await this.getClient();
+    const response = await client.get(`/workorders/${id}`);
+    return response.data;
   }
 
-  /**
-   * Create a work order in Assetic
-   */
   async createWorkOrder(data: any) {
-    try {
-      const response = await this.client.post('/workorders', data);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to create work order: ${error}`);
-    }
+    const client = await this.getClient();
+    const response = await client.post('/workorders', data);
+    return response.data;
   }
 
-  /**
-   * Update a work order in Assetic
-   */
-  async updateWorkOrder(workOrderId: string, data: any) {
-    try {
-      const response = await this.client.put(`/workorders/${workOrderId}`, data);
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to update work order ${workOrderId}: ${error}`);
-    }
+  async updateWorkOrder(id: string, data: any) {
+    const client = await this.getClient();
+    const response = await client.put(`/workorders/${id}`, data);
+    return response.data;
   }
 
-  /**
-   * Get available crafts/trades from Assetic
-   */
+  // ─── Assets (read-only for reference) ───────────────────────────────
+
+  async getAssets(params?: { limit?: number; offset?: number; status?: string }) {
+    const client = await this.getClient();
+    const response = await client.get('/assets', { params });
+    return response.data;
+  }
+
+  async getAsset(assetId: string) {
+    const client = await this.getClient();
+    const response = await client.get(`/assets/${assetId}`);
+    return response.data;
+  }
+
+  // ─── Lookups ────────────────────────────────────────────────────────
+
+  async getLocations() {
+    const client = await this.getClient();
+    const response = await client.get('/locations');
+    return response.data;
+  }
+
+  async getCategories() {
+    const client = await this.getClient();
+    const response = await client.get('/categories');
+    return response.data;
+  }
+
   async getCrafts() {
-    try {
-      const response = await this.client.get('/crafts');
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch crafts: ${error}`);
-    }
+    const client = await this.getClient();
+    const response = await client.get('/crafts');
+    return response.data;
   }
+}
+
+const asseticClient = new AsseticClient();
+export default asseticClient;
 }
 
 export default new AsseticClient();

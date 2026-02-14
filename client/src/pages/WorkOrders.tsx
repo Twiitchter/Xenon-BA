@@ -98,7 +98,9 @@ const WorkOrders: React.FC = () => {
 
   return (
     <div className="container">
-      <h2>Work Orders</h2>
+      <div className="page-header">
+        <h2>Work Orders</h2>
+      </div>
 
       <div className="card">
         <h3>Filters</h3>
@@ -133,7 +135,7 @@ const WorkOrders: React.FC = () => {
         {loading ? (
           <div className="loading">Loading work orders...</div>
         ) : workOrders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
             No work orders found.
           </div>
         ) : (
@@ -187,13 +189,13 @@ const WorkOrders: React.FC = () => {
                   <td>
                     {editingId === wo.id ? (
                       <div style={{ display: 'flex', gap: '4px' }}>
-                        <button onClick={saveEdit} style={{ fontSize: '0.85em' }}>Save</button>
-                        <button onClick={() => setEditingId(null)} style={{ fontSize: '0.85em', backgroundColor: '#6c757d' }}>Cancel</button>
+                        <button className="btn-ghost" onClick={saveEdit}>Save</button>
+                        <button className="btn-ghost" onClick={() => setEditingId(null)}>Cancel</button>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', gap: '4px' }}>
-                        <button onClick={() => startEdit(wo)} style={{ fontSize: '0.85em' }}>Edit</button>
-                        <button onClick={() => openDetail(wo)} style={{ fontSize: '0.85em' }}>Messages</button>
+                        <button className="btn-ghost" onClick={() => startEdit(wo)}>Edit</button>
+                        <button className="btn-ghost" onClick={() => openDetail(wo)}>Messages</button>
                       </div>
                     )}
                   </td>
@@ -222,14 +224,14 @@ const WorkOrders: React.FC = () => {
             <div className="loading">Loading messages...</div>
           ) : (
             <>
-              <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '10px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+              <div className="messages-box">
                 {messages.length === 0 ? (
-                  <p style={{ color: '#666' }}>No messages yet.</p>
+                  <p style={{ color: 'var(--text-muted)' }}>No messages yet.</p>
                 ) : (
                   messages.map((msg) => (
-                    <div key={msg.id} style={{ marginBottom: '10px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                    <div key={msg.id} className="message-bubble">
                       <strong>{msg.sender_username || 'Unknown'}</strong>
-                      <span style={{ color: '#666', fontSize: '0.85em', marginLeft: '10px' }}>
+                      <span className="message-meta">
                         {new Date(msg.created_at).toLocaleString()}
                       </span>
                       <p style={{ margin: '4px 0 0 0' }}>{msg.message}</p>
