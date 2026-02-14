@@ -3,7 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import pdfService from '../services/pdfService';
 import emailService from '../services/emailService';
-import { query } from '../database';
+import db from '../database';
 
 const router = Router();
 
@@ -19,26 +19,17 @@ router.post('/assets', async (req: AuthRequest, res: Response) => {
     const { status, category, email } = req.body;
 
     // Fetch assets based on filters
-    let queryText = 'SELECT * FROM assets WHERE 1=1';
-    const params: any[] = [];
-    let paramCount = 0;
+    let qb = db('assets');
 
     if (status) {
-      paramCount++;
-      queryText += ` AND status = $${paramCount}`;
-      params.push(status);
+      qb = qb.where('status', status);
     }
 
     if (category) {
-      paramCount++;
-      queryText += ` AND category = $${paramCount}`;
-      params.push(category);
+      qb = qb.where('category', category);
     }
 
-    queryText += ' ORDER BY created_at DESC';
-
-    const result = await query(queryText, params);
-    const assets = result.rows;
+    const assets = await qb.orderBy('created_at', 'desc');
 
     // Generate PDF
     const fileName = await pdfService.generateAssetReport(assets);
@@ -85,32 +76,21 @@ router.post('/changes', async (req: AuthRequest, res: Response) => {
     const { assetId, startDate, endDate, email } = req.body;
 
     // Fetch changes based on filters
-    let queryText = 'SELECT * FROM asset_changes WHERE 1=1';
-    const params: any[] = [];
-    let paramCount = 0;
+    let qb = db('asset_changes');
 
     if (assetId) {
-      paramCount++;
-      queryText += ` AND asset_id = $${paramCount}`;
-      params.push(assetId);
+      qb = qb.where('asset_id', assetId);
     }
 
     if (startDate) {
-      paramCount++;
-      queryText += ` AND changed_at >= $${paramCount}`;
-      params.push(startDate);
+      qb = qb.where('changed_at', '>=', startDate);
     }
 
     if (endDate) {
-      paramCount++;
-      queryText += ` AND changed_at <= $${paramCount}`;
-      params.push(endDate);
+      qb = qb.where('changed_at', '<=', endDate);
     }
 
-    queryText += ' ORDER BY changed_at DESC';
-
-    const result = await query(queryText, params);
-    const changes = result.rows;
+    const changes = await qb.orderBy('changed_at', 'desc');
 
     // Generate PDF
     const fileName = await pdfService.generateChangeReport(changes);

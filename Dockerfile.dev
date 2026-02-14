@@ -1,0 +1,20 @@
+# ── Development Dockerfile ───────────────────────────────────────────────────
+# Uses ts-node with nodemon for hot-reload during development
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install root dependencies
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Install client dependencies
+COPY client/package.json client/package-lock.json* ./client/
+RUN cd client && npm install
+
+# Copy all source (volumes will overlay in docker-compose)
+COPY . .
+
+EXPOSE 3000 3001
+
+CMD ["npm", "run", "dev"]

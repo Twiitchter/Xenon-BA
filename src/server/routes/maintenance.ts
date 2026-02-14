@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
-import { query } from '../database';
+import db from '../database';
 
 const router = Router();
 
@@ -18,35 +18,26 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
   try {
     const { status, priority, limit = 100, offset = 0 } = req.query;
 
-    let queryText = 'SELECT mr.*, u.username AS requested_by_username FROM maintenance_requests mr LEFT JOIN users u ON mr.requested_by = u.id WHERE 1=1';
-    const params: any[] = [];
-    let paramCount = 0;
+    let qb = db('maintenance_requests as mr')
+      .leftJoin('users as u', 'mr.requested_by', 'u.id')
+      .select('mr.*', 'u.username as requested_by_username');
 
     if (status) {
-      paramCount++;
-      queryText += ` AND mr.status = $${paramCount}`;
-      params.push(status);
+      qb = qb.where('mr.status', status as string);
     }
 
     if (priority) {
-      paramCount++;
-      queryText += ` AND mr.priority = $${paramCount}`;
-      params.push(priority);
+      qb = qb.where('mr.priority', priority as string);
     }
 
-    paramCount++;
-    queryText += ` ORDER BY mr.created_at DESC LIMIT $${paramCount}`;
-    params.push(limit);
-
-    paramCount++;
-    queryText += ` OFFSET $${paramCount}`;
-    params.push(offset);
-
-    const result = await query(queryText, params);
+    const requests = await qb
+      .orderBy('mr.created_at', 'desc')
+      .limit(Number(limit))
+      .offset(Number(offset));
 
     res.json({
-      requests: result.rows,
-      total: result.rowCount,
+      requests,
+      total: requests.length,
     });
   } catch (error) {
     console.error('Error fetching maintenance requests:', error);
@@ -62,16 +53,17 @@ router.get('/requests/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const result = await query(
-      'SELECT mr.*, u.username AS requested_by_username FROM maintenance_requests mr LEFT JOIN users u ON mr.requested_by = u.id WHERE mr.id = $1',
-      [id]
-    );
+    const request = await db('maintenance_requests as mr')
+      .leftJoin('users as u', 'mr.requested_by', 'u.id')
+      .select('mr.*', 'u.username as requested_by_username')
+      .where('mr.id', id)
+      .first();
 
-    if (result.rows.length === 0) {
+    if (!request) {
       return res.status(404).json({ error: 'Maintenance request not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json(request);
   } catch (error) {
     console.error('Error fetching maintenance request:', error);
     res.status(500).json({ error: 'Failed to fetch maintenance request' });
@@ -101,14 +93,26 @@ router.post(
     try {
       const { title, description, priority, category, location, assetId } = req.body;
 
-      const result = await query(
-        `INSERT INTO maintenance_requests (asset_id, requested_by, title, description, priority, category, location)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
-        [assetId || null, req.user.id, title, description || null, priority || 'medium', category || null, location || null]
-      );
+      const [inserted] = await db('maintenance_requests')
+        .insert({
+          asset_id: assetId || null,
+          requested_by: req.user.id,
+          title,
+          description: description || null,
+          priority: priority || 'medium',
+          category: category || null,
+          location: location || null,
+        })
+        .returning('*');
 
-      res.status(201).json(result.rows[0]);
+      // For MySQL/MSSQL that don't support RETURNING, fetch the inserted row
+      if (!inserted || typeof inserted === 'number') {
+        const id = typeof inserted === 'number' ? inserted : (inserted as any);
+        const row = await db('maintenance_requests').where('id', id).first();
+        return res.status(201).json(row);
+      }
+
+      res.status(201).json(inserted);
     } catch (error) {
       console.error('Error creating maintenance request:', error);
       res.status(500).json({ error: 'Failed to create maintenance request' });
@@ -140,26 +144,23 @@ router.put(
       const { id } = req.params;
       const { title, description, priority, status, category, location } = req.body;
 
-      const existing = await query('SELECT id FROM maintenance_requests WHERE id = $1', [id]);
-      if (existing.rows.length === 0) {
+      const existing = await db('maintenance_requests').where('id', id).first();
+      if (!existing) {
         return res.status(404).json({ error: 'Maintenance request not found' });
       }
 
-      const result = await query(
-        `UPDATE maintenance_requests
-         SET title = COALESCE($1, title),
-             description = COALESCE($2, description),
-             priority = COALESCE($3, priority),
-             status = COALESCE($4, status),
-             category = COALESCE($5, category),
-             location = COALESCE($6, location),
-             updated_at = NOW()
-         WHERE id = $7
-         RETURNING *`,
-        [title || null, description || null, priority || null, status || null, category || null, location || null, id]
-      );
+      const updateData: any = { updated_at: db.fn.now() };
+      if (title) updateData.title = title;
+      if (description) updateData.description = description;
+      if (priority) updateData.priority = priority;
+      if (status) updateData.status = status;
+      if (category) updateData.category = category;
+      if (location) updateData.location = location;
 
-      res.json(result.rows[0]);
+      await db('maintenance_requests').where('id', id).update(updateData);
+      const updated = await db('maintenance_requests').where('id', id).first();
+
+      res.json(updated);
     } catch (error) {
       console.error('Error updating maintenance request:', error);
       res.status(500).json({ error: 'Failed to update maintenance request' });
@@ -177,39 +178,27 @@ router.get('/work-orders', async (req: AuthRequest, res: Response) => {
   try {
     const { status, craft, limit = 100, offset = 0 } = req.query;
 
-    let queryText = `SELECT wo.*, u.username AS assigned_to_username, mr.title AS request_title
-       FROM work_orders wo
-       LEFT JOIN users u ON wo.assigned_to = u.id
-       LEFT JOIN maintenance_requests mr ON wo.request_id = mr.id
-       WHERE 1=1`;
-    const params: any[] = [];
-    let paramCount = 0;
+    let qb = db('work_orders as wo')
+      .leftJoin('users as u', 'wo.assigned_to', 'u.id')
+      .leftJoin('maintenance_requests as mr', 'wo.request_id', 'mr.id')
+      .select('wo.*', 'u.username as assigned_to_username', 'mr.title as request_title');
 
     if (status) {
-      paramCount++;
-      queryText += ` AND wo.status = $${paramCount}`;
-      params.push(status);
+      qb = qb.where('wo.status', status as string);
     }
 
     if (craft) {
-      paramCount++;
-      queryText += ` AND wo.craft = $${paramCount}`;
-      params.push(craft);
+      qb = qb.where('wo.craft', craft as string);
     }
 
-    paramCount++;
-    queryText += ` ORDER BY wo.created_at DESC LIMIT $${paramCount}`;
-    params.push(limit);
-
-    paramCount++;
-    queryText += ` OFFSET $${paramCount}`;
-    params.push(offset);
-
-    const result = await query(queryText, params);
+    const workOrders = await qb
+      .orderBy('wo.created_at', 'desc')
+      .limit(Number(limit))
+      .offset(Number(offset));
 
     res.json({
-      workOrders: result.rows,
-      total: result.rowCount,
+      workOrders,
+      total: workOrders.length,
     });
   } catch (error) {
     console.error('Error fetching work orders:', error);
@@ -225,20 +214,18 @@ router.get('/work-orders/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const result = await query(
-      `SELECT wo.*, u.username AS assigned_to_username, mr.title AS request_title
-       FROM work_orders wo
-       LEFT JOIN users u ON wo.assigned_to = u.id
-       LEFT JOIN maintenance_requests mr ON wo.request_id = mr.id
-       WHERE wo.id = $1`,
-      [id]
-    );
+    const workOrder = await db('work_orders as wo')
+      .leftJoin('users as u', 'wo.assigned_to', 'u.id')
+      .leftJoin('maintenance_requests as mr', 'wo.request_id', 'mr.id')
+      .select('wo.*', 'u.username as assigned_to_username', 'mr.title as request_title')
+      .where('wo.id', id)
+      .first();
 
-    if (result.rows.length === 0) {
+    if (!workOrder) {
       return res.status(404).json({ error: 'Work order not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json(workOrder);
   } catch (error) {
     console.error('Error fetching work order:', error);
     res.status(500).json({ error: 'Failed to fetch work order' });
@@ -270,25 +257,36 @@ router.post(
       const { requestId, title, description, priority, craft, assignedTo, scheduledDate } = req.body;
 
       // Verify the maintenance request exists
-      const reqCheck = await query('SELECT id FROM maintenance_requests WHERE id = $1', [requestId]);
-      if (reqCheck.rows.length === 0) {
+      const reqCheck = await db('maintenance_requests').where('id', requestId).first();
+      if (!reqCheck) {
         return res.status(404).json({ error: 'Maintenance request not found' });
       }
 
-      const result = await query(
-        `INSERT INTO work_orders (request_id, assigned_to, craft, title, description, priority, scheduled_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
-        [requestId, assignedTo || null, craft || null, title, description || null, priority || 'medium', scheduledDate || null]
-      );
+      const [inserted] = await db('work_orders')
+        .insert({
+          request_id: requestId,
+          assigned_to: assignedTo || null,
+          craft: craft || null,
+          title,
+          description: description || null,
+          priority: priority || 'medium',
+          scheduled_date: scheduledDate || null,
+        })
+        .returning('*');
 
       // Update the maintenance request status to in_progress
-      await query(
-        `UPDATE maintenance_requests SET status = 'in_progress', updated_at = NOW() WHERE id = $1`,
-        [requestId]
-      );
+      await db('maintenance_requests')
+        .where('id', requestId)
+        .update({ status: 'in_progress', updated_at: db.fn.now() });
 
-      res.status(201).json(result.rows[0]);
+      // For MySQL/MSSQL that don't support RETURNING, fetch the inserted row
+      if (!inserted || typeof inserted === 'number') {
+        const id = typeof inserted === 'number' ? inserted : (inserted as any);
+        const row = await db('work_orders').where('id', id).first();
+        return res.status(201).json(row);
+      }
+
+      res.status(201).json(inserted);
     } catch (error) {
       console.error('Error creating work order:', error);
       res.status(500).json({ error: 'Failed to create work order' });
@@ -321,36 +319,32 @@ router.put(
       const { id } = req.params;
       const { title, description, priority, status, craft, assignedTo, scheduledDate } = req.body;
 
-      const existing = await query('SELECT id, request_id FROM work_orders WHERE id = $1', [id]);
-      if (existing.rows.length === 0) {
+      const existing = await db('work_orders').where('id', id).select('id', 'request_id').first();
+      if (!existing) {
         return res.status(404).json({ error: 'Work order not found' });
       }
 
-      const result = await query(
-        `UPDATE work_orders
-         SET title = COALESCE($1, title),
-             description = COALESCE($2, description),
-             priority = COALESCE($3, priority),
-             status = COALESCE($4, status),
-             craft = COALESCE($5, craft),
-             assigned_to = COALESCE($6, assigned_to),
-             scheduled_date = COALESCE($7, scheduled_date),
-             completed_at = CASE WHEN $4 = 'completed' THEN NOW() ELSE completed_at END,
-             updated_at = NOW()
-         WHERE id = $8
-         RETURNING *`,
-        [title || null, description || null, priority || null, status || null, craft || null, assignedTo || null, scheduledDate || null, id]
-      );
+      const updateData: any = { updated_at: db.fn.now() };
+      if (title) updateData.title = title;
+      if (description) updateData.description = description;
+      if (priority) updateData.priority = priority;
+      if (status) updateData.status = status;
+      if (craft) updateData.craft = craft;
+      if (assignedTo) updateData.assigned_to = assignedTo;
+      if (scheduledDate) updateData.scheduled_date = scheduledDate;
+      if (status === 'completed') updateData.completed_at = db.fn.now();
+
+      await db('work_orders').where('id', id).update(updateData);
 
       // If work order is completed, update maintenance request status
       if (status === 'completed') {
-        await query(
-          `UPDATE maintenance_requests SET status = 'completed', updated_at = NOW() WHERE id = $1`,
-          [existing.rows[0].request_id]
-        );
+        await db('maintenance_requests')
+          .where('id', existing.request_id)
+          .update({ status: 'completed', updated_at: db.fn.now() });
       }
 
-      res.json(result.rows[0]);
+      const updated = await db('work_orders').where('id', id).first();
+      res.json(updated);
     } catch (error) {
       console.error('Error updating work order:', error);
       res.status(500).json({ error: 'Failed to update work order' });
@@ -369,19 +363,17 @@ router.get('/work-orders/:id/messages', async (req: AuthRequest, res: Response) 
     const { id } = req.params;
     const { limit = 50, offset = 0 } = req.query;
 
-    const result = await query(
-      `SELECT wom.*, u.username AS sender_username
-       FROM work_order_messages wom
-       LEFT JOIN users u ON wom.sender_id = u.id
-       WHERE wom.work_order_id = $1
-       ORDER BY wom.created_at ASC
-       LIMIT $2 OFFSET $3`,
-      [id, limit, offset]
-    );
+    const messages = await db('work_order_messages as wom')
+      .leftJoin('users as u', 'wom.sender_id', 'u.id')
+      .select('wom.*', 'u.username as sender_username')
+      .where('wom.work_order_id', id)
+      .orderBy('wom.created_at', 'asc')
+      .limit(Number(limit))
+      .offset(Number(offset));
 
     res.json({
-      messages: result.rows,
-      total: result.rowCount,
+      messages,
+      total: messages.length,
     });
   } catch (error) {
     console.error('Error fetching work order messages:', error);
@@ -407,19 +399,26 @@ router.post(
       const { message } = req.body;
 
       // Verify the work order exists
-      const woCheck = await query('SELECT id FROM work_orders WHERE id = $1', [id]);
-      if (woCheck.rows.length === 0) {
+      const woCheck = await db('work_orders').where('id', id).first();
+      if (!woCheck) {
         return res.status(404).json({ error: 'Work order not found' });
       }
 
-      const result = await query(
-        `INSERT INTO work_order_messages (work_order_id, sender_id, message)
-         VALUES ($1, $2, $3)
-         RETURNING *`,
-        [id, req.user.id, message]
-      );
+      const [inserted] = await db('work_order_messages')
+        .insert({
+          work_order_id: id,
+          sender_id: req.user.id,
+          message,
+        })
+        .returning('*');
 
-      res.status(201).json(result.rows[0]);
+      if (!inserted || typeof inserted === 'number') {
+        const newId = typeof inserted === 'number' ? inserted : (inserted as any);
+        const row = await db('work_order_messages').where('id', newId).first();
+        return res.status(201).json(row);
+      }
+
+      res.status(201).json(inserted);
     } catch (error) {
       console.error('Error creating work order message:', error);
       res.status(500).json({ error: 'Failed to create message' });
@@ -435,12 +434,12 @@ router.post(
  */
 router.get('/crafts', async (_req: AuthRequest, res: Response) => {
   try {
-    const result = await query(
-      `SELECT DISTINCT craft FROM work_orders WHERE craft IS NOT NULL ORDER BY craft ASC`,
-      []
-    );
+    const result = await db('work_orders')
+      .distinct('craft')
+      .whereNotNull('craft')
+      .orderBy('craft', 'asc');
 
-    const crafts = result.rows.map((row: any) => row.craft);
+    const crafts = result.map((row: any) => row.craft);
 
     res.json({ crafts });
   } catch (error) {

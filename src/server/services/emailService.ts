@@ -1,7 +1,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
-import { query } from '../database';
+import db from '../database';
 
 interface EmailOptions {
   to: string | string[];
@@ -52,7 +52,7 @@ class EmailService {
         Array.isArray(options.to) ? options.to.join(', ') : options.to,
         options.subject,
         options.text || options.html || '',
-        options.attachments && options.attachments.length > 0,
+        !!(options.attachments && options.attachments.length > 0),
         options.attachments?.[0]?.filename,
         'sent',
         null
@@ -65,7 +65,7 @@ class EmailService {
         Array.isArray(options.to) ? options.to.join(', ') : options.to,
         options.subject,
         options.text || options.html || '',
-        options.attachments && options.attachments.length > 0,
+        !!(options.attachments && options.attachments.length > 0),
         options.attachments?.[0]?.filename,
         'failed',
         error instanceof Error ? error.message : 'Unknown error'
@@ -167,20 +167,16 @@ class EmailService {
     errorMessage: string | null
   ): Promise<void> {
     try {
-      await query(
-        `INSERT INTO email_logs (recipient, subject, body, has_attachment, attachment_name, status, error_message, sent_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          recipient,
-          subject,
-          body,
-          hasAttachment,
-          attachmentName || null,
-          status,
-          errorMessage,
-          status === 'sent' ? new Date() : null,
-        ]
-      );
+      await db('email_logs').insert({
+        recipient,
+        subject,
+        body,
+        has_attachment: hasAttachment,
+        attachment_name: attachmentName || null,
+        status,
+        error_message: errorMessage,
+        sent_at: status === 'sent' ? new Date() : null,
+      });
     } catch (error) {
       console.error('Failed to log email:', error);
     }

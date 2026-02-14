@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import { query } from '../database';
+import db from '../database';
 
 export interface ReportData {
   title: string;
@@ -145,17 +145,13 @@ class PDFService {
    */
   async logReport(reportData: ReportData, fileName: string, status: string): Promise<void> {
     try {
-      await query(
-        `INSERT INTO report_logs (report_type, generated_by, file_name, parameters, status) 
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          reportData.type,
-          reportData.generatedBy || null,
-          fileName,
-          JSON.stringify(reportData.data),
-          status,
-        ]
-      );
+      await db('report_logs').insert({
+        report_type: reportData.type,
+        generated_by: reportData.generatedBy || null,
+        file_name: fileName,
+        parameters: JSON.stringify(reportData.data),
+        status,
+      });
     } catch (error) {
       console.error('Failed to log report:', error);
     }

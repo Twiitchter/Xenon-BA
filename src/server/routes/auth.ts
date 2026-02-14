@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import passport from 'passport';
 import bcrypt from 'bcrypt';
 import { body, validationResult } from 'express-validator';
-import { query } from '../database';
+import db from '../database';
 import { generateToken } from '../middleware/auth';
 
 const router = Router();
@@ -30,12 +30,13 @@ router.post(
       const { username, email, password, firstName, lastName } = req.body;
 
       // Check if user already exists
-      const existingUser = await query(
-        'SELECT id FROM users WHERE username = $1 OR email = $2',
-        [username, email]
-      );
+      const existingUser = await db('users')
+        .where('username', username)
+        .orWhere('email', email)
+        .select('id')
+        .first();
 
-      if (existingUser.rows.length > 0) {
+      if (existingUser) {
         return res.status(409).json({ error: 'Username or email already exists' });
       }
 
@@ -43,13 +44,27 @@ router.post(
       const passwordHash = await bcrypt.hash(password, 10);
 
       // Create user
-      const result = await query(
-        `INSERT INTO users (username, email, password_hash, first_name, last_name, auth_provider) 
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, username, email, first_name, last_name, created_at`,
-        [username, email, passwordHash, firstName, lastName, 'local']
-      );
+      const [inserted] = await db('users')
+        .insert({
+          username,
+          email,
+          password_hash: passwordHash,
+          first_name: firstName,
+          last_name: lastName,
+          auth_provider: 'local',
+        })
+        .returning(['id', 'username', 'email', 'first_name', 'last_name', 'created_at']);
 
-      const user = result.rows[0];
+      // For MySQL/MSSQL that don't support RETURNING, fetch the inserted user
+      let user = inserted;
+      if (!user || typeof user === 'number') {
+        const id = typeof user === 'number' ? user : (user as any);
+        user = await db('users')
+          .where('id', id)
+          .select('id', 'username', 'email', 'first_name', 'last_name', 'created_at')
+          .first();
+      }
+
       const token = generateToken(user);
 
       res.status(201).json({
@@ -76,7 +91,7 @@ router.post(
 router.post(
   '/login',
   [body('username').trim(), body('password').exists()],
-  (req: Request, res: Response, next) => {
+  (req: Request, res: Response, next: Function) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -162,15 +177,14 @@ router.get('/me', async (req: Request, res: Response) => {
     const jwt = require('jsonwebtoken');
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     
-    const result = await query('SELECT id, username, email, first_name, last_name FROM users WHERE id = $1', [
-      decoded.id,
-    ]);
+    const user = await db('users')
+      .where('id', decoded.id)
+      .select('id', 'username', 'email', 'first_name', 'last_name')
+      .first();
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    const user = result.rows[0];
     res.json({
       id: user.id,
       username: user.username,

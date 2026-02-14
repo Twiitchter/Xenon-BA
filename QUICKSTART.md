@@ -19,7 +19,7 @@ cd XeonB
 npm install
 
 # Install frontend dependencies
-cd client
+cd clientnpm
 npm install
 cd ..
 ```

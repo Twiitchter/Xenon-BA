@@ -1,34 +1,54 @@
-import fs from 'fs';
 import path from 'path';
-import { getClient } from './index';
+import db, { dialect } from './index';
 
 async function migrate() {
-  const client = await getClient();
-  
   try {
-    console.log('Starting database migration...');
-    
-    const schemaPath = path.join(__dirname, 'schema.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf8');
-    
-    await client.query('BEGIN');
-    await client.query(schema);
-    await client.query('COMMIT');
-    
+    console.log(`Starting database migration (${dialect})...`);
+
+    await db.migrate.latest({
+      directory: path.join(__dirname, 'migrations'),
+      extension: 'ts',
+    });
+
     console.log('Migration completed successfully');
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('Migration failed:', error);
     throw error;
   } finally {
-    client.release();
+    await db.destroy();
+  }
+}
+
+async function rollback() {
+  try {
+    console.log(`Rolling back migration (${dialect})...`);
+
+    await db.migrate.rollback({
+      directory: path.join(__dirname, 'migrations'),
+      extension: 'ts',
+    });
+
+    console.log('Rollback completed successfully');
+  } catch (error) {
+    console.error('Rollback failed:', error);
+    throw error;
+  } finally {
+    await db.destroy();
   }
 }
 
 if (require.main === module) {
-  migrate()
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1));
+  const command = process.argv[2];
+
+  if (command === 'rollback') {
+    rollback()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  } else {
+    migrate()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
+  }
 }
 
 export default migrate;

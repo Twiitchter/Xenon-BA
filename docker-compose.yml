@@ -1,0 +1,61 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# XeonB CRM — Production Docker Compose
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  # Choose one database service below (comment/uncomment as needed)
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-xeonb_crm}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ── SQL Server (uncomment to use instead of PostgreSQL) ────────────────────
+  # db:
+  #   image: mcr.microsoft.com/mssql/server:2022-latest
+  #   ports:
+  #     - "1433:1433"
+  #   environment:
+  #     ACCEPT_EULA: "Y"
+  #     MSSQL_SA_PASSWORD: ${DB_PASSWORD}
+  #     MSSQL_PID: Developer
+  #   volumes:
+  #     - dbdata:/var/opt/mssql
+  #   restart: unless-stopped
+
+  # ── MySQL (uncomment to use instead of PostgreSQL) ─────────────────────────
+  # db:
+  #   image: mysql:8.0
+  #   ports:
+  #     - "3306:3306"
+  #   environment:
+  #     MYSQL_DATABASE: ${DB_NAME:-xeonb_crm}
+  #     MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+  #     MYSQL_USER: ${DB_USER:-xeonb}
+  #     MYSQL_PASSWORD: ${DB_PASSWORD}
+  #   volumes:
+  #     - dbdata:/var/lib/mysql
+  #   restart: unless-stopped
+
+volumes:
+  dbdata:

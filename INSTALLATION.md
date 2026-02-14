@@ -6,15 +6,20 @@ XeonB CRM is a comprehensive Customer Relationship Management system integrated 
 
 1. **Authentication** - Simple username/password and SSO authentication (OAuth2/SAML)
 2. **Middleware API** - Integration with Brightly Assetic API
-3. **Database** - PostgreSQL database to track and monitor asset changes
+3. **Database** - PostgreSQL, SQL Server (MSSQL), or MySQL to track and monitor asset changes
 4. **PDF Generation** - Create PDF reports for assets and changes
 5. **Email Service** - Send emails with or without PDF attachments
+6. **Docker Support** - Containerised dev and production environments
 
 ## Prerequisites
 
 - Node.js 18+ and npm
-- PostgreSQL 12+
+- One of the following databases:
+  - PostgreSQL 12+
+  - Microsoft SQL Server 2019+ (or SQL Server Express)
+  - MySQL 8.0+
 - Brightly Assetic API credentials
+- (Optional) Docker Desktop for containerised development
 
 ## Installation
 
@@ -39,16 +44,24 @@ cd ..
 
 ### 3. Database Setup
 
-Create a PostgreSQL database:
+Choose one of the following databases:
+
+#### Option A: PostgreSQL
 
 ```bash
 createdb xeonb_crm
 ```
 
-Or using SQL:
+#### Option B: SQL Server (MSSQL)
 
 ```sql
 CREATE DATABASE xeonb_crm;
+```
+
+#### Option C: MySQL
+
+```bash
+mysql -u root -p -e "CREATE DATABASE xeonb_crm"
 ```
 
 ### 4. Environment Configuration
@@ -59,14 +72,15 @@ Copy the example environment file and configure it:
 cp .env.example .env
 ```
 
-Edit `.env` and configure the following:
+Edit `.env` and set the database dialect + credentials:
 
 ```env
 # Server Configuration
 PORT=3000
 NODE_ENV=development
 
-# Database Configuration
+# Database Configuration — set DB_DIALECT to: pg, mssql, or mysql
+DB_DIALECT=pg
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=xeonb_crm
@@ -90,6 +104,14 @@ EMAIL_USER=your-email@example.com
 EMAIL_PASSWORD=your-email-password
 EMAIL_FROM=noreply@xeonb.com
 ```
+
+**Database-specific settings:**
+
+| Dialect | DB_PORT | DB_USER | Notes |
+|---|---|---|---|
+| `pg` | 5432 | postgres | Default |
+| `mssql` | 1433 | sa | Set `DB_ENCRYPT=false`, `DB_TRUST_CERT=true` for local dev |
+| `mysql` | 3306 | root or custom | — |
 
 ### 5. Run Database Migrations
 
@@ -120,6 +142,36 @@ npm run dev:client
 The application will be available at:
 - Frontend: http://localhost:3001
 - Backend API: http://localhost:3000
+
+## Docker Development (Recommended)
+
+The easiest way to get started is with Docker, which runs the app and database in containers with zero local setup (apart from Docker Desktop).
+
+```bash
+# 1. Copy and edit your .env (set DB_HOST to the container name)
+cp .env.example .env
+
+# 2. Start with your chosen database profile:
+
+# PostgreSQL
+docker compose -f docker-compose.dev.yml --profile postgres up --build
+
+# SQL Server
+docker compose -f docker-compose.dev.yml --profile mssql up --build
+
+# MySQL
+docker compose -f docker-compose.dev.yml --profile mysql up --build
+
+# 3. Run migrations (in another terminal)
+docker compose -f docker-compose.dev.yml exec app npm run migrate
+```
+
+> **Important:** When running in Docker, set `DB_HOST` in `.env` to the container service name:
+> - PostgreSQL: `DB_HOST=db-postgres`
+> - SQL Server: `DB_HOST=db-mssql`
+> - MySQL: `DB_HOST=db-mysql`
+
+See [DOCKER.md](DOCKER.md) for full details.
 
 ## Production Deployment
 

@@ -1,0 +1,89 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# XeonB CRM — Development Docker Compose
+# ═══════════════════════════════════════════════════════════════════════════════
+# Switch database by changing DB_DIALECT in .env or using a profile:
+#
+#   PostgreSQL (default):  docker compose -f docker-compose.dev.yml --profile postgres up --build
+#   SQL Server (MSSQL):    docker compose -f docker-compose.dev.yml --profile mssql up --build
+#   MySQL:                 docker compose -f docker-compose.dev.yml --profile mysql up --build
+#
+# Or set DB_DIALECT in your .env and run:
+#   docker compose -f docker-compose.dev.yml up --build
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  # ── Application (API + Client) ─────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"   # API
+      - "3001:3001"   # Vite dev server
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/client/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      db-postgres:
+        condition: service_started
+        required: false
+      db-mssql:
+        condition: service_started
+        required: false
+      db-mysql:
+        condition: service_started
+        required: false
+    restart: unless-stopped
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db-postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-xeonb_crm}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ── SQL Server (MSSQL) ────────────────────────────────────────────────────
+  db-mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["mssql"]
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD:-YourStrong!Passw0rd}
+      MSSQL_PID: Developer
+    volumes:
+      - mssqldata:/var/opt/mssql
+    restart: unless-stopped
+
+  # ── MySQL ──────────────────────────────────────────────────────────────────
+  db-mysql:
+    image: mysql:8.0
+    profiles: ["mysql"]
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-xeonb_crm}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-mysql}
+      MYSQL_USER: ${DB_USER:-xeonb}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-mysql}
+    volumes:
+      - mysqldata:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mssqldata:
+  mysqldata:

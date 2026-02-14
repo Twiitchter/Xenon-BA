@@ -1,9 +1,16 @@
 import { PassportStatic } from 'passport';
 import { Strategy as LocalStrategy } from 'passport-local';
-import { Strategy as OAuth2Strategy } from 'passport-oauth2';
-import { Strategy as SamlStrategy } from 'passport-saml';
+import { Strategy as SamlStrategy } from '@node-saml/passport-saml';
 import bcrypt from 'bcrypt';
-import { query } from '../database';
+import db from '../database';
+
+// passport-oauth2 doesn't ship its own types; declare the module to avoid TS7016
+let OAuth2Strategy: any;
+try {
+  OAuth2Strategy = require('passport-oauth2').Strategy;
+} catch {
+  // OAuth2 not available — SSO won't be enabled
+}
 
 export function initializePassport(passport: PassportStatic) {
   // Local Strategy
@@ -15,16 +22,16 @@ export function initializePassport(passport: PassportStatic) {
       },
       async (username, password, done) => {
         try {
-          const result = await query(
-            'SELECT * FROM users WHERE username = $1 AND auth_provider = $2 AND is_active = true',
-            [username, 'local']
-          );
+          const user = await db('users')
+            .where('username', username)
+            .where('auth_provider', 'local')
+            .where('is_active', true)
+            .first();
 
-          if (result.rows.length === 0) {
+          if (!user) {
             return done(null, false, { message: 'Invalid username or password' });
           }
 
-          const user = result.rows[0];
           const isValidPassword = await bcrypt.compare(password, user.password_hash);
 
           if (!isValidPassword) {
@@ -40,7 +47,7 @@ export function initializePassport(passport: PassportStatic) {
   );
 
   // OAuth2 Strategy (for SSO)
-  if (process.env.SSO_ENABLED === 'true' && process.env.OAUTH2_CLIENT_ID) {
+  if (process.env.SSO_ENABLED === 'true' && process.env.OAUTH2_CLIENT_ID && OAuth2Strategy) {
     passport.use(
       'oauth2',
       new OAuth2Strategy(
@@ -51,32 +58,33 @@ export function initializePassport(passport: PassportStatic) {
           clientSecret: process.env.OAUTH2_CLIENT_SECRET || '',
           callbackURL: process.env.OAUTH2_CALLBACK_URL || '',
         },
-        async (accessToken, refreshToken, profile, done) => {
+        async (accessToken: any, refreshToken: any, profile: any, done: any) => {
           try {
             // Try to find user by external ID
-            let result = await query(
-              'SELECT * FROM users WHERE external_id = $1 AND auth_provider = $2',
-              [profile.id, 'oauth2']
-            );
+            let user = await db('users')
+              .where('external_id', profile.id)
+              .where('auth_provider', 'oauth2')
+              .first();
 
-            let user;
-            if (result.rows.length === 0) {
+            if (!user) {
               // Create new user
-              const insertResult = await query(
-                `INSERT INTO users (username, email, external_id, auth_provider, first_name, last_name) 
-                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-                [
-                  profile.username || profile.id,
-                  profile.email || `${profile.id}@external.com`,
-                  profile.id,
-                  'oauth2',
-                  profile.name?.givenName,
-                  profile.name?.familyName,
-                ]
-              );
-              user = insertResult.rows[0];
-            } else {
-              user = result.rows[0];
+              const [inserted] = await db('users')
+                .insert({
+                  username: profile.username || profile.id,
+                  email: profile.email || `${profile.id}@external.com`,
+                  external_id: profile.id,
+                  auth_provider: 'oauth2',
+                  first_name: profile.name?.givenName,
+                  last_name: profile.name?.familyName,
+                })
+                .returning('*');
+
+              if (!inserted || typeof inserted === 'number') {
+                const id = typeof inserted === 'number' ? inserted : (inserted as any);
+                user = await db('users').where('id', id).first();
+              } else {
+                user = inserted;
+              }
             }
 
             return done(null, user);
@@ -96,40 +104,47 @@ export function initializePassport(passport: PassportStatic) {
           entryPoint: process.env.SAML_ENTRY_POINT,
           issuer: process.env.SAML_ISSUER || 'xeonb-crm',
           callbackUrl: process.env.SAML_CALLBACK_URL || '',
-          cert: process.env.SAML_CERT || '',
+          idpCert: process.env.SAML_CERT || '',
+          wantAssertionsSigned: false,
         },
-        async (profile, done) => {
+        // Verify callback (login)
+        async (profile: any, done: any) => {
           try {
             const samlId = profile.nameID || profile.id;
             
-            let result = await query(
-              'SELECT * FROM users WHERE external_id = $1 AND auth_provider = $2',
-              [samlId, 'saml']
-            );
+            let user = await db('users')
+              .where('external_id', samlId)
+              .where('auth_provider', 'saml')
+              .first();
 
-            let user;
-            if (result.rows.length === 0) {
-              const insertResult = await query(
-                `INSERT INTO users (username, email, external_id, auth_provider, first_name, last_name) 
-                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-                [
-                  profile.email || samlId,
-                  profile.email || `${samlId}@external.com`,
-                  samlId,
-                  'saml',
-                  profile.firstName,
-                  profile.lastName,
-                ]
-              );
-              user = insertResult.rows[0];
-            } else {
-              user = result.rows[0];
+            if (!user) {
+              const [inserted] = await db('users')
+                .insert({
+                  username: profile.email || samlId,
+                  email: profile.email || `${samlId}@external.com`,
+                  external_id: samlId,
+                  auth_provider: 'saml',
+                  first_name: profile.firstName,
+                  last_name: profile.lastName,
+                })
+                .returning('*');
+
+              if (!inserted || typeof inserted === 'number') {
+                const id = typeof inserted === 'number' ? inserted : (inserted as any);
+                user = await db('users').where('id', id).first();
+              } else {
+                user = inserted;
+              }
             }
 
             return done(null, user);
           } catch (error) {
             return done(error as Error);
           }
+        },
+        // Logout callback (required by @node-saml/passport-saml v5)
+        async (profile: any, done: any) => {
+          return done(null);
         }
       )
     );
