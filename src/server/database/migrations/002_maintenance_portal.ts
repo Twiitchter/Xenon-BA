@@ -66,9 +66,9 @@ export async function up(knex: Knex): Promise<void> {
   // Seed default system settings
   const defaults = [
     { setting_key: 'app_name', setting_value: 'Facilities Management Portal', setting_type: 'string', category: 'general', description: 'Application display name' },
-    { setting_key: 'assetic_api_url', setting_value: '', setting_type: 'string', category: 'assetic', description: 'Assetic API base URL' },
+    { setting_key: 'assetic_api_url', setting_value: '', setting_type: 'string', category: 'assetic', description: 'Assetic site URL (e.g. https://yoursite.assetic.net)' },
     { setting_key: 'assetic_api_key', setting_value: '', setting_type: 'string', category: 'assetic', description: 'Assetic API key/token' },
-    { setting_key: 'assetic_api_version', setting_value: 'v1', setting_type: 'string', category: 'assetic', description: 'Assetic API version' },
+    { setting_key: 'assetic_api_version', setting_value: 'v2', setting_type: 'string', category: 'assetic', description: 'Assetic API version' },
     { setting_key: 'assetic_sync_enabled', setting_value: 'false', setting_type: 'boolean', category: 'assetic', description: 'Enable automatic sync with Assetic' },
     { setting_key: 'sso_enabled', setting_value: 'false', setting_type: 'boolean', category: 'sso', description: 'Enable SSO authentication' },
     { setting_key: 'sso_provider', setting_value: 'oauth2', setting_type: 'string', category: 'sso', description: 'SSO provider type (oauth2 or saml)' },

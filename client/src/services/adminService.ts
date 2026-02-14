@@ -28,6 +28,13 @@ class AdminService {
     return response.data;
   }
 
+  async getAsseticRateLimitStatus() {
+    const response = await axios.get(`${API_URL}/settings/assetic-rate-limit`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data;
+  }
+
   // ─── Users ────────────────────────────────────────────────────────
 
   async getUsers() {

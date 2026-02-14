@@ -1,30 +1,81 @@
 import axios, { AxiosInstance } from 'axios';
 import settingsService from './settingsService';
+import { asseticRateLimiter } from './asseticRateLimiter';
 
 /**
- * Assetic API client — reads connection details from system_settings (DB)
- * so admins can reconfigure without restarting the server.
+ * Assetic REST API client.
+ *
+ * Reads connection details from system_settings (DB) so admins can
+ * reconfigure without restarting the server.
+ *
+ * URL pattern:  {assetic_api_url}/api/{version}/{endpoint}
+ *   e.g.  https://dohtassandbox.assetic.net/api/v2/workrequest
+ *
+ * Auth: HTTP Basic — base64(username:token)
+ *
+ * Assetic is treated as the **source of truth**.  XeonB only stores
+ * user accounts, permissions, and a lightweight catalogue of IDs
+ * needed to query the Assetic API.  All data reads/writes pass
+ * through this client.
+ *
+ * All outbound calls are routed through the rate limiter which
+ * enforces a hard cap of 250 requests per rolling 60-second window.
  */
+
+/** Standard Assetic pagination / filter params */
+export interface AsseticQueryParams {
+  page?: number;
+  pageSize?: number;
+  filters?: string;       // e.g. "Id~eq~'abc'" or "Status~contains~'Open'"
+  sorts?: string;         // e.g. "CreatedDateTime-desc"
+  attributes?: string;    // e.g. "Comment,DimensionDetail"
+  [key: string]: any;
+}
+
+/** Convert our friendly params into Assetic's requestParams.* format */
+function toAsseticParams(p?: AsseticQueryParams): Record<string, any> | undefined {
+  if (!p) return undefined;
+  const out: Record<string, any> = {};
+  if (p.page != null)       out['requestParams.page'] = p.page;
+  if (p.pageSize != null)   out['requestParams.pageSize'] = p.pageSize;
+  if (p.filters)            out['requestParams.filters'] = p.filters;
+  if (p.sorts)              out['requestParams.sorts'] = p.sorts;
+  if (p.attributes)         out['attributes'] = p.attributes;
+  // Pass through any extra keys untouched
+  for (const [k, v] of Object.entries(p)) {
+    if (!['page', 'pageSize', 'filters', 'sorts', 'attributes'].includes(k) && v != null) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 class AsseticClient {
   private client: AxiosInstance | null = null;
 
   /**
    * Build (or rebuild) the Axios instance from current DB settings.
+   * URL:  {site}/api/{version}
    */
   private async getClient(): Promise<AxiosInstance> {
-    const apiUrl = await settingsService.get('assetic_api_url');
+    const siteUrl = await settingsService.get('assetic_api_url');
     const apiKey = await settingsService.get('assetic_api_key');
-    const apiVersion = await settingsService.get('assetic_api_version', 'v1');
+    const apiUsername = await settingsService.get('assetic_api_username');
+    const apiVersion = await settingsService.get('assetic_api_version', 'v2');
 
-    if (!apiUrl || !apiKey) {
-      throw new Error('Assetic API is not configured. Set the API URL and key in Admin > Settings.');
+    if (!siteUrl || !apiKey || !apiUsername) {
+      throw new Error(
+        'Assetic API is not configured. Set the site URL, username, and API key in Admin > Settings.',
+      );
     }
 
-    // Recreate client each call so setting changes take effect immediately
+    const basicAuth = Buffer.from(`${apiUsername}:${apiKey}`).toString('base64');
+
+    // Recreate on each call so DB setting changes take effect immediately
     this.client = axios.create({
-      baseURL: `${apiUrl}/${apiVersion}`,
+      baseURL: `${siteUrl.replace(/\/+$/, '')}/api/${apiVersion}`,
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Basic ${basicAuth}`,
         'Content-Type': 'application/json',
       },
       timeout: 30000,
@@ -33,110 +84,289 @@ class AsseticClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        console.error('Assetic API Error:', error.response?.data || error.message);
+        console.error('Assetic API Error:', error.response?.status, error.response?.data || error.message);
         throw error;
-      }
+      },
     );
 
     return this.client;
   }
 
-  /**
-   * Check whether Assetic sync is enabled in settings
-   */
+  /** Execute a rate-limited API call through the 250/min queue. */
+  private async call<T>(
+    fn: (client: AxiosInstance) => Promise<T>,
+    description?: string,
+  ): Promise<T> {
+    return asseticRateLimiter.execute(async () => {
+      const client = await this.getClient();
+      return fn(client);
+    }, description);
+  }
+
+  /** Check whether Assetic sync is enabled in settings. */
   async isEnabled(): Promise<boolean> {
     return settingsService.getBool('assetic_sync_enabled');
   }
 
-  // ─── Work Requests ──────────────────────────────────────────────────
-
-  async getWorkRequests(params?: { status?: string; limit?: number; offset?: number }) {
-    const client = await this.getClient();
-    const response = await client.get('/workrequests', { params });
-    return response.data;
+  /** Return current rate-limit / queue status (exposed for the admin endpoint). */
+  getRateLimitStatus() {
+    return asseticRateLimiter.getStatus();
   }
 
-  async getWorkRequest(id: string) {
-    const client = await this.getClient();
-    const response = await client.get(`/workrequests/${id}`);
-    return response.data;
+  // ═══════════════════════════════════════════════════════════════════
+  // AUTH / CONNECTION TEST
+  // ═══════════════════════════════════════════════════════════════════
+
+  /** Validate Login — GET /api/v2/auth */
+  async validateLogin() {
+    return this.call(
+      (c) => c.get('/auth').then((r) => r.data),
+      'GET /auth (validate login)',
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // WORK REQUESTS   (Assetic path: /workrequest)
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getWorkRequests(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/workrequest', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /workrequest',
+    );
+  }
+
+  async getWorkRequest(guid: string) {
+    return this.call(
+      (c) => c.get(`/workrequest/${guid}`).then((r) => r.data),
+      `GET /workrequest/${guid}`,
+    );
   }
 
   async createWorkRequest(data: any) {
-    const client = await this.getClient();
-    const response = await client.post('/workrequests', data);
-    return response.data;
+    return this.call(
+      (c) => c.post('/workrequest/', data).then((r) => r.data),
+      'POST /workrequest',
+    );
   }
 
-  async updateWorkRequest(id: string, data: any) {
-    const client = await this.getClient();
-    const response = await client.put(`/workrequests/${id}`, data);
-    return response.data;
+  async updateWorkRequest(guid: string, data: any) {
+    return this.call(
+      (c) => c.put(`/workrequest/${guid}/`, data).then((r) => r.data),
+      `PUT /workrequest/${guid}`,
+    );
   }
 
-  // ─── Work Orders ────────────────────────────────────────────────────
-
-  async getWorkOrders(params?: { status?: string; limit?: number; offset?: number }) {
-    const client = await this.getClient();
-    const response = await client.get('/workorders', { params });
-    return response.data;
+  async getWorkRequestTypes() {
+    return this.call(
+      (c) => c.get('/workrequesttype').then((r) => r.data),
+      'GET /workrequesttype',
+    );
   }
 
-  async getWorkOrder(id: string) {
-    const client = await this.getClient();
-    const response = await client.get(`/workorders/${id}`);
-    return response.data;
+  /** Add a comment / supporting info to a work request */
+  async addWorkRequestComment(guid: string, data: any) {
+    return this.call(
+      (c) => c.post(`/workrequest/${guid}/supportinginfo`, data).then((r) => r.data),
+      `POST /workrequest/${guid}/supportinginfo`,
+    );
+  }
+
+  /** Get supporting info / comments for a work request */
+  async getWorkRequestComments(guid: string) {
+    return this.call(
+      (c) => c.get(`/workrequest/${guid}/supportinginfo`).then((r) => r.data),
+      `GET /workrequest/${guid}/supportinginfo`,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // WORK ORDERS   (Assetic path: /workorder)
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getWorkOrders(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/workorder', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /workorder',
+    );
+  }
+
+  async getWorkOrder(guid: string) {
+    return this.call(
+      (c) => c.get(`/workorder/${guid}`).then((r) => r.data),
+      `GET /workorder/${guid}`,
+    );
   }
 
   async createWorkOrder(data: any) {
-    const client = await this.getClient();
-    const response = await client.post('/workorders', data);
-    return response.data;
+    return this.call(
+      (c) => c.post('/workorder', data).then((r) => r.data),
+      'POST /workorder',
+    );
   }
 
-  async updateWorkOrder(id: string, data: any) {
-    const client = await this.getClient();
-    const response = await client.put(`/workorders/${id}`, data);
-    return response.data;
+  /** Update a work order (also used to add comments via the body) */
+  async updateWorkOrder(guid: string, data: any) {
+    return this.call(
+      (c) => c.put(`/workorder/${guid}`, data).then((r) => r.data),
+      `PUT /workorder/${guid}`,
+    );
   }
 
-  // ─── Assets (read-only for reference) ───────────────────────────────
-
-  async getAssets(params?: { limit?: number; offset?: number; status?: string }) {
-    const client = await this.getClient();
-    const response = await client.get('/assets', { params });
-    return response.data;
+  async getWorkTypes() {
+    return this.call(
+      (c) => c.get('/worktype').then((r) => r.data),
+      'GET /worktype',
+    );
   }
 
-  async getAsset(assetId: string) {
-    const client = await this.getClient();
-    const response = await client.get(`/assets/${assetId}`);
-    return response.data;
+  // ═══════════════════════════════════════════════════════════════════
+  // ASSETS
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getAssets(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/assets', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /assets',
+    );
   }
 
-  // ─── Lookups ────────────────────────────────────────────────────────
-
-  async getLocations() {
-    const client = await this.getClient();
-    const response = await client.get('/locations');
-    return response.data;
+  async getAsset(guid: string) {
+    return this.call(
+      (c) => c.get(`/assets/${guid}`).then((r) => r.data),
+      `GET /assets/${guid}`,
+    );
   }
 
-  async getCategories() {
-    const client = await this.getClient();
-    const response = await client.get('/categories');
-    return response.data;
+  // ═══════════════════════════════════════════════════════════════════
+  // ASSET CONFIGURATION / LOOKUPS
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getAssetTypes(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/assettype', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /assettype',
+    );
   }
 
-  async getCrafts() {
-    const client = await this.getClient();
-    const response = await client.get('/crafts');
-    return response.data;
+  async getAssetClasses(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/assetclass', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /assetclass',
+    );
+  }
+
+  async getAssetCategories(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/assetcategory', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /assetcategory',
+    );
+  }
+
+  async getWorkgroups(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/workgroup', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /workgroup',
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FUNCTIONAL LOCATIONS  (for building / floor / room drill-down)
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getFunctionalLocationTypes(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/functionallocationtypes', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /functionallocationtypes',
+    );
+  }
+
+  async getFunctionalLocation(assetGuid: string) {
+    return this.call(
+      (c) => c.get(`/assets/${assetGuid}/functionallocation`).then((r) => r.data),
+      `GET /assets/${assetGuid}/functionallocation`,
+    );
+  }
+
+  async createFunctionalLocation(data: any) {
+    return this.call(
+      (c) => c.post('/functionallocations', data).then((r) => r.data),
+      'POST /functionallocations',
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // RESOURCES
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getResources(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/resource', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /resource',
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // DOCUMENTS
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getDocuments(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/document', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /document',
+    );
+  }
+
+  async getDocument(id: string) {
+    return this.call(
+      (c) => c.get(`/document/${id}`).then((r) => r.data),
+      `GET /document/${id}`,
+    );
+  }
+
+  async uploadDocument(data: any) {
+    return this.call(
+      (c) => c.post('/document', data).then((r) => r.data),
+      'POST /document',
+    );
+  }
+
+  async getDocumentFile(id: string) {
+    return this.call(
+      (c) => c.get(`/document/${id}/file`, { responseType: 'arraybuffer' }).then((r) => r.data),
+      `GET /document/${id}/file`,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // MAINTENANCE CONFIG
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getServiceActivities(params?: AsseticQueryParams) {
+    return this.call(
+      (c) => c.get('/serviceactivity', { params: toAsseticParams(params) }).then((r) => r.data),
+      'GET /serviceactivity',
+    );
+  }
+
+  async getMaintenanceAssetTypes() {
+    return this.call(
+      (c) => c.get('/maintenanceassettype').then((r) => r.data),
+      'GET /maintenanceassettype',
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // VERSION
+  // ═══════════════════════════════════════════════════════════════════
+
+  async getVersion() {
+    return this.call(
+      (c) => c.get('/version').then((r) => r.data),
+      'GET /version',
+    );
   }
 }
 
 const asseticClient = new AsseticClient();
 export default asseticClient;
-}
-
-export default new AsseticClient();

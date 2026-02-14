@@ -7,6 +7,9 @@ import WorkOrders from './pages/WorkOrders';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 import { authService } from './services/authService';
+import { ToastProvider } from './contexts/ToastContext';
+import ToastContainer from './components/ToastContainer';
+import { useAsseticRateLimitMonitor } from './components/useAsseticRateLimitMonitor';
 
 function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
   const location = useLocation();
@@ -51,6 +54,9 @@ function AppContent() {
   }
 
   const isAdmin = user?.role === 'admin';
+
+  // Monitor Assetic rate-limit status and show toasts when throttled
+  useAsseticRateLimitMonitor(isAdmin);
 
   return (
     <div className="app">
@@ -152,6 +158,8 @@ function AppContent() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
+
+      <ToastContainer />
     </div>
   );
 }
@@ -159,7 +167,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </Router>
   );
 }

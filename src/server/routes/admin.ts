@@ -5,6 +5,7 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 import db from '../database';
 import settingsService from '../services/settingsService';
 import activityService from '../services/activityService';
+import asseticClient from '../services/asseticClient';
 
 const router = Router();
 
@@ -76,34 +77,52 @@ router.put('/settings', async (req: AuthRequest, res: Response) => {
 
 /**
  * POST /api/admin/settings/test-assetic
- * Test Assetic API connection with current settings
+ * Test Assetic API connection using the Validate Login endpoint (GET /api/v2/auth)
  */
 router.post('/settings/test-assetic', async (req: AuthRequest, res: Response) => {
   try {
     const apiUrl = await settingsService.get('assetic_api_url');
     const apiKey = await settingsService.get('assetic_api_key');
-    const apiVersion = await settingsService.get('assetic_api_version', 'v1');
+    const apiUsername = await settingsService.get('assetic_api_username');
 
-    if (!apiUrl || !apiKey) {
-      return res.status(400).json({ error: 'Assetic API URL and key must be configured first' });
+    if (!apiUrl || !apiKey || !apiUsername) {
+      return res.status(400).json({ error: 'Assetic site URL, username, and API key must be configured first' });
     }
 
-    const axios = require('axios');
-    const response = await axios.get(`${apiUrl}/${apiVersion}/assets?limit=1`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    });
+    // Use the asseticClient directly — it handles auth, URL construction, and rate limiting
+    const result = await asseticClient.validateLogin();
 
-    res.json({ success: true, message: 'Connection successful', status: response.status });
-  } catch (error: any) {
     res.json({
-      success: false,
-      message: error.response?.data?.message || error.message || 'Connection failed',
-      status: error.response?.status || 0,
+      success: true,
+      message: 'Assetic connection successful — credentials validated',
+      status: 200,
+      data: result,
     });
+  } catch (error: any) {
+    const status = error.response?.status || 0;
+    let message = error.response?.data?.message || error.message || 'Connection failed';
+
+    if (status === 401) {
+      message = 'Authentication failed — check your username and API key';
+    } else if (status === 404) {
+      message = 'Endpoint not found — check your Assetic site URL (should be e.g. https://yoursite.assetic.net)';
+    }
+
+    res.json({ success: false, message, status });
+  }
+});
+
+/**
+ * GET /api/admin/settings/assetic-rate-limit
+ * Return current Assetic API rate-limit and queue status.
+ * The frontend polls this to show toast notifications.
+ */
+router.get('/settings/assetic-rate-limit', async (_req: AuthRequest, res: Response) => {
+  try {
+    const status = asseticClient.getRateLimitStatus();
+    res.json(status);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to retrieve rate limit status' });
   }
 });
 

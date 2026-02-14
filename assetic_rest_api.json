@@ -1,0 +1,5303 @@
+{
+	"info": {
+		"_postman_id": "3fc99a12-053a-41f5-ada4-edc1e653cad2",
+		"name": "Asset Cloud API Test Suite",
+		"description": "A set of Assetic Cloud Test APIs for the various modules",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "14068578"
+	},
+	"item": [
+		{
+			"name": "Asset Configuration",
+			"item": [
+				{
+					"name": "Asset Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"            if(jsonData.ResourceList[i].SubTypes.length > 0){\r",
+									"                postman.setEnvironmentVariable(\"asset_type\", jsonData.ResourceList[i].Name);\r",
+									"                postman.setEnvironmentVariable(\"asset_subtype\", jsonData.ResourceList[i].SubTypes[0].Name);\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assettype?requestParams.pageSize=500&requestParams.page=1",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assettype"
+							],
+							"query": [
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Asset Class",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"            if(jsonData.ResourceList[i].SubTypes.length > 0){\r",
+									"                postman.setEnvironmentVariable(\"asset_class\", jsonData.ResourceList[i].Name);\r",
+									"                postman.setEnvironmentVariable(\"asset_subclass\", jsonData.ResourceList[i].SubTypes[0].Name);\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assetclass?requestParams.pageSize=500&requestParams.page=1",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assetclass"
+							],
+							"query": [
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Workgroup",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"workgroup_name\", jsonData.ResourceList[0].Name);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/workgroup?requestParams.page=1&requestParams.pageSize=500",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"workgroup"
+							],
+							"query": [
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Asset Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"            postman.setEnvironmentVariable(\"asset_category\", jsonData.ResourceList[i].Label);\r",
+									"\r",
+									"                postman.setEnvironmentVariable(\"asset_category_guid\", jsonData.ResourceList[i].Id);\r",
+									"                break;\r",
+									"            \r",
+									"        }\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assetcategory?requestParams.pageSize=500",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assetcategory"
+							],
+							"query": [
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								}
+							]
+						},
+						"description": "Get a list of all asset categories"
+					},
+					"response": []
+				},
+				{
+					"name": "Asset Financial Class",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assetfinancialclass?requestParams.page=1&requestParams.pageSize=500",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assetfinancialclass"
+							],
+							"query": [
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Asset Criticality",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    const response=jsonData.ResourceList[0]\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"            //get only the asset category that the user define\r",
+									"            if(jsonData.ResourceList[i].Label == pm.environment.get(\"__asset_category\")){\r",
+									"                if(jsonData.ResourceList[i].AssetCategoryCriticality.length > 0){\r",
+									"                    //set the asset criticality in environment look to be the one that a user define\r",
+									"                    postman.setEnvironmentVariable(\"asset_criticality\", jsonData.ResourceList[i].AssetCategoryCriticality[0].Label);\r",
+									"                }\r",
+									"                else{\r",
+									"                    postman.setEnvironmentVariable(\"asset_criticality\", null);\r",
+									"                }\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assetcategory/criticality?requestParams.page=1&requestParams.pageSize=500",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assetcategory",
+								"criticality"
+							],
+							"query": [
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								},
+								{
+									"key": "",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Asset Criticality by Category GUID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assetcategory/{{asset_category_guid}}/criticality",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assetcategory",
+								"{{asset_category_guid}}",
+								"criticality"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Functional Location Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"fl_type_id\", jsonData.ResourceList[0].Id);\r",
+									"         postman.setEnvironmentVariable(\"fl_type_name\", jsonData.ResourceList[0].FunctionalLocationTypeName);\r",
+									"    }\r",
+									"}\r",
+									"\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/functionallocationtypes?requestParams.pageSize=500&requestParams.page=1",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"functionallocationtypes"
+							],
+							"query": [
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Assets",
+			"item": [
+				{
+					"name": "Asset",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"const response=pm.response.json();\r",
+									"\r",
+									"pm.test(\"Asset is found\",()=>\r",
+									"    pm.expect(response).to.be.an(\"object\")\r",
+									")\r",
+									"\r",
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody)\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"                postman.setEnvironmentVariable(\"LastModified\", jsonData.ResourceList[i].LastModified)\r",
+									"                postman.setEnvironmentVariable(\"asset_guid\", jsonData.ResourceList[i].Id);\r",
+									"                postman.setEnvironmentVariable(\"asset_id\", jsonData.ResourceList[i].AssetId)\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }\r",
+									"\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets?attributes=Comment,DimensionDetail,RaterComment",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets"
+							],
+							"query": [
+								{
+									"key": "attributes",
+									"value": "Comment,DimensionDetail,RaterComment"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Asset by GUID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"const response=pm.response.json();\r",
+									"\r",
+									"pm.test(\"Asset is found\",()=>\r",
+									"    pm.expect(response).to.be.an(\"object\")\r",
+									")\r",
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"LastModified\", jsonData.LastModified);\r",
+									"postman.setEnvironmentVariable(\"asset_guid\", jsonData.Id);\r",
+									"postman.setEnvironmentVariable(\"asset_id\", jsonData.AssetId);"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}?requestParams.page=1&requestParams.pageSize=500",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}"
+							],
+							"query": [
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Asset - Minimum Detail",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"asset_guid\", jsonData.Data[0].Id);\r",
+									"    postman.setEnvironmentVariable(\"asset_id\", jsonData.Data[0].AssetId);\r",
+									"    \r",
+									"    postman.setEnvironmentVariable(\"LastModified\", jsonData.Data[0].LastModified);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"AssetId\": \"{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n  \"AssetName\": \"BLD{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n  \"AssetCategory\": \"{{asset_category}}\"\r\n  \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets"
+							]
+						},
+						"description": "Creat a new asset in Assetic"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Asset",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"asset_guid\", jsonData.Data[0].Id);\r",
+									"    postman.setEnvironmentVariable(\"asset_id\", jsonData.Data[0].AssetId);\r",
+									"    \r",
+									"    postman.setEnvironmentVariable(\"LastModified\", jsonData.Data[0].LastModified);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"AssetId\": \"{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n  \"AssetName\": \"BLD{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n  \"AssetCategory\": \"{{asset_category}}\",\r\n  \"AssetExternalIdentifier\": \"{{$randomInt}}\",\r\n  \"AssetClass\": \"{{asset_class}}\",\r\n  \"AssetSubClass\": \"{{asset_subclass}}\",\r\n  \"AssetType\": \"{{asset_type}}\",\r\n  \"AssetSubType\": \"{{asset_subtype}}\",\r\n  \"AssetCriticality\": null,\r\n  \"AssetWorkGroup\": \"{{workgroup_name}}\",\r\n  \"WorkGroups\": [\r\n      \"{{workgroup_name}}\"\r\n  ],\r\n  \"Status\": \"Active\",\r\n  \"AssetMaintenanceType\": \"{{AssetMaintenanceType}}\",\r\n  \"AssetMaintenanceSubType\": \"{{maintasset_subtype}}\",\r\n  \"AssetSecurityGroup\": null,\r\n  \"Attributes\": {\r\n      \"Zone\": \"East\",\r\n      \"Comment\": \"{{$randomWords}}\"\r\n  }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets"
+							]
+						},
+						"description": "Creat a new asset in Assetic"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Asset by GUID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"//update last modified asset\r",
+									"if(pm.response.code == 200){\r",
+									"var response=pm.response.json();\r",
+									"postman.setEnvironmentVariable(\"LastModified\", response.LastModified);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "//  before you run this request, make sure that you have run the get request \"Get Asset by GUID\"\r\n        {\r\n            //id, assetId, AssetCategory cant be changed once created\r\n            \"Id\": \"{{asset_guid}}\",\r\n            \"AssetId\": \"{{asset_id}}\",\r\n            \"AssetName\": \"{{$randomWords}}\",\r\n            \"AssetCategory\": \"{{asset_category}}\",\r\n            \"AssetCategoryId\": \"{{asset_category_guid}}\",\r\n            \"AssetExternalIdentifier\": \"{{$randomInt}}\",\r\n            \"LastModified\": \"{{LastModified}}\",\r\n            \"AssetClass\": \"{{asset_class}}\",\r\n            \"AssetSubClass\": \"{{asset_subclass}}\",\r\n            \"AssetType\": \"{{asset_type}}\",\r\n            \"AssetSubType\": \"{{asset_subtype}}\",\r\n            \"AssetCriticality\": null,\r\n            \"AssetWorkGroup\": \"{{workgroup_name}}\",\r\n            \"WorkGroups\": [\r\n                \"{{workgroup_name}}\"\r\n                ],\r\n            \"Status\": \"Active\",\r\n            \"Attributes\": {\r\n                \"Zone\": \"East\",\r\n                \"Comment\": \"{{$randomWords}}\"\r\n            },\r\n            \"_links\": [],\r\n            \"_embedded\": null\r\n        }\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Component",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const response=pm.response.json();\r",
+									"\r",
+									"pm.test(\"components is found\",()=>\r",
+									"    pm.expect(response).to.be.an(\"object\")\r",
+									")\r",
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody)\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"                postman.setEnvironmentVariable(\"component_type\", jsonData.ResourceList[i].ComponentType)\r",
+									"                postman.setEnvironmentVariable(\"network_measure\", jsonData.ResourceList[i].NetworkMeasureType);\r",
+									"                postman.setEnvironmentVariable(\"dimension_unit\", jsonData.ResourceList[i].DimensionUnit)\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/components?requestParams.page=1&requestParams.pageSize=100",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"components"
+							],
+							"query": [
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "page",
+									"value": "1",
+									"disabled": true
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "100"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Material (Square Metre)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"material_m2_guid\", jsonData.ResourceList[0].Id);\r",
+									"        postman.setEnvironmentVariable(\"material_m2_type\", jsonData.ResourceList[0].MaterialType);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/billofmaterial?requestParams.filters=UnitType~eq~'m2'&requestParams.page=1&requestParams.pageSize=20",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"billofmaterial"
+							],
+							"query": [
+								{
+									"key": "requestParams.filters",
+									"value": "UnitType~eq~'m2'"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Component",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"component_guid\", jsonData.Data[0].Id);\r",
+									"    \r",
+									"   postman.setEnvironmentVariable(\"network_measure\", jsonData.NetworkMeasureType)\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "",
+								"value": "",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Label\":\"{{asset_category}} - Sub-sSetrdducture Main\"\r\n    ,\"AssetId\":\"{{asset_id}}\"\r\n    ,\"ComponentType\":\"{{component_type}}\"\r\n    ,\"NetworkMeasureType\":\"{{network_measure}}\"\r\n    ,\"DimensionUnit\":\"{{dimension_unit}}\"\r\n    ,\"MaterialType\":\"{{material_m2_type}}\"\r\n    ,\"DesignLife\":{{$randomInt}},\r\n    \"ExternalIdentifier\": {{$randomInt}},\r\n    \"ReferenceValue\": {{$randomInt}},\r\n    \"ReferenceDate\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/components",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"components"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Component by GUID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"const response=pm.response.json();\r",
+									"pm.test(\"Component is found\",()=>\r",
+									"\r",
+									"    pm.expect(response).to.be.an(\"object\")\r",
+									")\r",
+									"var jsonData = JSON.parse(responseBody);\r",
+									"\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/components/{{component_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"components",
+								"{{component_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Shape Dimension",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"           \r",
+									"                postman.setEnvironmentVariable(\"record_type\", jsonData.ResourceList[i].RecordType);\r",
+									"                postman.setEnvironmentVariable(\"component_guid\", jsonData.ResourceList[i].ComponentGuidId);\r",
+									"    \r",
+									"                postman.setEnvironmentVariable(\"network_measure\", jsonData.ResourceList[i].MeasurementType)\r",
+									"                postman.setEnvironmentVariable(\"dimension_unit\", jsonData.ResourceList[i].MeasurementUnitName)\r",
+									"               \r",
+									"                break;\r",
+									"        }\r",
+									"    }\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/dimensions?requestParams.pageSize=100",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"dimensions"
+							],
+							"query": [
+								{
+									"key": "requestParams.pageSize",
+									"value": "100"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Shape Dimension",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"nm_shp_addition_guid\", jsonData.Id);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\t\"Unit\": \"{{dimension_unit}}\",\r\n\t\"Multiplier\": {{$randomInt}},\r\n\t\"ComponentId\": \"{{component_guid}}\",\r\n\t\"Comments\": \"{{$randomWords}}\",\r\n\t\"NetworkMeasureType\": \"{{network_measure}}\",\r\n\t\"RecordType\": \"{{record_type}}\",\r\n    \"NetworkMeasure\": {{$randomInt}}\r\n}\r\n\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/components/85e31c31-821d-e711-946c-06edd62954d7/dimensions/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"components",
+								"85e31c31-821d-e711-946c-06edd62954d7",
+								"dimensions",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Functional Location",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    \r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"fl_guid\", jsonData.Data[0].Id);\r",
+									"    postman.setEnvironmentVariable(\"fl_fid\", jsonData.Data[0].FunctionalLocationId);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n      \"FunctionalLocationId\": \"{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n      \"FunctionalLocationName\": \"FL{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n      \"FunctionalLocationTypeId\": \"{{fl_type_id}}\"\r\n      \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/functionallocations",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"functionallocations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Component by GUID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    //Make sure that a change is made \r\n    \"Label\":\"{{$randomWord}}\"\r\n    ,\"MaterialType\":\"{{material_m2_type}}\"\r\n    ,\"DesignLife\":{{$randomInt}},\r\n    \"ExternalIdentifier\": \"{{$randomAlphaNumeric}}\",\r\n    \"ReferenceValue\": {{$randomInt}},\r\n    \"ReferenceDate\": \"2022-01-22T10:00:00\"\r\n \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/components/{{component_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"components",
+								"{{component_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Functional Location by GUID",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "//check comment\r\n{\r\n \"Id\": \"{{fl_guid}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}/functionallocation/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}",
+								"functionallocation",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Assets Spatial Location",
+			"item": [
+				{
+					"name": "Add Spatial Location by GUID - Point Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\t\"Data\": {\r\n\t\t\"type\": \"Feature\",\r\n\t\t\"geometry\": {\r\n\t\t\t\"type\": \"GeometryCollection\",\r\n\t\t\t\"geometries\": [{\r\n\t\t\t\t\"type\": \"point\",\r\n\t\t\t\t\"coordinates\": [144.95956238074393,\r\n\t\t\t\t-37.80924385229967]\r\n\t\t\t}]\r\n\t\t},\r\n\t\t\"properties\": null\r\n\t\t}\r\n\t}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}/location/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}",
+								"location",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Spatial Location by GUID - Polygon Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Data\": {\r\n        \"type\": \"Feature\",\r\n        \"geometry\": {\r\n            \"type\": \"GeometryCollection\",\r\n            \"geometries\": [\r\n                {\r\n                    \"type\": \"Point\",\r\n                    \"coordinates\": [\r\n                        144.59493412953995,\r\n                        -37.686391447843647\r\n                    ]\r\n                },\r\n                {\r\n                    \"type\": \"Polygon\",\r\n                    \"coordinates\": [\r\n                        [\r\n                            [\r\n                                144.59478671848709,\r\n                                -37.686116113363184\r\n                            ],\r\n                            [\r\n                                144.59532326044845,\r\n                                -37.686256058018678\r\n                            ],\r\n                            [\r\n                                144.59532326044845,\r\n                                -37.686256058018678\r\n                            ],\r\n                            [\r\n                                144.59469240814479,\r\n                                -37.686802171094442\r\n                            ],\r\n                            [\r\n                                144.59478671848709,\r\n                                -37.686116113363184\r\n                            ]\r\n                        ]\r\n                    ]\r\n                }\r\n            ]\r\n        },\r\n        \"properties\": {\r\n            \"AssetPhysicalLocation\": {\r\n                \"AddressId\": \"b3bc2408-b63c-4507-b81c-0bcaa7a337ad\",\r\n                \"StreetNumber\": \"\",\r\n                \"StreetAddress\": \"\",\r\n                \"CitySuburb\": \"\",\r\n                \"State\": \"\",\r\n                \"ZipPostcode\": \"\",\r\n                \"Country\": \" \",\r\n                \"OtherLocation\": null,\r\n                \"WhereLocation\": null\r\n            },\r\n            \"AssetId\": \"ee55096f-5ccc-4cb6-83f5-654fbdcaacfe\"\r\n        }\r\n    },\r\n    \"_links\": [],\r\n    \"_embedded\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}/location/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}",
+								"location",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Spatial Location by GUID - Line String Type",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Data\": {\r\n        \"type\": \"Feature\",\r\n        \"geometry\": {\r\n            \"type\": \"GeometryCollection\",\r\n            \"geometries\": [\r\n                {\r\n                    \"type\": \"Point\",\r\n                    \"coordinates\": [\r\n                        152.66340719032033,\r\n                        -26.18764347840489\r\n                    ]\r\n                },\r\n                {\r\n                    \"type\": \"LineString\",\r\n                    \"coordinates\": [\r\n                        [\r\n                            152.66344824527565,\r\n                            -26.18765828956937\r\n                        ],\r\n                        [\r\n                            152.66336613537547,\r\n                            -26.187628667228765\r\n                        ]\r\n                    ]\r\n                }\r\n            ]\r\n        },\r\n        \"properties\": {\r\n            \"AssetPhysicalLocation\": {\r\n                \"AddressId\": \"d5f64a8b-ad5a-e611-9469-06edd62954d7\",\r\n                \"StreetNumber\": \"9\",\r\n                \"StreetAddress\": \"Arrunga Street\",\r\n                \"CitySuburb\": \"Dundas\",\r\n                \"State\": \"NSW\",\r\n                \"ZipPostcode\": \"2117\",\r\n                \"Country\": \"Australia\",\r\n                \"OtherLocation\": null,\r\n                \"WhereLocation\": null\r\n            }\r\n            \r\n        }\r\n    }\r\n \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}/location/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}",
+								"location",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Spatial Location by GUID",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Data\": {\r\n        \"type\": \"Feature\",\r\n        \"geometry\": {\r\n            \"type\": \"GeometryCollection\",\r\n            \"geometries\": [\r\n                {\r\n                    \"type\": \"Point\",\r\n                    \"coordinates\": [\r\n                        144.59493412953995,\r\n                        -37.686391447843647\r\n                    ]\r\n                },\r\n                {\r\n                    \"type\": \"Polygon\",\r\n                    \"coordinates\": [\r\n                        [\r\n                            [\r\n                                144.59478671848709,\r\n                                -37.686116113363184\r\n                            ],\r\n                            [\r\n                                144.59532326044845,\r\n                                -37.686256058018678\r\n                            ],\r\n                            [\r\n                                144.59532326044845,\r\n                                -37.686256058018678\r\n                            ],\r\n                            [\r\n                                144.59469240814479,\r\n                                -37.686802171094442\r\n                            ],\r\n                            [\r\n                                144.59478671848709,\r\n                                -37.686116113363184\r\n                            ]\r\n                        ]\r\n                    ]\r\n                }\r\n            ]\r\n        },\r\n        \"properties\": {\r\n            \"AssetPhysicalLocation\": {\r\n                \"AddressId\": \"b3bc2408-b63c-4507-b81c-0bcaa7a337ad\",\r\n                \"StreetNumber\": \"wwhere is my street number\",\r\n                \"StreetAddress\": \"\",\r\n                \"CitySuburb\": \"\",\r\n                \"State\": \"\",\r\n                \"ZipPostcode\": \"\",\r\n                \"Country\": \" \",\r\n                \"OtherLocation\": null,\r\n                \"WhereLocation\": null\r\n            }\r\n         \r\n        }\r\n    },\r\n  \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}/location/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}",
+								"location",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Asset Spatial Location by GUID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}/location",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}",
+								"location"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Asset Spatial Location",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/locations?requestParams.longitude=144.5437&requestParams.latitude=-37.6691 &requestParams.condition=near_point&requestParams.range=3400&requestParams.unit=metre",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"locations"
+							],
+							"query": [
+								{
+									"key": "requestParams.longitude",
+									"value": "144.5437"
+								},
+								{
+									"key": "requestParams.latitude",
+									"value": "-37.6691 "
+								},
+								{
+									"key": "requestParams.condition",
+									"value": "near_point"
+								},
+								{
+									"key": "requestParams.range",
+									"value": "3400"
+								},
+								{
+									"key": "requestParams.unit",
+									"value": "metre"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Functional Location",
+			"item": [
+				{
+					"name": "Functional Location Types",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"fl_type_id\", jsonData.ResourceList[0].Id);\r",
+									"         postman.setEnvironmentVariable(\"fl_type_name\", jsonData.ResourceList[0].FunctionalLocationTypeName);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/functionallocationtypes?requestParams.pageSize=500&requestParams.page=1",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"functionallocationtypes"
+							],
+							"query": [
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Functional Location",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"fl_guid\", jsonData.Data[0].Id);\r",
+									"    postman.setEnvironmentVariable(\"fl_fid\", jsonData.Data[0].FunctionalLocationId);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n      \"FunctionalLocationId\": \"{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n      \"FunctionalLocationName\": \"FL{{$randomAlphaNumeric}}{{$randomInt}}\",\r\n      \"FunctionalLocationTypeId\": \"{{fl_type_id}}\"\r\n      \r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/functionallocations",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"functionallocations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Functional Location by Asset GUID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_id}}/functionallocation",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_id}}",
+								"functionallocation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Link Functional Location to Asset",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"Id\": \"{{fl_guid}}\"}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_id}}/functionallocation",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_id}}",
+								"functionallocation"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Functional Location",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets/{{asset_guid}}/functionallocation",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets",
+								"{{asset_guid}}",
+								"functionallocation"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Service Criteria",
+			"item": [
+				{
+					"name": "Service Criteria",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// take the asset id for get one"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"service_id\", jsonData.ResourceList[0].Id);\r",
+									"                \r",
+									"                \r",
+									"            \r",
+									"        \r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/servicecriteria/score?PageSize=20&page=1&sorts=Score-asc&=",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"servicecriteria",
+								"score"
+							],
+							"query": [
+								{
+									"key": "PageSize",
+									"value": "20"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "sorts",
+									"value": "Score-asc"
+								},
+								{
+									"key": "",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Service Criteria by GUID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/servicecriteria/score/{{service_id}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"servicecriteria",
+								"score",
+								"{{service_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Resource",
+			"item": [
+				{
+					"name": "Resource",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"labour_resource_id\", jsonData.ResourceList[0].Id);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/resource",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"resource"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resource by Filter (1)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if((jsonData.ResourceList.length > 0)&( jsonData.ResourceList[0].Types.length>0)){\r",
+									"        postman.setEnvironmentVariable(\"creator_resource_id\", jsonData.ResourceList[0].Id);\r",
+									"        postman.setEnvironmentVariable(\"resource_type\", jsonData.ResourceList[0].Types[0].Type);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/resource?requestParams.filters=DisplayName~eq~'{{__wo_creator_name}}'&requestParams.page=1&requestParams.pageSize=20",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"resource"
+							],
+							"query": [
+								{
+									"key": "requestParams.filters",
+									"value": "DisplayName~eq~'{{__wo_creator_name}}'"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resource by Filter (2)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = pm.response.json();\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"resource_guid\", jsonData.ResourceList[0].Id);\r",
+									"        postman.setEnvironmentVariable(\"resource_display_name\", jsonData.ResourceList[0].DisplayName);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/resource/?requestParams.filters=DisplayName~contains~'Assetic System'",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"resource",
+								""
+							],
+							"query": [
+								{
+									"key": "requestParams.filters",
+									"value": "DisplayName~contains~'Assetic System'"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Resource",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"labour_resource_id\", jsonData.ResourceList[0].Id);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n \"DisplayName\": \"{{$randomFullName}})\",\r\n \"FirstName\": \"{{$randomFirstName}}\",\r\n \"Surname\": \"{{$randomLastName}}\",\r\n \"Company\": \"{{$randomCompanyName}}\",\r\n \"Phone\": \"{{$randomPhoneNumber}}\",\r\n \"Mobile\": \"{{$randomPhoneNumber}}\",\r\n \"Email\": \"{{$randomEmail}}\",\r\n \"AddressComment\": \"{{$randomStreetAddress}}\",\r\n \"ExternalID\": \"{{$randomInt}}\",\r\n \"Status\": \"Active\",\r\n \"Types\": [{\"Type\": \"{{resource_type}}\"}]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/resource",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"resource"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Maintenance",
+			"item": [
+				{
+					"name": "Work Request",
+					"item": [
+						{
+							"name": "Work Request",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0 ){\r",
+											"         for(var i=0; i < jsonData.ResourceList.length; i++) {\r",
+											"             if(jsonData.ResourceList[i].Requestor.Types.length>0){\r",
+											"             postman.setEnvironmentVariable(\"wr_source_id\", jsonData.ResourceList[i].WorkRequestSourceId);\r",
+											"             postman.setEnvironmentVariable(\"requestor_type_id\", jsonData.ResourceList[i].Requestor.Types[0].Id);\r",
+											"            \r",
+											"        \r",
+											"         }\r",
+											"         }\r",
+											"\r",
+											"        \r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest"
+									]
+								},
+								"description": "Get a colllection of work requests based on a filtered search"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Work Request - Minimum Detail",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 201){\r",
+											"    postman.setEnvironmentVariable(\"wr_guid\", responseBody.replace(\"\\\"\", \"\").replace(\"\\\"\", \"\"));\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Requestor\": {\"DisplayName\":\"{{$randomFullName}}\",\"Types\": [{\"Id\": {{requestor_type_id}}}]},\r\n  \"Description\": \"{{$randomWords}}\",\r\n  \"WorkRequestSourceId\": {{wr_source_id}},\r\n  \"Location\": \"{{$randomStreetName}}\",   \r\n  \"WorkRequestPhysicalLocation\": { \"Address\":{\"StreetAddress\": \"{{$randomStreetAddress}}\",\r\n      \"CitySuburb\": \"{{$randomCity}}\",\r\n      \"State\": \"{{$randomCity}}\",\r\n      \"Country\": \"{{$randomCountry}}\"} }\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest/",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest",
+										""
+									]
+								},
+								"description": "Create a work request with just the mandatory fields"
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request by Filter",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"       \r",
+											"        postman.setEnvironmentVariable(\"wr_source_id\", jsonData.ResourceList[0].WorkRequestSourceId);\r",
+											"       \r",
+											"        \r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest?requestParams.filters=Id~eq~'{{wr_guid}}'",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest"
+									],
+									"query": [
+										{
+											"key": "requestParams.filters",
+											"value": "Id~eq~'{{wr_guid}}'"
+										}
+									]
+								},
+								"description": "Get a colllection of work requests based on a filtered search"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Work Request - With Inspection",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 201){\r",
+											"    postman.setEnvironmentVariable(\"wr_guid\", responseBody.replace(\"\\\"\", \"\").replace(\"\\\"\", \"\"));\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"var moment = require('moment');\r",
+											"\r",
+											"const yearsInTheFuture = 0;\r",
+											"const monthsInTheFuture = 0;\r",
+											"const daysInTheFuture = 3;\r",
+											"const hours = 12;\r",
+											"const minutes = 34;\r",
+											"const seconds = 56;\r",
+											"const milliseconds = 789;\r",
+											"\r",
+											"const inspection_date = moment()\r",
+											"    .add(yearsInTheFuture, 'years')\r",
+											"    .add(monthsInTheFuture, 'months')\r",
+											"    .add(daysInTheFuture, 'days')\r",
+											"    .hours(hours)\r",
+											"    .minutes(minutes)\r",
+											"    .seconds(seconds)\r",
+											"    .millisecond(milliseconds);\r",
+											"\r",
+											"console.log(\"inspection date: \" + inspection_date.toISOString());\r",
+											"pm.environment.set(\"wr_inspection_date\", inspection_date.toISOString());"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "work_request_id",
+										"value": "2",
+										"type": "text",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Requestor\": {\r\n    \"FirstName\":\"{{$randomFirstName}}\",\r\n    \"Surname\":\"{{$randomLastName}}\",\r\n    \"Types\": [{\"Id\": {{requestor_type_id}}}],\r\n    \"Mobile\": \"{{$randomPhoneNumber}}\"\r\n  },\r\n  \"AssetId\": \"{{asset_id}}\",\r\n  \"Description\": \"{{$randomWords}}\",\r\n  \"WorkRequestSourceId\": \"{{wr_source_id}}\",\r\n  \"Location\": \"{{$randomStreetName}}\",\r\n  \"ExternalIdentifier\": \"{{$randomInt}}\",\r\n  \"SupportingInformation\": \"{{$randomWords}}\",\r\n  \"WorkRequestPriorityId\": \"1\",\r\n  \"WorkRequestSubTypeId\": null,\r\n  \"ReactiveInspector\": {\r\n    \"DisplayName\": \"{{__wo_creator_name}}\"\r\n  },\r\n  \"ReactiveInspectionDate\": \"{{wr_inspection_date}}\",\r\n  \"WorkRequestPhysicalLocation\": {\r\n    \"Address\": {\r\n      \"StreetNumber\": \"{{$randomStreetAddress}}\",\r\n      \"StreetAddress\": \"{{$randomStreetName}}\",\r\n      \"CitySuburb\": \"{{$randomCity}}\",\r\n      \"State\": \"{{$randomCountry}}\",\r\n      \"ZipPostcode\": \"{{$randomCountryCode}}\",\r\n      \"Country\": \"{{$randomCountryCode}}\"\r\n    },\r\n    \"OtherLocation\": \"{{$randomWords}}\",\r\n    \"WhereLocation\": \"{{$randomWords}}\",\r\n  },\r\n  \"WorkRequestSpatialLocation\": {\r\n    \"PointString\": \"POINT (144.9651119 -37.8162149)\"\r\n  }\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest/",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest",
+										""
+									]
+								},
+								"description": "Create a work request with the typical information that would come from a CRM or other source"
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request by GUID",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var jsonData = JSON.parse(responseBody);\r",
+											"postman.setEnvironmentVariable(\"requestor_id\", jsonData.RequestorId);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest/{{wr_guid}}",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest",
+										"{{wr_guid}}"
+									]
+								},
+								"description": "Get Work Request by internal GUId"
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request - Add Comment",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n  \"Id\": \"{{wr_guid}}\",\r\n  \"Description\": \"{{$randomWords}}\",\r\n  \"CreatedDateTime\": \"2021-01-11T23:28:06.656Z\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest/{{wr_guid}}/supportinginfo",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest",
+										"{{wr_guid}}",
+										"supportinginfo"
+									]
+								},
+								"description": "Add a supporting information history comment to a work request\r\nNote that the comment time can be set in the payload."
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request - Supporting Information",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest/{{wr_guid}}/supportinginfo",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest",
+										"{{wr_guid}}",
+										"supportinginfo"
+									]
+								},
+								"description": "Get Supporting Information for given Work Request"
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request Update",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n      \"Id\": \"{{wr_guid}}\",\r\n      \"ContactType\": 4,\r\n      \"RequestorId\": \"{{requestor_id}}\",\r\n      \"WorkRequestSourceId\": {{wr_source_id}},\r\n      \"WorkRequestPriorityId\": null,\r\n      \"Description\": \"{{$randomWords}}\",\r\n      \"FeedbackRequired\": false,\r\n      \"FeedbackMethodId\": 0,\r\n      \"Location\": \"{{$randomStreetAddress}}\",\r\n      \"WorkRequestStatusId\": 8,\r\n      \"WorkRequestStatus\": \"In Progress\",\r\n      \"WorkRequestTypeId\": 0,\r\n      \"WorkRequestSubTypeId\": 1,\r\n      \"ClosedDate\": null,\r\n      \"AcknowledgeDueDate\": \"2020-02-28T09:44:00\",\r\n      \"ResolutionDueDate\": \"2020-03-03T00:00:00\",\r\n      \"ComplexAssetId\": \"{{asset_guid}}\",\r\n      \"AssetId\": \"{{asset_id}}\",\r\n      \"CreatedBy\": \"{{creator_resource_id}}\",\r\n      \"WorkOrderId\": \"{{wo_guid}}\",\r\n      \"ExternalIdentifier\": \" \",\r\n      \"WorkOrderPriorityId\": null,\r\n      \"ReferenceNumber\": null,\r\n      \"Requestor\": {\r\n        \"Address\": null,\r\n        \"Types\": [\r\n          {\r\n            \"Id\": 4\r\n          }\r\n        ],\r\n        \"Id\": \"{{requestor_id}}\",\r\n        \"DisplayName\": \"{{$randomFullName}}\",\r\n        \"FirstName\": \"{{$randomFirstName}}\",\r\n        \"Surname\": \"{{$randomLastName}}\",\r\n        \"Company\": \"\",\r\n        \"Position\": \"\",\r\n        \"Phone\": \"\",\r\n        \"Mobile\": \"{{$randomPhoneNumber}}\",\r\n        \"Fax\": null,\r\n        \"Email\": \"N/A\",\r\n        \"AddressComment\": \"\",\r\n        \"ExternalID\": \"\"\r\n      },\r\n      \"ReactiveInspectorId\": null,\r\n      \"ReactiveInspector\": null,\r\n      \"ResponsibleOfficerId\": null,\r\n      \"ResponsibleOfficer\": null,\r\n      \"ReactiveInspectionDate\": null,\r\n      \"WorkRequestPhysicalLocation\": {\r\n        \"Address\": {\r\n          \"Id\": \"fbe10a08-86f9-4427-bac5-01de1c17458f\",\r\n          \"StreetNumber\": \"\",\r\n          \"StreetAddress\": \"{{$randomStreetAddress}}t\",\r\n          \"CitySuburb\": \"{{$randomCity}}\",\r\n          \"State\": \"{{$randomCity}}\",\r\n          \"ZipPostcode\": \"\",\r\n          \"Country\": \"{{$randomCountry}}\",\r\n          \"GooglePlaceId\": null,\r\n          \"_links\": [],\r\n          \"_embedded\": null\r\n        },\r\n        \"OtherLocation\": \"{{$randomStreetAddress}}\",\r\n        \"WhereLocation\": \"{{$randomStreetAddress}}\",\r\n        \"AddressId\": \"fbe10a08-86f9-4427-bac5-01de1c17458f\",\r\n        \"_links\": [],\r\n        \"_embedded\": null\r\n      },\r\n      \"WorkRequestSpatialLocation\": {\r\n        \"Point\": {\r\n          \"Geography\": {\r\n            \"CoordinateSystemId\": 4326,\r\n            \"WellKnownText\": \"POINT (144.956676 -37.8182937)\"\r\n          }\r\n        },\r\n        \"PointString\": \"POINT (144.956676 -37.8182937)\",\r\n        \"_links\": [],\r\n        \"_embedded\": null\r\n      },\r\n      \"_links\": [],\r\n      \"_embedded\": null\r\n    }",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest/{{wr_guid}}/",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest",
+										"{{wr_guid}}",
+										""
+									]
+								},
+								"description": "Update a work request"
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request - Add Document",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"ParentId\": \"{{wr_guid}}\"\r\n    ,\"ParentType\": \"WorkRequest\"\r\n    ,\"ExternalId\": \"{{$randomInt}}\",\r\n    \"FileProperty\": [\r\n        {\r\n            \"Name\": \"{{$randomFileName}}\",\r\n            \"mimetype\": \"txt\",\r\n            \"filecontent\": \"QXNzZXRpYw==\"\r\n        }\r\n    ]\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/document",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"document"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Work Request all Document",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/document/",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"document",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request Location",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequest/locations?requestParams.longitude=144.5437&requestParams.latitude=-37.6691 &requestParams.condition=near_point&requestParams.range=3400&requestParams.unit=metre&requestParams.page=1&requestParams.pageSize=500",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequest",
+										"locations"
+									],
+									"query": [
+										{
+											"key": "requestParams.longitude",
+											"value": "144.5437"
+										},
+										{
+											"key": "requestParams.latitude",
+											"value": "-37.6691 "
+										},
+										{
+											"key": "requestParams.condition",
+											"value": "near_point"
+										},
+										{
+											"key": "requestParams.range",
+											"value": "3400"
+										},
+										{
+											"key": "requestParams.unit",
+											"value": "metre"
+										},
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "500"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Request Type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workrequesttype",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workrequesttype"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Work Order",
+					"item": [
+						{
+							"name": "Work Order",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code == 200) {\r",
+											"\r",
+											"\tvar jsonData = JSON.parse(responseBody);\r",
+											"\tfor (var i = 0; i < jsonData.ResourceList.length; i++) {\r",
+											"\t\tif ((jsonData.ResourceList.length > 0)) {\r",
+											"\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"wo_guid\", jsonData.ResourceList[i].Id);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"PriorityId\", jsonData.ResourceList[i].PriorityId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"FailureSubCode_Id\", 1);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"RemedyCode_Id\", jsonData.ResourceList[i].RemedyCodeId);\r",
+											"\t\t\tif (jsonData.ResourceList[i].MaintenanceMaterials.length > 0) {\r",
+											"\t\t\t\tpostman.setEnvironmentVariable(\"material_guid\", jsonData.ResourceList[i].MaintenanceMaterials[0].BillOfMaterialId);\r",
+											"\t\t\t}\r",
+											"\r",
+											"\t\t\t//    postman.setEnvironmentVariable(\"service_activity_guid\", jsonData.ResourceList[i].MaintenanceServices[0].Id);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"CauseSubCode_Id\", 1);\r",
+											"\r",
+											"\t\t}\r",
+											"\t}\r",
+											"\t// check if status is prep\r",
+											"\tfor (var i = 0; i < jsonData.ResourceList.length; i++) {\r",
+											"\t\tif (jsonData.ResourceList[i].Status == \"PREP\") {\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"wo_prep_asset_id\", jsonData.ResourceList[i].AssetId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"RemedyCode_Id\", jsonData.ResourceList[i].RemedyCodeId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"creator_id_prep\", jsonData.ResourceList[i].CreatorId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"requestor_id_prep\", jsonData.ResourceList[i].RequestorId);\r",
+											"\r",
+											"\t\t}\r",
+											"\t\t// if status is in progress\r",
+											"\t\tif ((jsonData.ResourceList[i].Status == (\"INPRG\")) & (jsonData.ResourceList[i].Labours.length > 0)) {\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"wo_inprg_asset_id\", jsonData.ResourceList[i].AssetId);\r",
+											"\t\t\t// postman.setEnvironmentVariable(\"service_activity_guid_INPRG\", jsonData.ResourceList[i].MaintenanceServices[0].Id);\r",
+											"\t\t\t//console.log(jsonData.ResourceList[i].MaintenanceServices[0])\r",
+											"\t\t\t//postman.setEnvironmentVariable(\"MaintenanceServicesDescript\", jsonData.ResourceList[i].MaintenanceServices[0].Description);\r",
+											"\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"requestor_id_INPRG\", jsonData.ResourceList[i].RequestorId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"RemedyCode_Id\", jsonData.ResourceList[i].RemedyCodeId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"MaintenanceResources_Resource_Id\", jsonData.ResourceList[i].Labours[0].MaintenanceResources[0].Resource.Id)\r",
+											"\r",
+											"\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"AssignedGroupCraftId\", jsonData.ResourceList[i].Labours[0].MaintenanceResources[0].AssignedGroupCraftId)\r",
+											"\t\t}\r",
+											"\t\tif (jsonData.ResourceList[i].Status == \"RFE\") {\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"wo_rfe_asset_id\", jsonData.ResourceList[i].AssetId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"requestor_id_rfe\", jsonData.ResourceList[i].RequestorId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"GroupCraftId\", jsonData.ResourceList[i].Labours[0].MaintenanceResources[0].GroupCraftId)\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"Labours_Id\", jsonData.ResourceList[i].Labours[0].Id)\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"PriorityId_rfe\", jsonData.ResourceList[i].PriorityId);\r",
+											"\t\t\tpostman.setEnvironmentVariable(\"PlannedGroupCraft_Id\", jsonData.ResourceList[i].Labours[0].PlannedGroupCraftId)\r",
+											"\t\t\tconsole.log(jsonData.ResourceList[i].Labours[0].Id)\r",
+											"\r",
+											"\t\t}\r",
+											"\r",
+											"\r",
+											"\r",
+											"\t}\r",
+											"\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorder",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorder"
+									],
+									"query": [
+										{
+											"key": "Id",
+											"value": "3",
+											"disabled": true
+										},
+										{
+											"key": "requestParams.filters",
+											"value": "Status~contains~INPRG",
+											"disabled": true
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Order by GUID",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorder/{{wo_guid}}",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorder",
+										"{{wo_guid}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Order - list of GroupCraftId",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "urlencoded",
+									"urlencoded": []
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/resource/{{Labours_Id}}/craft",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"resource",
+										"{{Labours_Id}}",
+										"craft"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Order -  Work Type",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    \r",
+											"        postman.setEnvironmentVariable(\"work_order_type_id\", jsonData.ResourceList[0].Id);\r",
+											"        \r",
+											"    \r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/worktype",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"worktype"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Work Order - Status INPRG",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 201){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    var woData = jsonData.Data[0]\r",
+											"    postman.setEnvironmentVariable(\"wo_guid\", woData.Id);\r",
+											"    if(woData.MaintenanceMaterials.length > 0)\r",
+											"    {\r",
+											"        postman.setEnvironmentVariable(\"wo_material0_guid\", woData.MaintenanceMaterials[0].Id);\r",
+											"    }\r",
+											"    else {\r",
+											"        postman.setEnvironmentVariable(\"wo_material0_guid\", null);\r",
+											"    }\r",
+											"    //MaintenanceServices\r",
+											"    if(woData.MaintenanceServices.length > 0)\r",
+											"    {\r",
+											"        postman.setEnvironmentVariable(\"wo_service0_guid\", woData.MaintenanceServices[0].Id);\r",
+											"    }\r",
+											"    else {\r",
+											"        postman.setEnvironmentVariable(\"wo_service0_guid\", null);\r",
+											"    }\r",
+											"    //Labours\r",
+											"    if(woData.Labours.length > 0)\r",
+											"    {\r",
+											"        postman.setEnvironmentVariable(\"wo_labours0_guid\", woData.Labours[0].Id);\r",
+											"\r",
+											"        postman.setEnvironmentVariable(\"PlannedGroupCraft_Id\", woData.Labours[0].PlannedGroupCraftId);\r",
+											"        //Labours[0].MaintenanceResources\r",
+											"        if(woData.Labours[0].MaintenanceResources.length > 0)\r",
+											"        {\r",
+											"            postman.setEnvironmentVariable(\"wo_labours0resource0_guid\", woData.Labours[0].MaintenanceResources[0].Id);\r",
+											"        }\r",
+											"        else {\r",
+											"            postman.setEnvironmentVariable(\"wo_labours0resource0_guid\", null);\r",
+											"        }\r",
+											"    }\r",
+											"    else {\r",
+											"        postman.setEnvironmentVariable(\"wo_labours0_guid\", null);\r",
+											"        postman.setEnvironmentVariable(\"wo_labours0resource0_guid\", null);\r",
+											"    }\r",
+											"    \r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"var uuid = require(\"uuid\");\r",
+											"postman.setEnvironmentVariable(\"work_task_guid\", uuid.v4());"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n\t\"Status\": \"INPRG\",\r\n\t\"BriefDescription\": \"{{$randomWords}}\",\r\n\t\"PriorityId\": null,\r\n\t\"EstimatedDuration\": {{$randomInt}},\r\n\t\"LocationDescription\": \"{{$randomStreetAddress}}\",\r\n\t\"PointString\": \"144.96406820000004 -37.8162175\",\r\n\t\"CreatorId\": \"{{creator_resource_id}}\",\r\n\t\"RequestorId\": \"{{requestor_id_INPRG}}\",\r\n\t\"WorkOrderType\": {\r\n\t\t\"Id\": \"6\"\r\n\t},\r\n\t\"FailureSubCodeId\": \"{{FailureSubCode_Id}}\",\r\n\t\"CauseSubCodeId\": \"{{CauseSubCode_Id}}\",\r\n\t\"RemedyCodeId\":\"{{RemedyCode_Id}}\",\r\n\t\"SupportingInformation\": [{\"Description\":\"{{$randomWords}}\"}],\r\n\t\"AssetId\": \"{{wo_inprg_asset_id}}\",\r\n\t\"WorkOrderWorkGroup\": \"{{workgroup_name}}\",\r\n\t\"Scheduling\": {\r\n\t\t\"TargetStart\": \"2021-04-15T16:04:56\",\r\n\t\t\"ScheduledStart\": \"2021-04-17T00:00:00\",\r\n\t\t\"ScheduledFinish\": \"2021-04-18T00:00:00\"\r\n\t},\r\n\t\"WorkTasks\": [{\r\n        \"Id\": \"{{work_task_guid}}\",\r\n\t\t\"FriendlyId\": {{$randomInt}},\r\n\t\t\"BriefDescription\": \"{{$randomWords}}\",\r\n\t\t\"Status\":1\r\n\t}],\r\n\t\"Labours\": [{\r\n\t\t\"PlannedGroupCraftId\": \"{{PlannedGroupCraft_Id}}\",\r\n\t\t\"QuantityRequired\": 1,\r\n\t\t\"HoursRequired\": {{$randomInt}},\r\n\t\t\"MaintenanceResources\": [{\r\n\t\t\t\"Resource\": {\r\n\t\t\t\t\"Id\": \"{{MaintenanceResources_Resource_Id}}\"\r\n\t\t\t},\r\n\t\t\t\"StatusId\": 1,\r\n\t\t\t\"AssignedGroupCraftId\": \"{{AssignedGroupCraftId}}\"\r\n\t\t}],\r\n        \"LinkedWorkTaskId\": \"{{work_task_guid}}\"\r\n\t}],\r\n\t\"MaintenanceMaterials\": [{\r\n\t\t\"BillOfMaterialId\": \"{{material_guid}}\",\r\n\t\t\"IsMaterialAvailable\": true,\r\n\t\t\"PlannedQuantity\": {{$randomInt}},\r\n        \"LinkedWorkTaskId\": \"{{work_task_guid}}\"\r\n\t}]\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorder",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorder"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Work Order - Status PREP",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"//have to put maintenance service array"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n\t\"Status\": \"PREP\",\r\n\t\"AssetId\": \"{{asset_guid}}\",\r\n\t\"WorkOrderWorkGroup\": \"{{workgroup_name}}\",\r\n\t\"BriefDescription\": \"{{$randomWords}}\",\r\n\t\"EstimatedDuration\": {{$randomInt}},\r\n\t\"LocationDescription\": \"{{$randomStreetAddress}}\",\r\n\t\"PointString\": \"144.96406820000004 -37.8162175\",\r\n\t\"CreatorId\": \"{{creator_resource_id}}\",\r\n\t\"RequestorId\": \"{{requestor_id_prep}}\",\r\n\t\"WorkOrderType\": {\r\n\t\t\"Id\": 4\r\n\t},\r\n\t\"RemedyCodeId\": {{RemedyCode_Id}},\r\n\t\"Scheduling\": {\r\n\t\t\"TargetStart\": \"2017-11-15T16:04:56\"\r\n\t}\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorder/",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorder",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Order - Add Comment via Update",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											""
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": " {\r\n    \"Id\": \"{{wo_guid}}\",\r\n    \"BriefDescription\": \"{{$randomWords}}\",\r\n    \"ExternalId\": null,\r\n    \"ReferenceNumber\": null,\r\n    \"WorkOrderSourceId\": null,\r\n    \"ReferenceWorkOrderId\": null,\r\n    \"LossOfServiceRequired\": false,\r\n    \"CreatorId\": \"{{creator_resource_id}}\",\r\n    \"RequestorId\": \"{{requestor_id_INPRG}}\",\r\n    \"ResponsibleOfficerId\": null,\r\n    \"RequestedBy\": null,\r\n    \"CreatedBy\": null,\r\n    \"ResponsibleOfficer\": null,\r\n    \"Status\": \"INPRG\",\r\n    //asset id has to match with the requirement the status either is INPRG, PREP or, RFE\r\n    \"AssetId\": \"{{wo_inprg_asset_id}}\",\r\n\t\"WorkOrderWorkGroup\": \"{{workgroup_name}}\",\r\n    \"PriorityId\": {{PriorityId}},\r\n    \"EstimatedDuration\": {{$randomInt}},\r\n    \"WorkTasks\": [\r\n        {\r\n            \"Id\": \"{{work_task_guid}}\",\r\n            \"FriendlyId\": 10,\r\n            \"BriefDescription\": \"{{$randomWords}}\",\r\n            \"Status\":1\r\n        }\r\n    ],\r\n    \"LocationDescription\": \"{{$randomStreetAddress}}\",\r\n    \"SupportingInformation\": [],\r\n    \"WRSupportingInformation\": [],\r\n    \"MaintenanceMaterials\": [\r\n        {\r\n            \"Id\": \"{{wo_material0_guid}}\",\r\n            \"BillOfMaterialId\": \"{{material_guid}}\",\r\n            \"IsMaterialAvailable\": false,\r\n            \"PlannedQuantity\": 1,\r\n            \"LinkedWorkTaskId\": \"{{work_task_guid}}\",\r\n            \"ActualQuantity\": 0.0,\r\n            \"ActualCosts\": {{$randomInt}}\r\n        }\r\n    ],\r\n    \r\n\r\n    \"WorkOrderType\": {\r\n        \"Id\": {{work_order_type_id}}\r\n       \r\n    },\r\n    \"FailureSubCodeId\": {{FailureSubCode_Id}},\r\n    \"CauseSubCodeId\": {{CauseSubCode_Id}},\r\n    \"RemedyCodeId\": {{RemedyCode_Id}},\r\n    \"PreventiveMaintenanceId\": null,\r\n    \"Scheduling\": {\r\n        \"DueDate\": \"2022-04-14T14:56:21\",\r\n        \"TargetStart\": \"2021-04-15T16:04:56\",\r\n        \"TargetFinish\": \"2022-04-14T14:56:21\",\r\n        \"ActualStart\": null,\r\n        \"ActualFinish\": null,\r\n        \"ScheduledStart\": \"2021-04-17T00:00:00\",\r\n        \"ScheduledFinish\": \"2021-04-18T00:00:00\",\r\n        \"_links\": [],\r\n        \"_embedded\": null\r\n    },\r\n    \"Labours\": [\r\n        {\r\n            \"Id\": \"{{wo_labours0_guid}}\",\r\n            \"LinkedWorkTaskId\": \"{{work_task_guid}}\",\r\n            \"PlannedGroupCraftId\": \"{{PlannedGroupCraft_Id}}\",\r\n            \"QuantityRequired\": 1.0,\r\n            \"HoursRequired\": 3.00,\r\n            \"PlannedCosts\": 0.00,\r\n            \"ActualCosts\": 0.0,\r\n            \"Craft\": \"A Cleaner\",\r\n            \"WorkGroup\": \"{{workgroup_name}}\",\r\n            \"MaintenanceResources\": [\r\n                {\r\n                    \"Id\": \"{{wo_labours0resource0_guid}}\",\r\n                    \"HoursRequired\": {{$randomInt}},\r\n                    \"ActualHours\": null,\r\n                    \"ActualCosts\": null,\r\n                    \"Resource\": {\r\n                        \"Id\": \"{{MaintenanceResources_Resource_Id}}\"\r\n                    },\r\n                    \"StatusId\": 1,\r\n                    \"ActualStart\": null,\r\n                    \"ActualFinish\": null,\r\n                    \"AssignedGroupCraftId\": \"{{AssignedGroupCraftId}}\",\r\n                    \"Craft\": \"A Cleaner\",\r\n                    \"WorkGroup\": \"{{workgroup_name}}\",\r\n                    \"WorkGroupId\": 1,\r\n                    \"GroupCraftId\": \"{{GroupCraftId}}\",\r\n                   \r\n                    \"CraftQuantity\": 1,\r\n                    \"_links\": [],\r\n                    \"_embedded\": null\r\n                }\r\n            ]\r\n        }\r\n    ],\r\n    \"MeterReadingRequired\": false\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorder/{{wo_guid}}",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorder",
+										"{{wo_guid}}"
+									]
+								},
+								"description": "Add a supporting information comment to a work order.   There is no separate API to add the comment, so need to update netire work order.  Note that the comment time can be set in the payload."
+							},
+							"response": []
+						},
+						{
+							"name": "Create Work Order - Status RFE",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 201){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    var woData = jsonData.Data[0]\r",
+											"    postman.setEnvironmentVariable(\"wo_guid\", woData.Id);\r",
+											"    if(woData.MaintenanceMaterials.length > 0)\r",
+											"    {\r",
+											"        postman.setEnvironmentVariable(\"wo_material0_guid\", woData.MaintenanceMaterials[0].Id);\r",
+											"    }\r",
+											"    else {\r",
+											"        postman.setEnvironmentVariable(\"wo_material0_guid\", null);\r",
+											"    }\r",
+											"    //MaintenanceServices\r",
+											"    if(woData.MaintenanceServices.length > 0)\r",
+											"    {\r",
+											"        postman.setEnvironmentVariable(\"wo_service0_guid\", woData.MaintenanceServices[0].Id);\r",
+											"    }\r",
+											"    else {\r",
+											"        postman.setEnvironmentVariable(\"wo_service0_guid\", null);\r",
+											"    }\r",
+											"    //Labours\r",
+											"    if(woData.Labours.length > 0)\r",
+											"    {\r",
+											"        postman.setEnvironmentVariable(\"wo_labours0_guid\", woData.Labours[0].Id);\r",
+											"        //Labours[0].MaintenanceResources\r",
+											"        if(woData.Labours[0].MaintenanceResources.length > 0)\r",
+											"        {\r",
+											"            postman.setEnvironmentVariable(\"wo_labours0resource0_guid\", woData.Labours[0].MaintenanceResources[0].Id);\r",
+											"        }\r",
+											"        else {\r",
+											"            postman.setEnvironmentVariable(\"wo_labours0resource0_guid\", null);\r",
+											"        }\r",
+											"    }\r",
+											"    else {\r",
+											"        postman.setEnvironmentVariable(\"wo_labours0_guid\", null);\r",
+											"        postman.setEnvironmentVariable(\"wo_labours0resource0_guid\", null);\r",
+											"    }\r",
+											"    \r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"var uuid = require(\"uuid\");\r",
+											"postman.setEnvironmentVariable(\"work_task_guid\", uuid.v4());"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n\t\"Status\": \"RFE\",\r\n\t\"BriefDescription\": \"{{$randomStreetAddress}}\",\r\n\t\"PriorityId\": \"{{PriorityId_rfe}}\",\r\n\t\"EstimatedDuration\": {{$randomInt}},\r\n\t\"LocationDescription\": \"{{$randomStreetAddress}}\",\r\n\t\"PointString\": \"144.96406820000004 -37.8162175\",\r\n\t\"CreatorId\": \"{{creator_resource_id}}\",\r\n\t\"RequestorId\": \"{{requestor_id_rfe}}\",\r\n\t\"WorkOrderType\": {\r\n\t\t\"Id\": {{work_order_type_id}}\r\n\t},\r\n\t\"FailureSubCodeId\": {{FailureSubCode_Id}},\r\n\t\"CauseSubCodeId\": {{CauseSubCode_Id}},\r\n\t\"RemedyCodeId\": {{RemedyCode_Id}},\r\n\t\"SupportingInformation\": [{\"Description\":\"{{$randomWords}}\"}],\r\n\t\"AssetId\": \"{{wo_inprg_asset_id}}\",\r\n\t\"Scheduling\": {\r\n\t\t\"TargetStart\": \"2021-04-15T16:04:56\",\r\n\t\t\"ScheduledStart\": \"2021-04-17T00:00:00\",\r\n\t\t\"ScheduledFinish\": \"2021-04-18T00:00:00\"\r\n\t},\r\n\t\"WorkTasks\": [{\r\n        \"Id\": \"{{work_task_guid}}\",\r\n\t\t\"FriendlyId\": {{$randomInt}},\r\n\t\t\"BriefDescription\": \"{{$randomWords}}\",\r\n\t\t\"Status\":1\r\n\t}],\r\n\t\"Labours\": [{\r\n\t\t\"PlannedGroupCraftId\": \"{{PlannedGroupCraft_Id}}\",\r\n\t\t\"QuantityRequired\": 1,\r\n\t\t\"HoursRequired\": {{$randomInt}},\r\n\t\t\"MaintenanceResources\": [{\r\n\t\t\t\"StatusId\": 5,\r\n            \"GroupCraftId\": \"{{GroupCraftId}}\"\r\n\t\t}],\r\n        \"LinkedWorkTaskId\": \"{{work_task_guid}}\"\r\n\t}],\r\n\t\"MaintenanceMaterials\": [{\r\n\t\t\"BillOfMaterialId\": \"{{material_guid}}\",\r\n\t\t\"IsMaterialAvailable\": true,\r\n\t\t\"PlannedQuantity\": {{$randomInt}},\r\n        \"LinkedWorkTaskId\": \"{{work_task_guid}}\"\r\n\t}],\r\n\t\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorder",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorder"
+									]
+								},
+								"description": "Create work order in 'RFE' ('Ready for Execution') status.  At this status the resource (contractor/internal crew) has not been assigned."
+							},
+							"response": []
+						},
+						{
+							"name": "Config - Get Resource for Created By",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"        postman.setEnvironmentVariable(\"creator_resource_id\", jsonData.ResourceList[0].Id);\r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/resource?requestParams.page=1&requestParams.pageSize=20",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"resource"
+									],
+									"query": [
+										{
+											"key": "requestParams.filters",
+											"value": "DisplayName~eq~'{{__wo_creator_name}}'",
+											"disabled": true
+										},
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "20"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Order Location",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorder/locations?requestParams.longitude=144.5437&requestParams.latitude=-37.6691 &requestParams.condition=near_point&requestParams.range=3400&requestParams.unit=metre&requestParams.page=1&requestParams.pageSize=500",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorder",
+										"locations"
+									],
+									"query": [
+										{
+											"key": "requestParams.longitude",
+											"value": "144.5437"
+										},
+										{
+											"key": "requestParams.latitude",
+											"value": "-37.6691 "
+										},
+										{
+											"key": "requestParams.condition",
+											"value": "near_point"
+										},
+										{
+											"key": "requestParams.range",
+											"value": "3400"
+										},
+										{
+											"key": "requestParams.unit",
+											"value": "metre"
+										},
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "500"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Order Resources Location Grouped by Work Order",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/workorderresources/locations?mode=workorder&requestParams.longitude=144.5437&requestParams.latitude=-37.6691&requestParams.condition=near_point&requestParams.range=3400&requestParams.unit=metre&requestParams.page=1&requestParams.pageSize=500",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"workorderresources",
+										"locations"
+									],
+									"query": [
+										{
+											"key": "mode",
+											"value": "workorder"
+										},
+										{
+											"key": "requestParams.longitude",
+											"value": "144.5437"
+										},
+										{
+											"key": "requestParams.latitude",
+											"value": "-37.6691"
+										},
+										{
+											"key": "requestParams.condition",
+											"value": "near_point"
+										},
+										{
+											"key": "requestParams.range",
+											"value": "3400"
+										},
+										{
+											"key": "requestParams.unit",
+											"value": "metre"
+										},
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "500"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Maintainence Configuration",
+					"item": [
+						{
+							"name": "Service Activity",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"        postman.setEnvironmentVariable(\"service_activity_guid\", jsonData.ResourceList[0].Id);\r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/serviceactivity?requestParams.page=1&requestParams.pageSize=20",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"serviceactivity"
+									],
+									"query": [
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "20"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Group Craft for Resource",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"        postman.setEnvironmentVariable(\"group_craft_id\", jsonData.ResourceList[0].GroupCraftId);\r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/resource/{{labour_resource_id}}/craft?requestParams.pageSize=500&requestParams.page=1&requestParams.filters=WorkGroupName~eq~'{{workgroup_name}}'",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"resource",
+										"{{labour_resource_id}}",
+										"craft"
+									],
+									"query": [
+										{
+											"key": "requestParams.pageSize",
+											"value": "500"
+										},
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.filters",
+											"value": "WorkGroupName~eq~'{{workgroup_name}}'"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Managed Resources",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/managedresource?page=1&pageSize=500&requestParams.filters=WorkGroupName~eq~'Fleet'",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"managedresource"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1"
+										},
+										{
+											"key": "pageSize",
+											"value": "500"
+										},
+										{
+											"key": "requestParams.filters",
+											"value": "WorkGroupName~eq~'Fleet'"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Bill Material",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"        postman.setEnvironmentVariable(\"material_guid\", jsonData.ResourceList[0].Id);\r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/billofmaterial?requestParams.filters=UnitType~eq~'Each'&requestParams.page=1&requestParams.pageSize=20",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"billofmaterial"
+									],
+									"query": [
+										{
+											"key": "requestParams.filters",
+											"value": "UnitType~eq~'Each'"
+										},
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "20"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Bill Material (filtered by Unit Type)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"        postman.setEnvironmentVariable(\"material_guid\", jsonData.ResourceList[0].Id);\r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/billofmaterial?requestParams.filters=UnitType~eq~'Each'&requestParams.page=1&requestParams.pageSize=20",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"billofmaterial"
+									],
+									"query": [
+										{
+											"key": "requestParams.filters",
+											"value": "UnitType~eq~'Each'"
+										},
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "20"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Maintenance Asset Type",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"        postman.setEnvironmentVariable(\"material_guid\", jsonData.ResourceList[0].Id);\r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/maintenanceassettype",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"maintenanceassettype"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Interruption Factor",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if(pm.response.code == 200){\r",
+											"    var jsonData = JSON.parse(responseBody);\r",
+											"    if(jsonData.ResourceList.length > 0){\r",
+											"        postman.setEnvironmentVariable(\"material_guid\", jsonData.ResourceList[0].Id);\r",
+											"    }\r",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/interruptionfactor?requestParams.page=1&requestParams.pageSize=500",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"interruptionfactor"
+									],
+									"query": [
+										{
+											"key": "requestParams.page",
+											"value": "1"
+										},
+										{
+											"key": "requestParams.pageSize",
+											"value": "500"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Work Type",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{assetic_site}}/api/v2/worktype",
+									"host": [
+										"{{assetic_site}}"
+									],
+									"path": [
+										"api",
+										"v2",
+										"worktype"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			],
+			"description": "Assetic Cloud Maintenance APIs - Work Order and Work Request"
+		},
+		{
+			"name": "Documents",
+			"item": [
+				{
+					"name": "Document",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"document_id\", jsonData.ResourceList[0].Id);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document"
+							],
+							"query": [
+								{
+									"key": "requestParams.filters",
+									"value": "ParentType~contains~'WorkOrder'",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Get the document metadata for the given document GUID"
+					},
+					"response": []
+				},
+				{
+					"name": "Config - Get Document Groups",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"//set the document category to the first returned record\r",
+									"if(jsonData.length > 0){\r",
+									"    postman.setEnvironmentVariable(\"doc_group_id\", jsonData[0].Id);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/group",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"group"
+							]
+						},
+						"description": "Get the list of available document groups that a document an be allocated to via the DocumentGroup property"
+					},
+					"response": []
+				},
+				{
+					"name": "Config - Get Document Categories",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"//set the document category to the first returned record\r",
+									"postman.setEnvironmentVariable(\"doc_cat_id\", jsonData[0].Id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/category",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"category"
+							]
+						},
+						"description": "Get a list of the configured document categories"
+					},
+					"response": []
+				},
+				{
+					"name": "Config - Get Document Sub Category for Category",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"//set the document category to the first returned record\r",
+									"if(jsonData.length > 0){\r",
+									"    postman.setEnvironmentVariable(\"doc_sub_cat_id\", jsonData[0].Id);\r",
+									"}\r",
+									"else {\r",
+									"    postman.setEnvironmentVariable(\"doc_sub_cat_id\", null);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/category/{{doc_cat_id}}/subcategory",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"category",
+								"{{doc_cat_id}}",
+								"subcategory"
+							]
+						},
+						"description": "For the given Document Category Id get a list of Document Sub-Categories"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Document metadata by Id",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{document_id}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{document_id}}"
+							]
+						},
+						"description": "Get the document metadata for the given document GUID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Document Metadata",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Id\": \"{{document_id}}\",\r\n    \"Label\": \"{{$randomWords}}\",\r\n    \"ExternalId\": \"{{$randomAlphaNumeric}}\",\r\n    \"Description\": \"{{$randomWords}}\",\r\n    \"ExpiryDate\": \"2022-01-04T20:01:47\",\r\n    \"DocumentGroup\": {{doc_group_id}},\r\n    \"DocumentSubCategory\": {{doc_sub_cat_id}},\r\n    \"DocumentCategory\": {{doc_cat_id}},\r\n    \"IsKeyPhoto\": false\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{document_id}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{document_id}}"
+							]
+						},
+						"description": "Update the metadata of a document"
+					},
+					"response": []
+				},
+				{
+					"name": "Set Document as Key Photo",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/6dcd19e0-44d6-40ff-b5ac-f6f475115f32/keyphoto",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"6dcd19e0-44d6-40ff-b5ac-f6f475115f32",
+								"keyphoto"
+							]
+						},
+						"description": "If the documeis associated with an asset, and is an image file, it can be set as the key photo for the asset."
+					},
+					"response": []
+				},
+				{
+					"name": "Link Document to Asset",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ParentId\": \"{{asset_guid}}\",\r\n  \"ParentType\": \"ComplexAsset\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{document_id}}/link",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{document_id}}",
+								"link"
+							]
+						},
+						"description": "Link an existing document to a parent record such as an asset or work order."
+					},
+					"response": []
+				},
+				{
+					"name": "Link Document to Work Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ParentId\": \"{{wr_guid}}\",\r\n  \"ParentType\": \"WorkRequest\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{document_id}}/link",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{document_id}}",
+								"link"
+							]
+						},
+						"description": "Link an existing document to a parent record such as an asset or work order."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Document",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{document_id}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{document_id}}"
+							]
+						},
+						"description": "Delete a document from Assetic"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Assessment Documents",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        postman.setEnvironmentVariable(\"document_id\", jsonData.ResourceList[0].Id);\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document?requestParams.sorts=LastModified-desc&requestParams.filters=ParentType~eq~15&requestParams.page=1&requestParams.pageSize=20",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document"
+							],
+							"query": [
+								{
+									"key": "requestParams.sorts",
+									"value": "LastModified-desc"
+								},
+								{
+									"key": "requestParams.filters",
+									"value": "ParentType~eq~15"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload documents multiple",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\r\n    \"AssetId\": \"{{asset_id}}\"\r\n    ,\"ExternalId\": \"{{$randomInt}}\",\r\n    \"FileProperty\": [\r\n        {\r\n            \"Name\": \"{{$randomFileName}}\",\r\n            \"FileSize\": {{$randomInt}},\r\n            \"mimetype\": \"txt\",\r\n            \"filecontent\": \"QXNzZXRpYw==\"\r\n        },\r\n        {\r\n            \"Name\": \"{{$randomFileName}}\",\r\n            \"FileSize\": {{$randomInt}},\r\n            \"mimetype\": \"txt\",\r\n            \"filecontent\": \"QXNzZXRpYw==\"\r\n        }\r\n    ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								""
+							]
+						},
+						"description": "Add multiple documents in a single post payload.  Not recommended becuase the response from the API ony return the document Id for one of the uploaded documents yet each document will have it's own Id."
+					},
+					"response": []
+				},
+				{
+					"name": "File Content",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{document_id}}/file",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{document_id}}",
+								"file"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "File Content Copy",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"ParentType\": \"ComplexAsset\",\r\n  \"DocumentGroup\": {{doc_group_id}},\r\n  \"DocumentSubCategory\": {{doc_sub_cat_id}},\r\n  \"DocumentCategory\": {{doc_cat_id}},\r\n  \"FileProperty\": [\r\n    {\r\n      \"Name\": \"{{$randomFileName}}\",\r\n      \"FileSize\": {{$randomInt}},\r\n      \"mimetype\": \"txt\",\r\n      \"filecontent\": \"QXNzZXRpYw==\"\r\n    }\r\n  ],\r\n  \"ParentIdentifier\": \"{{asset_id}}\",\r\n  \"ExpiryDate\": \"2016-06-02T23:45:29.559Z\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Document",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"ParentType\":\"ComplexAsset\",\r\n    \"ParentId\":\"{{asset_guid}}\",\r\n    \"DocumentGroup\": \"{{doc_group_id}}\"\r\n    ,\"DocumentCategory\": {{doc_cat_id}}\r\n    ,\"DocumentSubCategory\": {{doc_sub_cat_id}}\r\n    ,\"ExternalId\": \"{{$randomAlphaNumeric}}\",\r\n    \"FileProperty\": [\r\n        {\r\n            \"Name\": \"ExampleFile\",\r\n            \"FileSize\": 7,\r\n            \"mimetype\": \"txt\",\r\n            \"filecontent\": \"QXNzZXRpYw==\"\r\n        }\r\n    ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Document Staging Thumbnail Link",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/staging/document/downloadthumbnaillinks?ids={{document_id}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"staging",
+								"document",
+								"downloadthumbnaillinks"
+							],
+							"query": [
+								{
+									"key": "ids",
+									"value": "{{document_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Asset Document APIs"
+		},
+		{
+			"name": "Data Exchange",
+			"item": [
+				{
+					"name": "Upload File",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Uploads a CSV file for Data Exchange import \"Workflow\" > \"Assets\"\r",
+									"// File is a csv encoded in base64\r",
+									"// Decoded csv content preview is as below:\r",
+									"// Asset Id,To State,Buyer,Sell Value,Disposal Date,Reason\r",
+									"// testtest,Disposed,,,20/05/2021,asset end of life\r",
+									"\r",
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"Dataexchange_Docsguid\", jsonData[0].Id);\r",
+									"console.log(jsonData[0].Id)"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"ParentType\": 2,\r\n    \"ParentId\":\"{{asset_guid}}\",\r\n  \"DocumentGroup\": {{doc_group_id}},\r\n  \"DocumentSubCategory\": {{doc_sub_cat_id}},\r\n  \"DocumentCategory\": {{doc_cat_id}},\r\n  \"FileProperty\": [\r\n    {\r\n      \"Name\": \"{{$randomFileName}}\",\r\n      \"FileSize\": {{$randomInt}},\r\n      \"mimetype\": \"csv\",\r\n      \"filecontent\":\"QXNzZXQgSWQsVG8gU3RhdGUsQnV5ZXIsU2VsbCBWYWx1ZSxEaXNwb3NhbCBEYXRlLFJlYXNvbg0KdGVzdHRlc3QsRGlzcG9zZWQsLCwyMC8wNS8yMDIxLGFzc2V0IGVuZCBvZiBsaWZlDQo=\"\r\n    }\r\n  ],\r\n  \"ParentIdentifier\": \"{{asset_id}}\",\r\n  \"ExpiryDate\": \"2016-06-02T23:45:29.559Z\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "File Content",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{Dataexchange_Docsguid}}/file",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{Dataexchange_Docsguid}}",
+								"file"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Data Exchange No Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"Dataexchange_taskguid\", jsonData.Data[0].Id);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{   \"DocumentId\": \"{{Dataexchange_Docsguid}}\",\r\n    \"Module\": \"Workflow\",\r\n    \"Category\": \"assets\"\r\n    \r\n }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/DataExchangeJobNoProfile",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"DataExchangeJobNoProfile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Data Exchange Job",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"//retrieve the task id\r",
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"Dataexchange_taskguid\", jsonData);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "//obtain the profile id from the UI URL\r\n{\r\n  \"ProfileId\": \"98d3f2a8-8cb4-4f26-b5f0-2de2ad242d40\",\r\n  \"DocumentId\": \"{{Dataexchange_Docsguid}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/DataExchangeJob",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"DataExchangeJob"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Document Link creation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"Dataexchange_Docsguid\", jsonData[0].Id);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\t\"Label\": \"{{$randomFileName}}\",\r\n\t\"DocumentLink\": \"https://anything.pdf\",\r\n\t\"ParentIdentifier\": \"{{Dataexchange_Docsguid}}\",\r\n\t\"ParentType\": \"DataExchange\",\r\n\t\"DocumentGroup\": {{doc_group_id}},\r\n\t\"DocumentSubCategory\": {{doc_sub_cat_id}},\r\n\t\"DocumentCategory\": {{doc_cat_id}}\t\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Task Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    var jsonData = JSON.parse(responseBody);\r",
+									"    postman.setEnvironmentVariable(\"DataExchange_ErrorDocumentId\", jsonData.ErrorDocumentId);\r",
+									"    postman.setEnvironmentVariable(\"DataExchange_OutputDocumentId\", jsonData.OutputDocumentId);\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/DataExchangeTask/{{Dataexchange_taskguid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"DataExchangeTask",
+								"{{Dataexchange_taskguid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Task Output Document",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{DataExchange_OutputDocumentId}}/file",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{DataExchange_OutputDocumentId}}",
+								"file"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Task Error Document",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{DataExchange_ErrorDocumentId}}/file",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{DataExchange_ErrorDocumentId}}",
+								"file"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Search",
+			"item": [
+				{
+					"name": "Advanced Search Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/search?requestParams.id={{example_search_profile}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"search"
+							],
+							"query": [
+								{
+									"key": "requestParams.id",
+									"value": "{{example_search_profile}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Advanced Search Profile Metadata",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/search/{{example_search_profile}}/metadata",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"search",
+								"{{example_search_profile}}",
+								"metadata"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Export of Advance Search Profile Result",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"//obtain the profile id from the UI\r",
+									"\r",
+									"//export the profile\r",
+									"var jsonData = JSON.parse(responseBody);\r",
+									" postman.setEnvironmentVariable(\"Task_guid\", jsonData);\r",
+									" "
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/search/{{profile_guid_search}}/export/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"search",
+								"{{profile_guid_search}}",
+								"export",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Advance Search Profile in GeoJson Format",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/search/Geojson",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"search",
+								"Geojson"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Mappings of an Advanced Search Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/search/{{profile_guid_search}}/metadata",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"search",
+								"{{profile_guid_search}}",
+								"metadata"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Task Status",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/backgroundworker/{{Task_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"backgroundworker",
+								"{{Task_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Content",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/document/{{document_id}}/file",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"document",
+								"{{document_id}}",
+								"file"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Assessment Project",
+			"item": [
+				{
+					"name": "Create Assessment Project",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Use a moment to set the 'endDate' environment variable to today's date +14 days.\r",
+									"var moment = require(\"moment\")\r",
+									"pm.environment.set('endDate', moment().add(14, 'days').toISOString())"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// capture the system generated GUID for the Assessment Project if successfully created\r",
+									"if(pm.response.code == 201){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    if(jsonData.Data.length > 0){\r",
+									"        for(let i=0; i < jsonData.Data.length; i++) {\r",
+									"                postman.setEnvironmentVariable(\"asmt_project_guid\", jsonData.Data[i].Id)\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\t\"ProjectId\": \"PROJ{{$randomBankAccount}}\",\r\n\t\"Name\": \"Create Assessment Project API Example\",\r\n\t\"ProjectManager\": {\r\n\t\t\"Id\": \"{{resource_guid}}\"\r\n\t},\r\n\t\"Status\": \"Open\",\r\n\t\"StartDate\": \"{{$isoTimestamp}}\",\r\n\t\"EndDate\": \"{{endDate}}\",\r\n\t\"Comments\": \"{{$randomPhrase}}\",\r\n\t\"ProjectType\": {\r\n\t\t\"Id\": 1\r\n\t}\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentproject",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentproject"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Assessment Task",
+			"item": [
+				{
+					"name": "Assessment Tasks by Filter",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Set environment variables based on first result of paginated response\r",
+									"if(pm.response.code == 200){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(let i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"                postman.setEnvironmentVariable(\"asmt_task_guid\", jsonData.ResourceList[i].Id)\r",
+									"                postman.setEnvironmentVariable(\"asmt_friendly_task_id\", jsonData.ResourceList[i].TaskId)\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmenttask?requestParams.filters=Name~contains~'Assessment Task API Example'&requestParams.page=1&requestParams.pageSize=500&requestParams.sorts=CreatedDateTime-desc",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmenttask"
+							],
+							"query": [
+								{
+									"key": "requestParams.filters",
+									"value": "Name~contains~'Assessment Task API Example'"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								},
+								{
+									"key": "requestParams.sorts",
+									"value": "CreatedDateTime-desc"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Assessment Task",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// capture the system generated GUID for the Assessment Task if successfully created\r",
+									"if(pm.response.code == 201){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    if(jsonData.Data.length > 0){\r",
+									"        for(let i=0; i < jsonData.Data.length; i++) {\r",
+									"                postman.setEnvironmentVariable(\"asmt_task_guid\", jsonData.Data[i].Id)\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Use a moment to set the 'endDate' environment variable to today's date +14 days.\r",
+									"var moment = require(\"moment\")\r",
+									"pm.environment.set('endDate', moment().add(14, 'days').toISOString())"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\t\"AsmtProjectId\": null,\r\n\t\"Status\": \"Open\",\r\n\t\"RsResourceIdAssignedTo\": {\r\n\t\t\"Id\": \"{{resource_guid}}\"\r\n\t},\r\n\t\"Name\": \"Create Assessment Task API Example\",\r\n\t\"StartDate\": \"{{$isoTimestamp}}\",\r\n\t\"EndDate\": \"{{endDate}}\",\r\n\t\"CompletionDate\": \"{{$isoTimestamp}}\",\r\n\t\"Comments\": \"{{$randomPhrase}}\",\r\n\t\"ExternalIdentifier\": \"EXT15028\",\r\n\t\"AsmtTaskForms\": [\r\n\t\t{\r\n\t\t\t\"FormId\": \"{{assessment_form_guid}}\",\r\n\t\t\t\"Minimum\": 1,\r\n\t\t\t\"Maximum\": 5,\r\n\t\t\t\"Order\": 1\r\n\t\t}\r\n\t],\r\n\t\"TaskTypeId\": 1,\r\n\t\"AssetObject\": {\r\n\t\t\"Id\": \"{{asset_guid}}\"\r\n\t},\r\n    \"Priority\": 0,\r\n\t\"_links\": [],\r\n\t\"_embedded\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmenttask",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmenttask"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Assessment Task by GUID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Set environment variables based on response\r",
+									"if(pm.response.code == 200){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    postman.setEnvironmentVariable(\"asmt_task_guid\", jsonData.Id)\r",
+									"    postman.setEnvironmentVariable(\"asmt_friendly_task_id\", jsonData.TaskId)\r",
+									"    postman.setEnvironmentVariable(\"resource_guid\", jsonData.RsResourceIdAssignedTo.Id)\r",
+									"    postman.setEnvironmentVariable(\"assessment_form_guid\", jsonData.AsmtTaskForms[0].FormId)\r",
+									"    postman.setEnvironmentVariable(\"asset_guid\", jsonData.AssetObject.Id)\r",
+									"    }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmenttask/{{asmt_task_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmenttask",
+								"{{asmt_task_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Assessment Task by GUID",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Use a moment to set the 'endDate' environment variable to today's date +14 days.\r",
+									"var moment = require(\"moment\")\r",
+									"pm.environment.set('endDate', moment().add(14, 'days').toISOString())"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Id\": \"{{asmt_task_guid}}\",\r\n    \"AsmtProjectId\": null,\r\n    \"Status\": \"Completed\",\r\n    \"AssessmentLevel\": 0,\r\n    \"RsResourceIdAssignedTo\": {\r\n        \"Id\": \"{{resource_guid}}\"\r\n    },\r\n    \"Name\": \"Assessment task API example\",\r\n    \"TaskId\": \"TASK016292\",\r\n\t\"StartDate\": \"{{$isoTimestamp}}\",\r\n\t\"EndDate\": \"{{endDate}}\",\r\n\t\"CompletionDate\": \"{{$isoTimestamp}}\",\r\n    \"Priority\": 0,\r\n    \"ResultsCount\": 0,\r\n    \"Comments\": \"Updated comments using PUT request\",\r\n\t\"ExternalIdentifier\": \"EXT15028\",\r\n\t\"AsmtTaskForms\": [\r\n\t\t{\r\n\t\t\t\"FormId\": \"{{assessment_form_guid}}\",\r\n\t\t\t\"Minimum\": 1,\r\n\t\t\t\"Maximum\": 5,\r\n\t\t\t\"Order\": 1\r\n\t\t}\r\n\t],\r\n    \"TaskTypeId\": 1,\r\n\t\"AssetObject\": {\r\n\t\t\"Id\": \"{{asset_guid}}\"\r\n\t},\r\n    \"_links\": [],\r\n    \"_embedded\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmenttask/{{asmt_task_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmenttask",
+								"{{asmt_task_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Link Assessment Task to Form Result",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmenttask/{{asmt_task_guid}}/linkformresult/{{assessment_form_result_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmenttask",
+								"{{asmt_task_guid}}",
+								"linkformresult",
+								"{{assessment_form_result_guid}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Assessment Form",
+			"item": [
+				{
+					"name": "Assessment Form Details",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    if(jsonData.ResourceList.length > 0){\r",
+									"        for(let i=0; i < jsonData.ResourceList.length; i++) {\r",
+									"            if (jsonData.ResourceList[i].Status == \"Published\"){\r",
+									"                                postman.setEnvironmentVariable(\"assessment_form_guid\", jsonData.ResourceList[i].Id)\r",
+									"                                postman.setEnvironmentVariable(\"assessment_form_name\", jsonData.ResourceList[i].Name)\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentformdetail?requestParams.filters=Name~eq~'{{assessment_form_name}}'&requestParams.page=1&requestParams.pageSize=50",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentformdetail"
+							],
+							"query": [
+								{
+									"key": "requestParams.filters",
+									"value": "Name~eq~'{{assessment_form_name}}'"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								},
+								{
+									"key": "requestParams.pageSize",
+									"value": "50"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Assessment Form Definition",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 200){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    const formWidgets = jsonData.FormTabs[0].FormLayout.Widgets\r",
+									"    var controlNames = {}\r",
+									"    if(formWidgets.length > 0){\r",
+									"        for(let i=0; i < formWidgets.length; i++) {\r",
+									"            var formControls = formWidgets[i].FormControlGroup.FormControls;\r",
+									"            for(let j=0; j < formControls.length; j++){\r",
+									"                console.log(formControls[j].Name, formControls[j].Label, formControls[j].TypeName);\r",
+									"                if (formControls[j].TypeName === \"Textbox\" || formControls[j].TypeName === \"TextArea\"){\r",
+									"                    controlNames[formControls[j].Name] = pm.variables.replaceIn(\"{{$randomWord}}\");\r",
+									"                } else if (formControls[j].TypeName === \"UdfCombobox\"){\r",
+									"                    if(formControls[j].ComboboxItems.length > 0){\r",
+									"                         controlNames[formControls[j].Name] = formControls[j].ComboboxItems[0].Label;\r",
+									"                    }\r",
+									"                } else if (formControls[j].TypeName === \"Checkbox\"){\r",
+									"                    controlNames[formControls[j].Name] = \"true\";\r",
+									"                } else if (formControls[j].TypeName === \"NumericTextBox\"){\r",
+									"                    controlNames[formControls[j].Name] = 1;\r",
+									"                } else if (formControls[j].TypeName === \"DatePicker\"){\r",
+									"                    //var moment = require(\"moment\");\r",
+									"                    controlNames[formControls[j].Name] = pm.variables.replaceIn(\"{{$isoTimestamp}}\");\r",
+									"                } else if (formControls[j].TypeName === \"Map\"){\r",
+									"                        controlNames[\"mapLocationComment\"] = \"226 Collins St, Melbourne VIC 3000, Australia\";\r",
+									"                        controlNames[\"mapLocationPoint\"] = \"POINT (144.96623909071673 -37.815499609144474)\";\r",
+									"                } else if (formControls[j].TypeName === \"Timespan\"){\r",
+									"                    controlNames[formControls[j].Name] = pm.variables.replaceIn(\"{{$isoTimestamp}}\");\r",
+									"                }    \r",
+									"            }\r",
+									"            }\r",
+									"        console.log(controlNames);\r",
+									"        pm.environment.set(\"assessment_form_control_names\", JSON.stringify(controlNames));\r",
+									"        }\r",
+									"    }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentform/{{assessment_form_name}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentform",
+								"{{assessment_form_name}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Assessment Form",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentform/:name",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentform",
+								":name"
+							],
+							"variable": [
+								{
+									"key": "name",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Assessment Form",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    postman.setEnvironmentVariable(\"assessment_form_name\", jsonData)\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Name\": \"{{$randomWord}}{{$randomInt}}\",\r\n    \"Label\": \"{{$randomWord}}{{$randomInt}}\",\r\n\t\"Version\": 1,\r\n\t\"CanAddAttachment\": true,\r\n\t\"ApplicableLevelName\": \"Asset\",\r\n\t\"FormTabs\": [{\r\n\t\t\"Visible\": true,\r\n\t\t\"FormLayout\": {\r\n\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\"FormLayoutPattern\": {\r\n\t\t\t\t\"Id\": 2\r\n\t\t\t},\r\n\t\t\t\"Widgets\": [{\r\n\t\t\t\t\"ViewName\": \"FormControlGroup\",\r\n\t\t\t\t\"TypeName\": \"User\",\r\n\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\"FormControlGroup\": {\r\n\t\t\t\t\t\"FormControls\": [{\r\n\t\t\t\t\t\t\"Label\": \"Operating Facility\",\r\n\t\t\t\t\t\t\"TypeName\": \"Textbox\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"string\",\r\n\t\t\t\t\t\t\"HelpString\": \"The facility name\",\r\n\t\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"TextLength\": 100\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"Label\": \"Primary Location\",\r\n\t\t\t\t\t\t\"TypeName\": \"Textbox\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"string\",\r\n\t\t\t\t\t\t\"HelpString\": \"Main Location\",\r\n\t\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"TextLength\": 100\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"TypeName\": \"UdfCombobox\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"string\",\r\n\t\t\t\t\t\t\"HelpString\": \"Accessibility standards\",\r\n\t\t\t\t\t\t\"Label\": \"Complexity of Access\",\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"ComboboxItems\": [{\r\n\t\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\t\"Value\": \"Low\",\r\n\t\t\t\t\t\t\t\"Label\": \"Low\"\r\n\t\t\t\t\t\t},\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\t\"Value\": \"Medium\",\r\n\t\t\t\t\t\t\t\"Label\": \"Medium\"\r\n\t\t\t\t\t\t},\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\t\"Value\": \"High\",\r\n\t\t\t\t\t\t\t\"Label\": \"High\"\r\n\t\t\t\t\t\t}]\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"TypeName\": \"Checkbox\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"bool\",\r\n\t\t\t\t\t\t\"HelpString\": \"Is facility active\",\r\n\t\t\t\t\t\t\"Label\": \"Is Active\",\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"Visible\": true\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"TypeName\": \"Map\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"geography\",\r\n\t\t\t\t\t\t\"HelpString\": \"Facility location\",\r\n\t\t\t\t\t\t\"Label\": \"Location\",\r\n\t\t\t\t\t\t\"Required\": false,\r\n\t\t\t\t\t\t\"Visible\": true\r\n\t\t\t\t\t}],\r\n\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\"AreaIcon\": \"fa-check-square-o\",\r\n\t\t\t\t\t\"Label\": \"FCGFacility Detail\"\r\n\t\t\t\t},\r\n\t\t\t\t\"View\": \"Dashboard Partials/_FormControlGroup\",\r\n\t\t\t\t\"LayoutContainer\": 0,\r\n\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\"Label\": \"Facility Detail\",\r\n\t\t\t\t\"Collapsed\": false\r\n\t\t\t},\r\n\t\t\t{\r\n\t\t\t\t\"ViewName\": \"FormControlGroup\",\r\n\t\t\t\t\"TypeName\": \"User\",\r\n\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\"FormControlGroup\": {\r\n\t\t\t\t\t\"FormControls\": [{\r\n\t\t\t\t\t\t\"TypeName\": \"UdfCombobox\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"string\",\r\n\t\t\t\t\t\t\"HelpString\": \"Type of system\",\r\n\t\t\t\t\t\t\"Label\": \"System\",\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"ComboboxItems\": [{\r\n\t\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\t\"Value\": \"1\",\r\n\t\t\t\t\t\t\t\"Label\": \"Type A\"\r\n\t\t\t\t\t\t},\r\n\t\t\t\t\t\t{\r\n\t\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\t\"Value\": \"2\",\r\n\t\t\t\t\t\t\t\"Label\": \"Type B\"\r\n\t\t\t\t\t\t}]\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"Label\": \"Classification\",\r\n\t\t\t\t\t\t\"TypeName\": \"Textbox\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"string\",\r\n\t\t\t\t\t\t\"HelpString\": \"System classification\",\r\n\t\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"TextLength\": 200\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"NumericMax\": 100,\r\n\t\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\t\"Label\": \"Installed Area\",\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"TypeName\": \"NumericTextBox\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"NumericMin\": 0,\r\n\t\t\t\t\t\t\"NumericMask\": \"n0\",\r\n\t\t\t\t\t\t\"DataType\": \"decimal\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"NumericStep\": 1,\r\n\t\t\t\t\t\t\"HelpString\": \"Dimensions of facility\"\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"Label\": \"Comment\",\r\n\t\t\t\t\t\t\"TypeName\": \"TextArea\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"string\",\r\n\t\t\t\t\t\t\"HelpString\": \"As per standard AC:3423\",\r\n\t\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\t\"Required\": false,\r\n\t\t\t\t\t\t\"TextLength\": 1000\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"TypeName\": \"DatePicker\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"DateTime\",\r\n\t\t\t\t\t\t\"HelpString\": \"Last date serviced\",\r\n\t\t\t\t\t\t\"Label\": \"Tagged Service Date\",\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"Visible\": true\r\n\t\t\t\t\t},\r\n\t\t\t\t\t{\r\n\t\t\t\t\t\t\"TypeName\": \"Timespan\",\r\n\t\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\t\"SortOrder\": 1,\r\n\t\t\t\t\t\t\"DataType\": \"DateTime\",\r\n\t\t\t\t\t\t\"HelpString\": \"The date and time the unit was last started\",\r\n\t\t\t\t\t\t\"Label\": \"Running Since\",\r\n\t\t\t\t\t\t\"Required\": true,\r\n\t\t\t\t\t\t\"Visible\": true\r\n\t\t\t\t\t}],\r\n\t\t\t\t\t\"Visible\": true,\r\n\t\t\t\t\t\"Name\": \"W{{$randomPassword}}\",\r\n\t\t\t\t\t\"AreaIcon\": \"fa-check-square-o\",\r\n\t\t\t\t\t\"Label\": \"FCGSystem Detail\"\r\n\t\t\t\t},\r\n\t\t\t\t\"View\": \"Dashboard Partials/_FormControlGroup\",\r\n\t\t\t\t\"LayoutContainer\": 1,\r\n\t\t\t\t\"SortOrder\": 2,\r\n\t\t\t\t\"Label\": \"System Detail\",\r\n\t\t\t\t\"Collapsed\": false\r\n\t\t\t}],\r\n\t\t\t\"Label\": \"layoutTab Label\"\r\n\t\t},\r\n\t\t\"Label\": \"Tab Label\"\r\n\t}]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentform/",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentform",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clone Assesment Form",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentform/:id/clone",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentform",
+								":id",
+								"clone"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "hello"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Assesment Form",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"Name\": \"NEW\",\r\n    \"Label\": \"news\",\r\n    \"Version\": 1,\r\n    \"CanAddAttachment\": false,\r\n    \"FormTabs\": [\r\n        {\r\n            \"Label\": \"Tab\",\r\n            \"SortOrder\": 0,\r\n            \"Visible\": true,\r\n            \"FormLayout\": {\r\n                \"Name\": \"FORMLAYOUT1105\",\r\n                \"Label\": \"new\",\r\n                \"FormLayoutPattern\": {\r\n                    \"Id\": 2,\r\n                    \"Name\": \"Column66\",\r\n                    \"Label\": \"column: 2 equal columns\",\r\n                    \"LayoutPatternRows\": [\r\n                        {\r\n                            \"SortOrder\": 2,\r\n                            \"LayoutPatternColumns\": [\r\n                                {\r\n                                    \"ContainerId\": 0,\r\n                                    \"RelativeWidth\": 1,\r\n                                    \"LayoutPatternRow\": null,\r\n                                    \"_links\": [],\r\n                                    \"_embedded\": null\r\n                                },\r\n                                {\r\n                                    \"ContainerId\": 1,\r\n                                    \"RelativeWidth\": 1,\r\n                                    \"LayoutPatternRow\": null,\r\n                                    \"_links\": [],\r\n                                    \"_embedded\": null\r\n                                }\r\n                            ],\r\n                            \"Widgets\": null,\r\n                            \"HasTree\": false,\r\n                            \"ForIcon\": false,\r\n                            \"IsFirstRow\": false,\r\n                            \"RowCount\": 0,\r\n                            \"_links\": [],\r\n                            \"_embedded\": null\r\n                        }\r\n                    ],\r\n                    \"ContainerCount\": 2,\r\n                    \"FormType\": 0,\r\n                    \"_links\": [],\r\n                    \"_embedded\": null\r\n                },\r\n                \"Widgets\": [],\r\n                \"_links\": [],\r\n                \"_embedded\": null\r\n            },\r\n            \"_links\": [],\r\n            \"_embedded\": null\r\n        }\r\n    ],\r\n    \"ApplicableLevel\": 2,\r\n    \"ApplicableLevelName\": \"ComplexAsset\",\r\n    \"AttachedDocuments\": null,\r\n    \"_links\": [],\r\n    \"_embedded\": null\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentform/:name",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentform",
+								":name"
+							],
+							"variable": [
+								{
+									"key": "name",
+									"value": "FORM0800"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Assessment Form Result",
+			"item": [
+				{
+					"name": "Assessment Form Result by GUID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// capture the system generated GUID for the Assessment Task if successfully created\r",
+									"if(pm.response.code == 200){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    if(jsonData.Data.length > 0){\r",
+									"        for(let i=0; i < jsonData.Data.length; i++) {\r",
+									"                postman.setEnvironmentVariable(\"assessment_form_guid\", jsonData.Data[i].FormId)\r",
+									"                break;\r",
+									"            }\r",
+									"        }\r",
+									"    }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentformresult/{{assessment_form_result_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentformresult",
+								"{{assessment_form_result_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Assessment Form Result",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Use a moment to set the 'endDate' environment variable to today's date +14 days.\r",
+									"var moment = require(\"moment\")\r",
+									"pm.environment.set('endDate', moment().add(1, 'days').toISOString())\r",
+									"\r",
+									"// choose a random status between 0 (Active) and 100 (Inactive)\r",
+									"var resultStatus = [0, 100];\r",
+									"pm.environment.set(\"resultStatus\", resultStatus[Math.floor(Math.random() * resultStatus.length)]);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\t\"Id\": \"{{assessment_form_result_guid}}\",\r\n\t\"FormId\": \"{{assessment_form_guid}}\",\r\n\t\"FormResultStartTime\": \"{{$isoTimestamp}}\",\r\n\t\"FormResultEndTime\": \"{{endDate}}\",\r\n    \"FormResultLastModified\": \"{{$isoTimestamp}}\",\r\n\t\"FormResultStatus\": {{resultStatus}},\r\n\t\"FormResultComment\": \"Updated assessment form result via the API\",\r\n\t\"FormResultSkipped\": false,\r\n\t\"FormResultSkippedReason\": 0,\r\n\t\"FormResultRsResourceIdAssessedBy\": {\r\n\t\t\"Id\": \"{{resource_guid}}\",\r\n\t\t\"DisplayName\": \"{{resource_display_name}}\"\r\n\t},\r\n\t\"Data\": {\r\n\t\t\"C0616ee451ca64fd8aed2b85885a1e08e\": \"{{$randomCity}}\",\r\n\t\t\"C0cc9c225ccea445bbc43e96b3560083b\": \"{{$randomCountry}}\",\r\n\t\t\"C59d636e47dd4423f9bad07da82aec454\": \"{{$randomInt}}\",\r\n\t\t\"C608a43fee61b4a118b64f8aeed658b5a\": \"{{$isoTimestamp}}\",\r\n\t\t\"C1878625b38d74d66a8ed3ad7add738b2\": \"{{$isoTimestamp}}\",\r\n\t\t\"C80b329352e3441eabd120db9523a1339\": \"abc\"\r\n\t},\r\n\t\"ParentEntityId\": \"{{asmt_task_guid}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentformresult/{{assessment_form_result_guid}}",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentformresult",
+								"{{assessment_form_result_guid}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Assessment Form Result",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if(pm.response.code == 201){\r",
+									"    const jsonData = JSON.parse(responseBody)\r",
+									"    postman.setEnvironmentVariable(\"assessment_form_result_guid\", jsonData.Data[0].Id)\r",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n\t\t\t\"FormId\": \"{{assessment_form_guid}}\",\r\n\t\t\t\"FormResultStartTime\": \"{{$isoTimestamp}}\",\r\n\t\t\t\"FormResultEndTime\": \"{{$isoTimestamp}}\",\r\n\t\t\t\"FormResultLastModified\": \"{{$isoTimestamp}}\",\r\n\t\t\t\"FormResultStatus\": 1,\r\n\t\t\t\"FormResultComment\": \"Form results created via the API\",\r\n\t\t\t\"FormResultSkipped\": false,\r\n\t\t\t\"FormResultSkippedReason\": 0,\r\n\t\t\t\"FormResultRsResourceIdAssessedBy\": {\r\n\t\t\t\t\"Id\": \"{{resource_guid}}\",\r\n\t\t\t\t\"DisplayName\": \"{{resource_display_name}}\"\r\n\t\t\t},\r\n\t\t\t\"Data\": {{assessment_form_control_names}},\r\n\t\t\t\"ParentEntityId\": \"{{asmt_task_guid}}\"\r\n\t\t}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assessmentformresult",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assessmentformresult"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Version",
+			"item": [
+				{
+					"name": "Get Version",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/version",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"version"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "OData",
+			"item": [
+				{
+					"name": "OData",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/odata",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"odata"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OData metadata",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/odata/$metadata",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"odata",
+								"$metadata"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "API Limit",
+			"item": [
+				{
+					"name": "API test",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"function _parallel (tasks, callback) {\r",
+									"    // If no tasks have been provided then bail-out\r",
+									"    if (_.isEmpty(tasks)) {\r",
+									"        return callback(null);\r",
+									"    }\r",
+									"\r",
+									"    let itemsToProcess = [],\r",
+									"        results = [];\r",
+									"    tasks.forEach((task) => {\r",
+									"        const cb = (err, res) => {\r",
+									"            // Filter out the task that was completed based on the function reference\r",
+									"            itemsToProcess = itemsToProcess.filter((item) => item.task !== task);\r",
+									"            // If any error occured, then bail-out completely with the error\r",
+									"            if (err) {\r",
+									"                return callback(err);\r",
+									"            }\r",
+									"            // Push the results to the final resultant array\r",
+									"            results.push(res);\r",
+									"            // Check if all the items have been processed\r",
+									"            if (!_.size(itemsToProcess)) {\r",
+									"                return callback(null, results);\r",
+									"            }\r",
+									"        };\r",
+									"        // Store yet, do not run them because otherwise we could lose out onto the results\r",
+									"        // such as if any callback fires immediately\r",
+									"        itemsToProcess.push({ task, cb });\r",
+									"    });\r",
+									"\r",
+									"    itemsToProcess.forEach((item) => {\r",
+									"        if (typeof item.task !== 'function') {\r",
+									"            return cb(new Error('asyncParallel: Please provide a function'));\r",
+									"        }\r",
+									"        item.task(item.cb); \r",
+									"    });\r",
+									"}\r",
+									"\r",
+									"/**\r",
+									" * @description Run tasks in parallel\r",
+									" * \r",
+									" * @param {Array<Function>} tasks\r",
+									" * @param {Function} callback\r",
+									" */\r",
+									"function asyncParallel(tasks, callback = () => {}) {\r",
+									"    return _parallel(tasks, callback);\r",
+									"}\r",
+									"\r",
+									"// Loop through each asset and concat all the Ids into an array (urls)\r",
+									"const jsonData = JSON.parse(responseBody)\r",
+									"var urls=[]\r",
+									"for (let i = 0; i < jsonData.ResourceList.length; i++) {\r",
+									"    let obj = jsonData.ResourceList[i];   \r",
+									"    assetic_site = pm.collectionVariables.get(\"assetic_site\") \r",
+									"    one_url = assetic_site+'/api/v2/assets/'+ obj.Id\r",
+									"    urls=urls.concat(one_url)\r",
+									"}\r",
+									"\r",
+									"\r",
+									"\r",
+									"\r",
+									"// asynchronous APIs is used to run all the the request\r",
+									"asyncParallel(urls.map((url) => (cb) => pm.sendRequest({url, cb, \r",
+									"method:'GET',\r",
+									"header: {'content-type': 'application/json',  \"accept\": \"application/json\",\r",
+									"'authorization': request.headers[\"authorization\"]}})) );\r",
+									"\r",
+									"//This test script shows that a maximum of 250 async api requests are allowed per minute. Exceeding the rate limit is not recommended as APIs can slow down or even crash if they receive too many requests within a timeframe, though one might find the api still running well 90% of the time. Status '429 Too Many Requests' is supposedly returned in the api response if user hits the requests limit.\r",
+									"//Next: set time out to stop the async request being executed and run new  next request \r",
+									"\r",
+									"\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{assetic_site}}/api/v2/assets?requestParams.pageSize=500&requestParams.page=1",
+							"host": [
+								"{{assetic_site}}"
+							],
+							"path": [
+								"api",
+								"v2",
+								"assets"
+							],
+							"query": [
+								{
+									"key": "requestParams.pageSize",
+									"value": "500"
+								},
+								{
+									"key": "requestParams.page",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Validate Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {\r",
+							"  pm.response.to.have.status(200);\r",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{assetic_site}}/api/v2/auth",
+					"host": [
+						"{{assetic_site}}"
+					],
+					"path": [
+						"api",
+						"v2",
+						"auth"
+					]
+				},
+				"description": "Ensure the credentials are valid"
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "basic",
+		"basic": [
+			{
+				"key": "password",
+				"value": "{{assetic_token}}",
+				"type": "string"
+			},
+			{
+				"key": "username",
+				"value": "{{assetic_user}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.test('result' , function () {",
+					"    if(pm.response.code == 200){",
+					"        pm.response.to.have.status(200);",
+					"    }",
+					"    else if(pm.response.code == 201){",
+					"        pm.response.to.have.status(201);",
+					"    }",
+					"    else if(pm.request.method == \"GET\"){",
+					"        pm.response.to.have.status(200)",
+					"    }",
+					"    else {",
+					"        pm.response.to.have.status(201)",
+					"    }",
+					"})"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "assetic_site",
+			"value": ""
+		},
+		{
+			"key": "assetic_user",
+			"value": ""
+		},
+		{
+			"key": "assetic_token",
+			"value": ""
+		},
+		{
+			"key": "__asset_category",
+			"value": "",
+			"disabled": true
+		},
+		{
+			"key": "__wo_creator_name",
+			"value": ""
+		},
+		{
+			"key": "profile_guid_search",
+			"value": ""
+		},
+		{
+			"key": "FailureSubCode_Id",
+			"value": "",
+			"disabled": true
+		},
+		{
+			"key": "CauseSubCode_Id",
+			"value": "",
+			"disabled": true
+		},
+		{
+			"key": "responseData ",
+			"value": "",
+			"disabled": true
+		},
+		{
+			"key": "example_profile_guid_search",
+			"value": "c0512320-d067-e511-944d-06edd62954d7"
+		}
+	]
+}
