@@ -3,6 +3,16 @@ import { authService } from './authService';
 
 const API_URL = '/api';
 
+interface WorkRequestSource {
+  id: string;
+  name: string;
+}
+
+interface WorkRequestType {
+  Id: string;
+  Name: string;
+}
+
 interface CreateRequestParams {
   title: string;
   description?: string;

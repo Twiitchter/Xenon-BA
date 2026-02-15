@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { maintenanceService } from '../services/maintenanceService';
 
+interface WorkRequestSource {
+  id: string;
+  name: string;
+}
+
+interface WorkRequestType {
+  Id: string;
+  Name: string;
+}
+
 const Maintenance: React.FC = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,8 +42,8 @@ const Maintenance: React.FC = () => {
   });
 
   // Assetic integration state
-  const [workRequestSources, setWorkRequestSources] = useState<any[]>([]);
-  const [workRequestTypes, setWorkRequestTypes] = useState<any[]>([]);
+  const [workRequestSources, setWorkRequestSources] = useState<WorkRequestSource[]>([]);
+  const [workRequestTypes, setWorkRequestTypes] = useState<WorkRequestType[]>([]);
   const [asseticEnabled, setAsseticEnabled] = useState(false);
 
   // Messages state
@@ -162,6 +172,7 @@ const Maintenance: React.FC = () => {
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 required
+                aria-required="true"
               />
             </div>
             <div className="form-group">
@@ -183,6 +194,7 @@ const Maintenance: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, requestorDisplayName: e.target.value })}
                   placeholder="Your full name"
                   required
+                  aria-required="true"
                 />
               </div>
               <div className="form-group" style={{ flex: 1 }}>

@@ -542,6 +542,12 @@ router.get('/assetic/work-request-types', async (_req: AuthRequest, res: Respons
  * GET /api/maintenance/assetic/work-request-sources
  * Get available work request sources from Assetic API
  * This endpoint fetches work requests and extracts unique source IDs
+ * 
+ * NOTE: This is a temporary implementation that samples existing work requests
+ * to discover available sources. In production, consider:
+ * 1. Caching the sources list (with TTL)
+ * 2. Using a dedicated Assetic API endpoint if available
+ * 3. Storing sources in the database during sync operations
  */
 router.get('/assetic/work-request-sources', async (_req: AuthRequest, res: Response) => {
   try {
@@ -554,7 +560,12 @@ router.get('/assetic/work-request-sources', async (_req: AuthRequest, res: Respo
     const data = await asseticClient.getWorkRequests({ pageSize: 100 });
     
     // Extract unique source IDs from the response
-    const sources: any[] = [];
+    interface WorkRequestSource {
+      id: string;
+      name: string;
+    }
+    
+    const sources: WorkRequestSource[] = [];
     const seenIds = new Set<string>();
     
     if (data && data.ResourceList) {
