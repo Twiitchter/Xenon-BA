@@ -10,6 +10,41 @@ interface CreateRequestParams {
   category?: string;
   location?: string;
   assetId?: number;
+  
+  // Assetic required fields
+  workRequestSourceId?: string;
+  
+  // Requestor details (at least displayName OR firstName+surname required by Assetic)
+  requestorDisplayName?: string;
+  requestorFirstName?: string;
+  requestorSurname?: string;
+  requestorEmail?: string;
+  requestorPhone?: string;
+  requestorMobile?: string;
+  requestorTypeId?: string;
+  
+  // Optional Assetic fields
+  workRequestSubtypeId?: string;
+  workRequestPriorityId?: string;
+  externalIdentifier?: string;
+  supportingInformation?: string;
+  
+  // Physical location details
+  streetNumber?: string;
+  streetAddress?: string;
+  citySuburb?: string;
+  state?: string;
+  zipPostcode?: string;
+  country?: string;
+  otherLocation?: string;
+  whereLocation?: string;
+  
+  // Spatial location
+  spatialLocation?: string;
+  
+  // Reactive inspection
+  reactiveInspectorName?: string;
+  reactiveInspectionDate?: string;
 }
 
 interface UpdateRequestParams {

@@ -83,6 +83,35 @@ router.post(
     body('category').optional().trim(),
     body('location').optional().trim(),
     body('assetId').optional().isInt(),
+    // Assetic required fields
+    body('workRequestSourceId').optional().trim(),
+    // Requestor fields
+    body('requestorDisplayName').optional().trim(),
+    body('requestorFirstName').optional().trim(),
+    body('requestorSurname').optional().trim(),
+    body('requestorEmail').optional().isEmail().normalizeEmail(),
+    body('requestorPhone').optional().trim(),
+    body('requestorMobile').optional().trim(),
+    body('requestorTypeId').optional().trim(),
+    // Optional Assetic fields
+    body('workRequestSubtypeId').optional().trim(),
+    body('workRequestPriorityId').optional().trim(),
+    body('externalIdentifier').optional().trim(),
+    body('supportingInformation').optional().trim(),
+    // Physical location fields
+    body('streetNumber').optional().trim(),
+    body('streetAddress').optional().trim(),
+    body('citySuburb').optional().trim(),
+    body('state').optional().trim(),
+    body('zipPostcode').optional().trim(),
+    body('country').optional().trim(),
+    body('otherLocation').optional().trim(),
+    body('whereLocation').optional().trim(),
+    // Spatial location
+    body('spatialLocation').optional().trim(),
+    // Reactive inspection
+    body('reactiveInspectorName').optional().trim(),
+    body('reactiveInspectionDate').optional().isISO8601(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -91,7 +120,15 @@ router.post(
     }
 
     try {
-      const { title, description, priority, category, location, assetId } = req.body;
+      const { 
+        title, description, priority, category, location, assetId,
+        workRequestSourceId, requestorDisplayName, requestorFirstName, requestorSurname,
+        requestorEmail, requestorPhone, requestorMobile, requestorTypeId,
+        workRequestSubtypeId, workRequestPriorityId, externalIdentifier, supportingInformation,
+        streetNumber, streetAddress, citySuburb, state, zipPostcode, country,
+        otherLocation, whereLocation, spatialLocation,
+        reactiveInspectorName, reactiveInspectionDate
+      } = req.body;
 
       const [inserted] = await db('maintenance_requests')
         .insert({
@@ -102,6 +139,30 @@ router.post(
           priority: priority || 'medium',
           category: category || null,
           location: location || null,
+          // Assetic fields
+          work_request_source_id: workRequestSourceId || null,
+          requestor_display_name: requestorDisplayName || null,
+          requestor_first_name: requestorFirstName || null,
+          requestor_surname: requestorSurname || null,
+          requestor_email: requestorEmail || null,
+          requestor_phone: requestorPhone || null,
+          requestor_mobile: requestorMobile || null,
+          requestor_type_id: requestorTypeId || null,
+          work_request_subtype_id: workRequestSubtypeId || null,
+          work_request_priority_id: workRequestPriorityId || null,
+          external_identifier: externalIdentifier || null,
+          supporting_information: supportingInformation || null,
+          street_number: streetNumber || null,
+          street_address: streetAddress || null,
+          city_suburb: citySuburb || null,
+          state: state || null,
+          zip_postcode: zipPostcode || null,
+          country: country || null,
+          other_location: otherLocation || null,
+          where_location: whereLocation || null,
+          spatial_location: spatialLocation || null,
+          reactive_inspector_name: reactiveInspectorName || null,
+          reactive_inspection_date: reactiveInspectionDate || null,
         })
         .returning('*');
 

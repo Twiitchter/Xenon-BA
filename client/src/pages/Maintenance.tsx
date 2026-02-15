@@ -13,6 +13,19 @@ const Maintenance: React.FC = () => {
     priority: 'medium',
     category: '',
     location: '',
+    // Requestor information
+    requestorDisplayName: '',
+    requestorEmail: '',
+    requestorPhone: '',
+    requestorMobile: '',
+    // Physical location details
+    streetAddress: '',
+    citySuburb: '',
+    state: '',
+    zipPostcode: '',
+    country: '',
+    // Optional fields
+    supportingInformation: '',
   });
 
   // Messages state
@@ -44,7 +57,23 @@ const Maintenance: React.FC = () => {
     try {
       await maintenanceService.createRequest(formData);
       setShowForm(false);
-      setFormData({ title: '', description: '', priority: 'medium', category: '', location: '' });
+      setFormData({ 
+        title: '', 
+        description: '', 
+        priority: 'medium', 
+        category: '', 
+        location: '',
+        requestorDisplayName: '',
+        requestorEmail: '',
+        requestorPhone: '',
+        requestorMobile: '',
+        streetAddress: '',
+        citySuburb: '',
+        state: '',
+        zipPostcode: '',
+        country: '',
+        supportingInformation: '',
+      });
       fetchRequests();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create request');
@@ -110,6 +139,51 @@ const Maintenance: React.FC = () => {
                 rows={3}
               />
             </div>
+            
+            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Contact Information</h4>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Contact Name *</label>
+                <input
+                  type="text"
+                  value={formData.requestorDisplayName}
+                  onChange={(e) => setFormData({ ...formData, requestorDisplayName: e.target.value })}
+                  placeholder="Your full name"
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={formData.requestorEmail}
+                  onChange={(e) => setFormData({ ...formData, requestorEmail: e.target.value })}
+                  placeholder="contact@example.com"
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Phone</label>
+                <input
+                  type="tel"
+                  value={formData.requestorPhone}
+                  onChange={(e) => setFormData({ ...formData, requestorPhone: e.target.value })}
+                  placeholder="Office phone"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Mobile</label>
+                <input
+                  type="tel"
+                  value={formData.requestorMobile}
+                  onChange={(e) => setFormData({ ...formData, requestorMobile: e.target.value })}
+                  placeholder="Mobile phone"
+                />
+              </div>
+            </div>
+
+            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Request Details</h4>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label>Priority</label>
@@ -132,16 +206,78 @@ const Maintenance: React.FC = () => {
                   placeholder="e.g. Plumbing, Electrical"
                 />
               </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Location</label>
+            </div>
+
+            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Location Information</h4>
+            <div className="form-group">
+              <label>General Location</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="e.g. Building A, Room 101"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 2 }}>
+                <label>Street Address</label>
                 <input
                   type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="e.g. Building A, Room 101"
+                  value={formData.streetAddress}
+                  onChange={(e) => setFormData({ ...formData, streetAddress: e.target.value })}
+                  placeholder="Street address"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>City/Suburb</label>
+                <input
+                  type="text"
+                  value={formData.citySuburb}
+                  onChange={(e) => setFormData({ ...formData, citySuburb: e.target.value })}
+                  placeholder="City"
                 />
               </div>
             </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>State</label>
+                <input
+                  type="text"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  placeholder="State"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Zip/Postcode</label>
+                <input
+                  type="text"
+                  value={formData.zipPostcode}
+                  onChange={(e) => setFormData({ ...formData, zipPostcode: e.target.value })}
+                  placeholder="Postcode"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Country</label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  placeholder="Country"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Supporting Information</label>
+              <textarea
+                value={formData.supportingInformation}
+                onChange={(e) => setFormData({ ...formData, supportingInformation: e.target.value })}
+                rows={2}
+                placeholder="Any additional details that might be helpful"
+              />
+            </div>
+
             <button type="submit">Submit Request</button>
           </form>
         </div>
