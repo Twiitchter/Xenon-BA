@@ -311,7 +311,7 @@ const MyRequests: React.FC = () => {
                       ) : (
                         messages.map((msg) => (
                           <div key={msg.id} className="message-bubble">
-                            <strong>{msg.sender_username || 'Unknown'}</strong>
+                            <strong>{msg.sender_username || 'System'}</strong>
                             <span className="message-meta">
                               {new Date(msg.created_at).toLocaleString()}
                             </span>

@@ -53,17 +53,19 @@ router.get('/my-items', async (req: AuthRequest, res: Response) => {
     const requests = await wrQuery.orderBy('mr.created_at', 'desc');
 
     // Transform and combine results, applying display logic
-    const items = requests.map(r => ({
+    const allItems = requests.map(r => ({
       ...r,
       // If work order exists, show work order status
       display_type: r.work_order_id ? 'work_order' : 'request',
       display_status: r.work_order_id ? r.work_order_status : r.status,
-    })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(Number(offset), Number(offset) + Number(limit));
+    })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const total = allItems.length;
+    const items = allItems.slice(Number(offset), Number(offset) + Number(limit));
 
     res.json({
       items,
-      total: items.length,
+      total,
     });
   } catch (error) {
     console.error('Error fetching user items:', error);
