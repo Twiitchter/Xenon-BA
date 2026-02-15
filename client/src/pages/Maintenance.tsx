@@ -26,6 +26,9 @@ const Maintenance: React.FC = () => {
     country: '',
     // Optional fields
     supportingInformation: '',
+    // Assetic fields
+    workRequestSourceId: '',
+    workRequestSubtypeId: '',
   });
 
   // Assetic integration state
@@ -101,6 +104,8 @@ const Maintenance: React.FC = () => {
         zipPostcode: '',
         country: '',
         supportingInformation: '',
+        workRequestSourceId: '',
+        workRequestSubtypeId: '',
       });
       fetchRequests();
     } catch (err: any) {
@@ -235,6 +240,41 @@ const Maintenance: React.FC = () => {
                 />
               </div>
             </div>
+
+            {asseticEnabled && workRequestSources.length > 0 && (
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Request Source</label>
+                  <select
+                    value={formData.workRequestSourceId}
+                    onChange={(e) => setFormData({ ...formData, workRequestSourceId: e.target.value })}
+                  >
+                    <option value="">Select a source...</option>
+                    {workRequestSources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {workRequestTypes.length > 0 && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Request Type</label>
+                    <select
+                      value={formData.workRequestSubtypeId}
+                      onChange={(e) => setFormData({ ...formData, workRequestSubtypeId: e.target.value })}
+                    >
+                      <option value="">Select a type...</option>
+                      {workRequestTypes.map((type: any) => (
+                        <option key={type.Id} value={type.Id}>
+                          {type.Name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
 
             <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Location Information</h4>
             <div className="form-group">
