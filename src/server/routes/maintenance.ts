@@ -50,54 +50,16 @@ router.get('/my-items', async (req: AuthRequest, res: Response) => {
       wrQuery = wrQuery.where('mr.priority', priority as string);
     }
 
-    // Get work orders where the user is assigned or created from their request
-    let woQuery = db('work_orders as wo')
-      .join('maintenance_requests as mr', 'wo.request_id', 'mr.id')
-      .leftJoin('users as u', 'wo.assigned_to', 'u.id')
-      .select(
-        'wo.id',
-        'wo.title',
-        'wo.description',
-        'wo.priority',
-        'wo.status',
-        db.raw('NULL as category'),
-        db.raw('NULL as location'),
-        'wo.created_at',
-        'wo.updated_at',
-        db.raw('? as item_type', ['work_order']),
-        db.raw('NULL as work_order_id'),
-        db.raw('NULL as work_order_status'),
-        'wo.craft as work_order_craft',
-        'u.username as assigned_to_username',
-        'wo.scheduled_date'
-      )
-      .where('mr.requested_by', userId);
+    const requests = await wrQuery.orderBy('mr.created_at', 'desc');
 
-    if (status) {
-      woQuery = woQuery.where('wo.status', status as string);
-    }
-    if (priority) {
-      woQuery = woQuery.where('wo.priority', priority as string);
-    }
-
-    const [requests, workOrders] = await Promise.all([
-      wrQuery.orderBy('mr.created_at', 'desc').limit(Number(limit)).offset(Number(offset)),
-      woQuery.orderBy('wo.created_at', 'desc').limit(Number(limit)).offset(Number(offset))
-    ]);
-
-    // Combine and sort by created_at, removing duplicate requests that have work orders
-    const requestIdsWithWorkOrders = new Set(
-      requests.filter(r => r.work_order_id).map(r => r.id)
-    );
-
-    const items = [
-      ...requests.map(r => ({
-        ...r,
-        // If work order exists, show work order status
-        display_type: r.work_order_id ? 'work_order' : 'request',
-        display_status: r.work_order_id ? r.work_order_status : r.status,
-      })),
-    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // Transform and combine results, applying display logic
+    const items = requests.map(r => ({
+      ...r,
+      // If work order exists, show work order status
+      display_type: r.work_order_id ? 'work_order' : 'request',
+      display_status: r.work_order_id ? r.work_order_status : r.status,
+    })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(Number(offset), Number(offset) + Number(limit));
 
     res.json({
       items,

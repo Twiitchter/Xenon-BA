@@ -21,6 +21,13 @@ interface MyItem {
   scheduled_date?: string;
 }
 
+interface Message {
+  id: number;
+  sender_username: string;
+  created_at: string;
+  message: string;
+}
+
 const MyRequests: React.FC = () => {
   const [items, setItems] = useState<MyItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,7 +36,7 @@ const MyRequests: React.FC = () => {
   
   // Detail view state
   const [selectedItem, setSelectedItem] = useState<MyItem | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(false);
 
