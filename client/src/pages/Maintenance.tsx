@@ -28,6 +28,11 @@ const Maintenance: React.FC = () => {
     supportingInformation: '',
   });
 
+  // Assetic integration state
+  const [workRequestSources, setWorkRequestSources] = useState<any[]>([]);
+  const [workRequestTypes, setWorkRequestTypes] = useState<any[]>([]);
+  const [asseticEnabled, setAsseticEnabled] = useState(false);
+
   // Messages state
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -36,7 +41,30 @@ const Maintenance: React.FC = () => {
 
   useEffect(() => {
     fetchRequests();
+    fetchAsseticData();
   }, []);
+
+  const fetchAsseticData = async () => {
+    try {
+      // Try to fetch Assetic data, but don't fail if integration is not enabled
+      const [sourcesRes, typesRes] = await Promise.allSettled([
+        maintenanceService.getWorkRequestSources(),
+        maintenanceService.getWorkRequestTypes(),
+      ]);
+
+      if (sourcesRes.status === 'fulfilled' && sourcesRes.value?.sources) {
+        setWorkRequestSources(sourcesRes.value.sources);
+        setAsseticEnabled(true);
+      }
+
+      if (typesRes.status === 'fulfilled' && typesRes.value?.ResourceList) {
+        setWorkRequestTypes(typesRes.value.ResourceList);
+      }
+    } catch (err) {
+      // Silently fail - Assetic integration may not be enabled
+      console.log('Assetic integration not available');
+    }
+  };
 
   const fetchRequests = async () => {
     setLoading(true);

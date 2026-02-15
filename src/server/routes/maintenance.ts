@@ -2,11 +2,19 @@ import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import db from '../database';
+import asseticClient from '../services/asseticClient';
 
 const router = Router();
 
 // All routes require authentication
 router.use(authenticateToken);
+
+// Set Assetic logging context for Assetic API calls
+router.use((req: AuthRequest, _res: Response, next: Function) => {
+  asseticClient.setContext(req.user?.id, 'maintenance');
+  _res.on('finish', () => asseticClient.clearContext());
+  next();
+});
 
 // ─── Maintenance Requests ───────────────────────────────────────────────────
 
@@ -506,6 +514,65 @@ router.get('/crafts', async (_req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Error fetching crafts:', error);
     res.status(500).json({ error: 'Failed to fetch crafts' });
+  }
+});
+
+// ─── Assetic Integration Endpoints ─────────────────────────────────────
+
+/**
+ * GET /api/maintenance/assetic/work-request-types
+ * Get available work request types from Assetic API
+ */
+router.get('/assetic/work-request-types', async (_req: AuthRequest, res: Response) => {
+  try {
+    const enabled = await asseticClient.isEnabled();
+    if (!enabled) {
+      return res.status(503).json({ error: 'Assetic integration is not enabled' });
+    }
+
+    const types = await asseticClient.getWorkRequestTypes();
+    res.json(types);
+  } catch (error) {
+    console.error('Error fetching work request types:', error);
+    res.status(500).json({ error: 'Failed to fetch work request types from Assetic' });
+  }
+});
+
+/**
+ * GET /api/maintenance/assetic/work-request-sources
+ * Get available work request sources from Assetic API
+ * This endpoint fetches work requests and extracts unique source IDs
+ */
+router.get('/assetic/work-request-sources', async (_req: AuthRequest, res: Response) => {
+  try {
+    const enabled = await asseticClient.isEnabled();
+    if (!enabled) {
+      return res.status(503).json({ error: 'Assetic integration is not enabled' });
+    }
+
+    // Fetch a sample of work requests to extract source IDs
+    const data = await asseticClient.getWorkRequests({ pageSize: 100 });
+    
+    // Extract unique source IDs from the response
+    const sources: any[] = [];
+    const seenIds = new Set<string>();
+    
+    if (data && data.ResourceList) {
+      for (const wr of data.ResourceList) {
+        if (wr.WorkRequestSourceId && !seenIds.has(wr.WorkRequestSourceId)) {
+          seenIds.add(wr.WorkRequestSourceId);
+          sources.push({
+            id: wr.WorkRequestSourceId,
+            name: wr.WorkRequestSource || `Source ${wr.WorkRequestSourceId}`,
+          });
+        }
+      }
+    }
+
+    res.json({ sources });
+  } catch (error) {
+    console.error('Error fetching work request sources:', error);
+    res.status(500).json({ error: 'Failed to fetch work request sources from Assetic' });
   }
 });
 

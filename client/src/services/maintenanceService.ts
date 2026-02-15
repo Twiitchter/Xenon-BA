@@ -166,6 +166,22 @@ class MaintenanceService {
     });
     return response.data;
   }
+
+  // ─── Assetic Integration ──────────────────────────────────────────
+
+  async getWorkRequestTypes() {
+    const response = await axios.get(`${API_URL}/maintenance/assetic/work-request-types`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data;
+  }
+
+  async getWorkRequestSources() {
+    const response = await axios.get(`${API_URL}/maintenance/assetic/work-request-sources`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data;
+  }
 }
 
 export const maintenanceService = new MaintenanceService();
