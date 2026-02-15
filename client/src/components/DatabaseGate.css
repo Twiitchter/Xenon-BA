@@ -1,0 +1,88 @@
+/* Database Gate – loading spinner overlay */
+.db-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary, #0d1520);
+}
+
+.db-gate-card {
+  text-align: center;
+  max-width: 420px;
+  padding: 48px 36px;
+  background: var(--bg-card, #162033);
+  border: 1px solid var(--border, #1e3050);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Spinner */
+.db-gate-spinner {
+  display: inline-flex;
+  margin-bottom: 24px;
+}
+
+.db-gate-spinner-svg {
+  width: 48px;
+  height: 48px;
+  color: var(--accent, #0ea5e9);
+  animation: db-gate-spin 1.2s linear infinite;
+}
+
+.db-gate-spinner-svg circle {
+  stroke-dasharray: 90, 150;
+  stroke-dashoffset: 0;
+  animation: db-gate-dash 1.4s ease-in-out infinite;
+}
+
+@keyframes db-gate-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes db-gate-dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+/* Text */
+.db-gate-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text-primary, #e0e8f0);
+  margin-bottom: 12px;
+}
+
+.db-gate-message {
+  font-size: 0.95rem;
+  color: var(--text-secondary, #8899aa);
+  margin-bottom: 8px;
+}
+
+.db-gate-attempt {
+  font-size: 0.82rem;
+  color: var(--text-muted, #5a6a7a);
+  margin-bottom: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.db-gate-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted, #5a6a7a);
+  opacity: 0.8;
+  line-height: 1.5;
+}

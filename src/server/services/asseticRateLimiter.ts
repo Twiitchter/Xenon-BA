@@ -3,9 +3,13 @@ import { EventEmitter } from 'events';
 /**
  * Rate-limited queue for Assetic API calls.
  *
- * Hard cap: 250 requests per rolling 60-second window.
+ * Hard cap: configurable requests per rolling 60-second window
+ * (defaults to 250 — Assetic's documented per-agent limit).
  * When the limit is reached, new calls are queued and executed
  * in FIFO order as capacity becomes available.
+ *
+ * Multiple instances can be created (one per API agent worker)
+ * to multiply total throughput.
  */
 
 interface QueuedRequest<T = any> {
@@ -32,8 +36,8 @@ export interface RateLimitStatus {
   msUntilNextSlot: number;
 }
 
-class AsseticRateLimiter extends EventEmitter {
-  private readonly MAX_PER_MINUTE = 250;
+export class AsseticRateLimiter extends EventEmitter {
+  private readonly maxPerMinute: number;
   private readonly WINDOW_MS = 60_000; // 60 seconds
   private readonly DRAIN_INTERVAL_MS = 200; // check queue every 200ms
 
@@ -49,6 +53,15 @@ class AsseticRateLimiter extends EventEmitter {
   /** Counter for generating request IDs */
   private requestCounter = 0;
 
+  /** Optional label for logging (e.g. "Agent 1") */
+  readonly label: string;
+
+  constructor(options?: { maxPerMinute?: number; label?: string }) {
+    super();
+    this.maxPerMinute = options?.maxPerMinute ?? 250;
+    this.label = options?.label ?? 'default';
+  }
+
   /**
    * Execute an API call through the rate limiter.
    * If under the limit, it runs immediately.
@@ -58,7 +71,7 @@ class AsseticRateLimiter extends EventEmitter {
     this.pruneWindow();
 
     // If under limit, execute immediately
-    if (this.callTimestamps.length < this.MAX_PER_MINUTE) {
+    if (this.callTimestamps.length < this.maxPerMinute) {
       this.recordCall();
       return fn();
     }
@@ -69,7 +82,7 @@ class AsseticRateLimiter extends EventEmitter {
       this.queue.push({ id, execute: fn, resolve, reject, enqueuedAt: Date.now(), description });
 
       console.log(
-        `[AsseticRateLimiter] Rate limit reached (${this.MAX_PER_MINUTE}/min). ` +
+        `[AsseticRateLimiter:${this.label}] Rate limit reached (${this.maxPerMinute}/min). ` +
         `Queued request #${id} (queue depth: ${this.queue.length})`
       );
 
@@ -85,7 +98,7 @@ class AsseticRateLimiter extends EventEmitter {
     this.pruneWindow();
 
     const callsInWindow = this.callTimestamps.length;
-    const remaining = Math.max(0, this.MAX_PER_MINUTE - callsInWindow);
+    const remaining = Math.max(0, this.maxPerMinute - callsInWindow);
     const isThrottled = remaining === 0;
 
     let msUntilNextSlot = 0;
@@ -96,7 +109,7 @@ class AsseticRateLimiter extends EventEmitter {
 
     return {
       callsInWindow,
-      maxCallsPerWindow: this.MAX_PER_MINUTE,
+      maxCallsPerWindow: this.maxPerMinute,
       remaining,
       queueLength: this.queue.length,
       isThrottled,
@@ -131,13 +144,13 @@ class AsseticRateLimiter extends EventEmitter {
     while (this.queue.length > 0) {
       this.pruneWindow();
 
-      if (this.callTimestamps.length < this.MAX_PER_MINUTE) {
+      if (this.callTimestamps.length < this.maxPerMinute) {
         const item = this.queue.shift()!;
         this.recordCall();
 
         const waitTime = Date.now() - item.enqueuedAt;
         console.log(
-          `[AsseticRateLimiter] Dequeuing #${item.id} after ${waitTime}ms wait ` +
+          `[AsseticRateLimiter:${this.label}] Dequeuing #${item.id} after ${waitTime}ms wait ` +
           `(remaining queue: ${this.queue.length})`
         );
 
@@ -163,6 +176,6 @@ class AsseticRateLimiter extends EventEmitter {
   }
 }
 
-/** Singleton rate limiter instance */
-export const asseticRateLimiter = new AsseticRateLimiter();
+/** Default singleton rate limiter instance (backward compat) */
+export const asseticRateLimiter = new AsseticRateLimiter({ label: 'default' });
 export default asseticRateLimiter;

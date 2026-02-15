@@ -1,6 +1,7 @@
-import axios, { AxiosInstance } from 'axios';
+import { AxiosInstance, AxiosResponse } from 'axios';
 import settingsService from './settingsService';
-import { asseticRateLimiter } from './asseticRateLimiter';
+import { asseticWorkerPool } from './asseticWorkerPool';
+import { asseticApiLogger, ApiLogEntityType } from './asseticApiLogger';
 
 /**
  * Assetic REST API client.
@@ -18,8 +19,10 @@ import { asseticRateLimiter } from './asseticRateLimiter';
  * needed to query the Assetic API.  All data reads/writes pass
  * through this client.
  *
- * All outbound calls are routed through the rate limiter which
- * enforces a hard cap of 250 requests per rolling 60-second window.
+ * All outbound calls are routed through the worker pool which
+ * distributes requests across N API agent workers, each enforcing
+ * a hard cap of 250 requests per rolling 60-second window.
+ * Total throughput = workerCount × 250 req/min.
  */
 
 /** Standard Assetic pagination / filter params */
@@ -51,56 +54,105 @@ function toAsseticParams(p?: AsseticQueryParams): Record<string, any> | undefine
 }
 
 class AsseticClient {
-  private client: AxiosInstance | null = null;
+  /** User ID of the current request context (set per-request by middleware). */
+  private _contextUserId?: number;
+  private _contextSource?: string;
 
   /**
-   * Build (or rebuild) the Axios instance from current DB settings.
-   * URL:  {site}/api/{version}
+   * Set the calling context for logging (user + source route).
+   * Should be called from route handlers before Assetic calls.
    */
-  private async getClient(): Promise<AxiosInstance> {
-    const siteUrl = await settingsService.get('assetic_api_url');
-    const apiKey = await settingsService.get('assetic_api_key');
-    const apiUsername = await settingsService.get('assetic_api_username');
-    const apiVersion = await settingsService.get('assetic_api_version', 'v2');
-
-    if (!siteUrl || !apiKey || !apiUsername) {
-      throw new Error(
-        'Assetic API is not configured. Set the site URL, username, and API key in Admin > Settings.',
-      );
-    }
-
-    const basicAuth = Buffer.from(`${apiUsername}:${apiKey}`).toString('base64');
-
-    // Recreate on each call so DB setting changes take effect immediately
-    this.client = axios.create({
-      baseURL: `${siteUrl.replace(/\/+$/, '')}/api/${apiVersion}`,
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    });
-
-    this.client.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        console.error('Assetic API Error:', error.response?.status, error.response?.data || error.message);
-        throw error;
-      },
-    );
-
-    return this.client;
+  setContext(userId?: number, source?: string): this {
+    this._contextUserId = userId;
+    this._contextSource = source;
+    return this;
   }
 
-  /** Execute a rate-limited API call through the 250/min queue. */
+  /** Clear the context after a request cycle. */
+  clearContext(): void {
+    this._contextUserId = undefined;
+    this._contextSource = undefined;
+  }
+
+  /**
+   * Execute a rate-limited API call through the worker pool.
+   * The pool selects the least-loaded worker and provides its
+   * Axios client (with that worker's credentials) to `fn`.
+   */
   private async call<T>(
     fn: (client: AxiosInstance) => Promise<T>,
     description?: string,
   ): Promise<T> {
-    return asseticRateLimiter.execute(async () => {
-      const client = await this.getClient();
-      return fn(client);
-    }, description);
+    return asseticWorkerPool.execute(fn, description);
+  }
+
+  /**
+   * Execute a rate-limited API call with full DB logging.
+   *
+   * Captures the Axios response (or error), measures duration,
+   * and writes a row into `assetic_api_log`.  Used for work
+   * request creation and other operations that need an audit trail.
+   */
+  private async loggedCall<T>(options: {
+    method: string;
+    endpoint: string;
+    description: string;
+    entityType: ApiLogEntityType;
+    entityGuid?: string;
+    requestBody?: any;
+    fn: (client: AxiosInstance) => Promise<AxiosResponse<T>>;
+  }): Promise<T> {
+    const start = Date.now();
+    try {
+      const response = await asseticWorkerPool.execute(
+        (client) => options.fn(client),
+        options.description,
+      );
+
+      const durationMs = Date.now() - start;
+
+      // Log success — fire-and-forget
+      asseticApiLogger.log({
+        method: options.method,
+        endpoint: options.endpoint,
+        description: options.description,
+        entityType: options.entityType,
+        entityGuid: options.entityGuid,
+        requestBody: options.requestBody,
+        responseBody: response.data,
+        httpStatus: response.status,
+        durationMs,
+        performedBy: this._contextUserId,
+        source: this._contextSource,
+        status: 'success',
+      });
+
+      return response.data;
+    } catch (error: any) {
+      const durationMs = Date.now() - start;
+      const httpStatus = error.response?.status;
+      const responseBody = error.response?.data;
+      const errorMessage = error.message || 'Unknown error';
+
+      // Log failure — fire-and-forget
+      asseticApiLogger.log({
+        method: options.method,
+        endpoint: options.endpoint,
+        description: options.description,
+        entityType: options.entityType,
+        entityGuid: options.entityGuid,
+        requestBody: options.requestBody,
+        responseBody,
+        httpStatus,
+        errorMessage,
+        durationMs,
+        performedBy: this._contextUserId,
+        source: this._contextSource,
+        status: httpStatus ? 'error' : 'timeout',
+      });
+
+      throw error;
+    }
   }
 
   /** Check whether Assetic sync is enabled in settings. */
@@ -110,7 +162,12 @@ class AsseticClient {
 
   /** Return current rate-limit / queue status (exposed for the admin endpoint). */
   getRateLimitStatus() {
-    return asseticRateLimiter.getStatus();
+    return asseticWorkerPool.getStatus();
+  }
+
+  /** Refresh the worker pool configuration (call after admin saves settings). */
+  async refreshWorkerPool() {
+    return asseticWorkerPool.refresh();
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -130,31 +187,48 @@ class AsseticClient {
   // ═══════════════════════════════════════════════════════════════════
 
   async getWorkRequests(params?: AsseticQueryParams) {
-    return this.call(
-      (c) => c.get('/workrequest', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /workrequest',
-    );
+    return this.loggedCall({
+      method: 'GET',
+      endpoint: '/workrequest',
+      description: 'GET /workrequest',
+      entityType: 'work_request',
+      requestBody: toAsseticParams(params),
+      fn: (c) => c.get('/workrequest', { params: toAsseticParams(params) }),
+    });
   }
 
   async getWorkRequest(guid: string) {
-    return this.call(
-      (c) => c.get(`/workrequest/${guid}`).then((r) => r.data),
-      `GET /workrequest/${guid}`,
-    );
+    return this.loggedCall({
+      method: 'GET',
+      endpoint: `/workrequest/${guid}`,
+      description: `GET /workrequest/${guid}`,
+      entityType: 'work_request',
+      entityGuid: guid,
+      fn: (c) => c.get(`/workrequest/${guid}`),
+    });
   }
 
   async createWorkRequest(data: any) {
-    return this.call(
-      (c) => c.post('/workrequest/', data).then((r) => r.data),
-      'POST /workrequest',
-    );
+    return this.loggedCall({
+      method: 'POST',
+      endpoint: '/workrequest',
+      description: 'POST /workrequest',
+      entityType: 'work_request',
+      requestBody: data,
+      fn: (c) => c.post('/workrequest/', data),
+    });
   }
 
   async updateWorkRequest(guid: string, data: any) {
-    return this.call(
-      (c) => c.put(`/workrequest/${guid}/`, data).then((r) => r.data),
-      `PUT /workrequest/${guid}`,
-    );
+    return this.loggedCall({
+      method: 'PUT',
+      endpoint: `/workrequest/${guid}`,
+      description: `PUT /workrequest/${guid}`,
+      entityType: 'work_request',
+      entityGuid: guid,
+      requestBody: data,
+      fn: (c) => c.put(`/workrequest/${guid}/`, data),
+    });
   }
 
   async getWorkRequestTypes() {
@@ -166,18 +240,27 @@ class AsseticClient {
 
   /** Add a comment / supporting info to a work request */
   async addWorkRequestComment(guid: string, data: any) {
-    return this.call(
-      (c) => c.post(`/workrequest/${guid}/supportinginfo`, data).then((r) => r.data),
-      `POST /workrequest/${guid}/supportinginfo`,
-    );
+    return this.loggedCall({
+      method: 'POST',
+      endpoint: `/workrequest/${guid}/supportinginfo`,
+      description: `POST /workrequest/${guid}/supportinginfo`,
+      entityType: 'work_request',
+      entityGuid: guid,
+      requestBody: data,
+      fn: (c) => c.post(`/workrequest/${guid}/supportinginfo`, data),
+    });
   }
 
   /** Get supporting info / comments for a work request */
   async getWorkRequestComments(guid: string) {
-    return this.call(
-      (c) => c.get(`/workrequest/${guid}/supportinginfo`).then((r) => r.data),
-      `GET /workrequest/${guid}/supportinginfo`,
-    );
+    return this.loggedCall({
+      method: 'GET',
+      endpoint: `/workrequest/${guid}/supportinginfo`,
+      description: `GET /workrequest/${guid}/supportinginfo`,
+      entityType: 'work_request',
+      entityGuid: guid,
+      fn: (c) => c.get(`/workrequest/${guid}/supportinginfo`),
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -199,18 +282,27 @@ class AsseticClient {
   }
 
   async createWorkOrder(data: any) {
-    return this.call(
-      (c) => c.post('/workorder', data).then((r) => r.data),
-      'POST /workorder',
-    );
+    return this.loggedCall({
+      method: 'POST',
+      endpoint: '/workorder',
+      description: 'POST /workorder',
+      entityType: 'work_order',
+      requestBody: data,
+      fn: (c) => c.post('/workorder', data),
+    });
   }
 
   /** Update a work order (also used to add comments via the body) */
   async updateWorkOrder(guid: string, data: any) {
-    return this.call(
-      (c) => c.put(`/workorder/${guid}`, data).then((r) => r.data),
-      `PUT /workorder/${guid}`,
-    );
+    return this.loggedCall({
+      method: 'PUT',
+      endpoint: `/workorder/${guid}`,
+      description: `PUT /workorder/${guid}`,
+      entityType: 'work_order',
+      entityGuid: guid,
+      requestBody: data,
+      fn: (c) => c.put(`/workorder/${guid}`, data),
+    });
   }
 
   async getWorkTypes() {

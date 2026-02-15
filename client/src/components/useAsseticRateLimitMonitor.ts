@@ -6,6 +6,9 @@ import { adminService } from '../services/adminService';
  * Hook that polls the Assetic rate-limit status endpoint and displays
  * toast notifications when the queue is filling or throttled.
  *
+ * Supports the multi-worker pool: shows aggregate capacity and
+ * per-worker details when more than one worker is active.
+ *
  * Only active for admin users (the endpoint requires admin access).
  * Polls every 5 seconds when idle, every 2 seconds when throttled.
  */
@@ -21,15 +24,18 @@ export function useAsseticRateLimitMonitor(isAdmin: boolean) {
 
     try {
       const status = await adminService.getAsseticRateLimitStatus();
+      const workerCount = status.totalWorkers || 1;
+      const workerLabel = workerCount > 1 ? ` across ${workerCount} workers` : '';
 
       // ── Throttled state ───────────────────────────────────────────
       if (status.isThrottled && !prevThrottled.current) {
-        // Just became throttled
+        // Just became throttled (ALL workers at capacity)
         const waitSec = Math.ceil(status.msUntilNextSlot / 1000);
+        const capLabel = `${status.maxCallsPerWindow} calls/min${workerLabel}`;
         throttledToastRef.current = addToast({
           type: 'warning',
           title: 'Assetic API rate limit reached',
-          message: `250 calls/min cap hit. ${status.queueLength} request${status.queueLength !== 1 ? 's' : ''} queued. Next slot in ~${waitSec}s.`,
+          message: `${capLabel} cap hit. ${status.queueLength} request${status.queueLength !== 1 ? 's' : ''} queued. Next slot in ~${waitSec}s.`,
           duration: 0, // sticky until resolved
         });
       }
@@ -51,7 +57,7 @@ export function useAsseticRateLimitMonitor(isAdmin: boolean) {
           addToast({
             type: 'info',
             title: 'Assetic request queued',
-            message: `${status.queueLength} request${status.queueLength !== 1 ? 's' : ''} waiting. ${status.remaining} slots remaining.`,
+            message: `${status.queueLength} request${status.queueLength !== 1 ? 's' : ''} waiting. ${status.remaining} slots remaining${workerLabel}.`,
             duration: 3000,
           });
         }

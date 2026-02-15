@@ -36,9 +36,25 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check
+// Health check (basic)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Health check with database status
+app.get('/api/health/db', async (req, res) => {
+  try {
+    const { db } = await import('./database');
+    await db.raw('SELECT 1');
+    res.json({ status: 'ok', database: 'connected', timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'unavailable',
+      database: 'disconnected',
+      message: 'Database is not ready',
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // Error handling middleware

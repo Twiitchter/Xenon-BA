@@ -10,6 +10,7 @@ import { authService } from './services/authService';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
 import { useAsseticRateLimitMonitor } from './components/useAsseticRateLimitMonitor';
+import DatabaseGate from './components/DatabaseGate';
 
 function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
   const location = useLocation();
@@ -49,14 +50,14 @@ function AppContent() {
     setUser(authService.getUser());
   };
 
-  if (loading) {
-    return <div className="loading">Loading...</div>;
-  }
-
   const isAdmin = user?.role === 'admin';
 
   // Monitor Assetic rate-limit status and show toasts when throttled
   useAsseticRateLimitMonitor(isAdmin);
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
 
   return (
     <div className="app">
@@ -166,11 +167,13 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </Router>
+    <DatabaseGate>
+      <Router>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </Router>
+    </DatabaseGate>
   );
 }
 

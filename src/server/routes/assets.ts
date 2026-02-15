@@ -8,6 +8,13 @@ const router = Router();
 // All routes require authentication
 router.use(authenticateToken);
 
+// Set Assetic logging context (user + source) for every request through this router
+router.use((req: AuthRequest, _res: Response, next: Function) => {
+  asseticClient.setContext(req.user?.id, 'assets');
+  _res.on('finish', () => asseticClient.clearContext());
+  next();
+});
+
 /**
  * GET /api/assets
  * Get all assets from local database

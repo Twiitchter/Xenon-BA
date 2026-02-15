@@ -6,6 +6,7 @@ import db from '../database';
 import settingsService from '../services/settingsService';
 import activityService from '../services/activityService';
 import asseticClient from '../services/asseticClient';
+import asseticApiLogger from '../services/asseticApiLogger';
 
 const router = Router();
 
@@ -26,6 +27,13 @@ const requireAdmin = async (req: AuthRequest, res: Response, next: Function) => 
 };
 
 router.use(requireAdmin);
+
+// Set Assetic logging context (user + source) for every request through this router
+router.use((req: AuthRequest, _res: Response, next: Function) => {
+  asseticClient.setContext(req.user?.id, 'admin');
+  _res.on('finish', () => asseticClient.clearContext());
+  next();
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // SETTINGS
@@ -59,6 +67,18 @@ router.put('/settings', async (req: AuthRequest, res: Response) => {
     }
 
     await settingsService.bulkSet(settings, req.user.id);
+
+    // If any assetic/worker settings changed, refresh the worker pool
+    const asseticKeys = Object.keys(settings).filter(
+      (k) => k.startsWith('assetic_'),
+    );
+    if (asseticKeys.length > 0) {
+      try {
+        await asseticClient.refreshWorkerPool();
+      } catch (e) {
+        console.warn('Worker pool refresh after settings update failed:', e);
+      }
+    }
 
     await activityService.log({
       entity_type: 'setting',
@@ -116,6 +136,7 @@ router.post('/settings/test-assetic', async (req: AuthRequest, res: Response) =>
  * GET /api/admin/settings/assetic-rate-limit
  * Return current Assetic API rate-limit and queue status.
  * The frontend polls this to show toast notifications.
+ * Includes per-worker breakdown when multiple workers are configured.
  */
 router.get('/settings/assetic-rate-limit', async (_req: AuthRequest, res: Response) => {
   try {
@@ -123,6 +144,20 @@ router.get('/settings/assetic-rate-limit', async (_req: AuthRequest, res: Respon
     res.json(status);
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to retrieve rate limit status' });
+  }
+});
+
+/**
+ * POST /api/admin/settings/assetic-refresh-workers
+ * Force-reload the worker pool configuration from DB settings.
+ */
+router.post('/settings/assetic-refresh-workers', async (_req: AuthRequest, res: Response) => {
+  try {
+    await asseticClient.refreshWorkerPool();
+    const status = asseticClient.getRateLimitStatus();
+    res.json({ message: 'Worker pool refreshed', status });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to refresh worker pool' });
   }
 });
 
@@ -381,6 +416,76 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Error fetching stats:', error);
     res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ASSETIC API LOGS
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/admin/api-logs
+ * Query Assetic API call logs for debugging.
+ * Supports filters: entityType, entityGuid, httpStatus, status,
+ * performedBy, from, to, limit, offset
+ */
+router.get('/api-logs', async (req: AuthRequest, res: Response) => {
+  try {
+    const { entityType, entityGuid, httpStatus, status, performedBy, from, to, limit = 100, offset = 0 } = req.query;
+
+    const params = {
+      entityType: entityType as any,
+      entityGuid: entityGuid as string | undefined,
+      httpStatus: httpStatus ? Number(httpStatus) : undefined,
+      status: status as any,
+      performedBy: performedBy ? Number(performedBy) : undefined,
+      from: from as string | undefined,
+      to: to as string | undefined,
+      limit: Number(limit),
+      offset: Number(offset),
+    };
+
+    const [logs, total] = await Promise.all([
+      asseticApiLogger.query(params),
+      asseticApiLogger.count(params),
+    ]);
+
+    res.json({ logs, total, limit: params.limit, offset: params.offset });
+  } catch (error) {
+    console.error('Error fetching API logs:', error);
+    res.status(500).json({ error: 'Failed to fetch API logs' });
+  }
+});
+
+/**
+ * GET /api/admin/api-logs/:id
+ * Get a single API log entry with full request/response payloads.
+ */
+router.get('/api-logs/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const log = await asseticApiLogger.getById(Number(req.params.id));
+    if (!log) {
+      return res.status(404).json({ error: 'Log entry not found' });
+    }
+    res.json(log);
+  } catch (error) {
+    console.error('Error fetching API log entry:', error);
+    res.status(500).json({ error: 'Failed to fetch API log entry' });
+  }
+});
+
+/**
+ * DELETE /api/admin/api-logs/purge
+ * Purge API log entries older than `days` (default 30).
+ */
+router.delete('/api-logs/purge', async (req: AuthRequest, res: Response) => {
+  try {
+    const days = Number(req.query.days) || 30;
+    const deleted = await asseticApiLogger.purgeOlderThan(days);
+    res.json({ message: `Purged ${deleted} log entries older than ${days} days`, deleted });
+  } catch (error) {
+    console.error('Error purging API logs:', error);
+    res.status(500).json({ error: 'Failed to purge API logs' });
   }
 });
 
