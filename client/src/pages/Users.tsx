@@ -95,7 +95,7 @@ const Users: React.FC = () => {
   const handleDelete = async (user: User) => {
     if (!confirm(`Delete user ${user.username}? This cannot be undone.`)) return;
     try {
-      await adminService.deleteUser(user.id);
+      await adminService.deactivateUser(user.id);
       fetchUsers();
       setSuccess('User deleted');
       setTimeout(() => setSuccess(''), 3000);

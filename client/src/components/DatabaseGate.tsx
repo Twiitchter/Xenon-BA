@@ -6,7 +6,6 @@ interface DatabaseGateProps {
 }
 
 const POLL_INTERVAL = 3000; // 3 seconds between retries
-const MAX_DISPLAY_RETRIES = 99; // effectively unlimited
 
 export default function DatabaseGate({ children }: DatabaseGateProps) {
   const [dbReady, setDbReady] = useState(false);

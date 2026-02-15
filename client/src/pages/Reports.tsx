@@ -44,7 +44,10 @@ const Reports: React.FC = () => {
     setError('');
 
     try {
-      const result = await reportService.generateChangeReport(changeFilters);
+      const result = await reportService.generateChangeReport({
+        ...changeFilters,
+        assetId: changeFilters.assetId ? Number(changeFilters.assetId) : undefined,
+      });
       setMessage(result.message);
       
       if (result.downloadUrl && !changeFilters.email) {
