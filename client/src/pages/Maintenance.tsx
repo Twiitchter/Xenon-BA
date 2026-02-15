@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { maintenanceService } from '../services/maintenanceService';
 
+interface WorkRequestSource {
+  id: string;
+  name: string;
+}
+
+interface WorkRequestType {
+  Id: string;
+  Name: string;
+}
+
 const Maintenance: React.FC = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -13,7 +23,28 @@ const Maintenance: React.FC = () => {
     priority: 'medium',
     category: '',
     location: '',
+    // Requestor information
+    requestorDisplayName: '',
+    requestorEmail: '',
+    requestorPhone: '',
+    requestorMobile: '',
+    // Physical location details
+    streetAddress: '',
+    citySuburb: '',
+    state: '',
+    zipPostcode: '',
+    country: '',
+    // Optional fields
+    supportingInformation: '',
+    // Assetic fields
+    workRequestSourceId: '',
+    workRequestSubtypeId: '',
   });
+
+  // Assetic integration state
+  const [workRequestSources, setWorkRequestSources] = useState<WorkRequestSource[]>([]);
+  const [workRequestTypes, setWorkRequestTypes] = useState<WorkRequestType[]>([]);
+  const [asseticEnabled, setAsseticEnabled] = useState(false);
 
   // Messages state
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(null);
@@ -23,7 +54,30 @@ const Maintenance: React.FC = () => {
 
   useEffect(() => {
     fetchRequests();
+    fetchAsseticData();
   }, []);
+
+  const fetchAsseticData = async () => {
+    try {
+      // Try to fetch Assetic data, but don't fail if integration is not enabled
+      const [sourcesRes, typesRes] = await Promise.allSettled([
+        maintenanceService.getWorkRequestSources(),
+        maintenanceService.getWorkRequestTypes(),
+      ]);
+
+      if (sourcesRes.status === 'fulfilled' && sourcesRes.value?.sources) {
+        setWorkRequestSources(sourcesRes.value.sources);
+        setAsseticEnabled(true);
+      }
+
+      if (typesRes.status === 'fulfilled' && typesRes.value?.ResourceList) {
+        setWorkRequestTypes(typesRes.value.ResourceList);
+      }
+    } catch (err) {
+      // Silently fail - Assetic integration may not be enabled
+      console.log('Assetic integration not available');
+    }
+  };
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -44,7 +98,25 @@ const Maintenance: React.FC = () => {
     try {
       await maintenanceService.createRequest(formData);
       setShowForm(false);
-      setFormData({ title: '', description: '', priority: 'medium', category: '', location: '' });
+      setFormData({ 
+        title: '', 
+        description: '', 
+        priority: 'medium', 
+        category: '', 
+        location: '',
+        requestorDisplayName: '',
+        requestorEmail: '',
+        requestorPhone: '',
+        requestorMobile: '',
+        streetAddress: '',
+        citySuburb: '',
+        state: '',
+        zipPostcode: '',
+        country: '',
+        supportingInformation: '',
+        workRequestSourceId: '',
+        workRequestSubtypeId: '',
+      });
       fetchRequests();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create request');
@@ -100,6 +172,7 @@ const Maintenance: React.FC = () => {
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 required
+                aria-required="true"
               />
             </div>
             <div className="form-group">
@@ -110,6 +183,52 @@ const Maintenance: React.FC = () => {
                 rows={3}
               />
             </div>
+            
+            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Contact Information</h4>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Contact Name *</label>
+                <input
+                  type="text"
+                  value={formData.requestorDisplayName}
+                  onChange={(e) => setFormData({ ...formData, requestorDisplayName: e.target.value })}
+                  placeholder="Your full name"
+                  required
+                  aria-required="true"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={formData.requestorEmail}
+                  onChange={(e) => setFormData({ ...formData, requestorEmail: e.target.value })}
+                  placeholder="contact@example.com"
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Phone</label>
+                <input
+                  type="tel"
+                  value={formData.requestorPhone}
+                  onChange={(e) => setFormData({ ...formData, requestorPhone: e.target.value })}
+                  placeholder="Office phone"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Mobile</label>
+                <input
+                  type="tel"
+                  value={formData.requestorMobile}
+                  onChange={(e) => setFormData({ ...formData, requestorMobile: e.target.value })}
+                  placeholder="Mobile phone"
+                />
+              </div>
+            </div>
+
+            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Request Details</h4>
             <div style={{ display: 'flex', gap: '10px' }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label>Priority</label>
@@ -132,16 +251,113 @@ const Maintenance: React.FC = () => {
                   placeholder="e.g. Plumbing, Electrical"
                 />
               </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Location</label>
+            </div>
+
+            {asseticEnabled && workRequestSources.length > 0 && (
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label>Request Source</label>
+                  <select
+                    value={formData.workRequestSourceId}
+                    onChange={(e) => setFormData({ ...formData, workRequestSourceId: e.target.value })}
+                  >
+                    <option value="">Select a source...</option>
+                    {workRequestSources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {workRequestTypes.length > 0 && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label>Request Type</label>
+                    <select
+                      value={formData.workRequestSubtypeId}
+                      onChange={(e) => setFormData({ ...formData, workRequestSubtypeId: e.target.value })}
+                    >
+                      <option value="">Select a type...</option>
+                      {workRequestTypes.map((type: any) => (
+                        <option key={type.Id} value={type.Id}>
+                          {type.Name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Location Information</h4>
+            <div className="form-group">
+              <label>General Location</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="e.g. Building A, Room 101"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 2 }}>
+                <label>Street Address</label>
                 <input
                   type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="e.g. Building A, Room 101"
+                  value={formData.streetAddress}
+                  onChange={(e) => setFormData({ ...formData, streetAddress: e.target.value })}
+                  placeholder="Street address"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>City/Suburb</label>
+                <input
+                  type="text"
+                  value={formData.citySuburb}
+                  onChange={(e) => setFormData({ ...formData, citySuburb: e.target.value })}
+                  placeholder="City"
                 />
               </div>
             </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>State</label>
+                <input
+                  type="text"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  placeholder="State"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Zip/Postcode</label>
+                <input
+                  type="text"
+                  value={formData.zipPostcode}
+                  onChange={(e) => setFormData({ ...formData, zipPostcode: e.target.value })}
+                  placeholder="Postcode"
+                />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Country</label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  placeholder="Country"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Supporting Information</label>
+              <textarea
+                value={formData.supportingInformation}
+                onChange={(e) => setFormData({ ...formData, supportingInformation: e.target.value })}
+                rows={2}
+                placeholder="Any additional details that might be helpful"
+              />
+            </div>
+
             <button type="submit">Submit Request</button>
           </form>
         </div>

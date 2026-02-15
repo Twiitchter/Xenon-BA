@@ -3,6 +3,16 @@ import { authService } from './authService';
 
 const API_URL = '/api';
 
+interface WorkRequestSource {
+  id: string;
+  name: string;
+}
+
+interface WorkRequestType {
+  Id: string;
+  Name: string;
+}
+
 interface CreateRequestParams {
   title: string;
   description?: string;
@@ -10,6 +20,41 @@ interface CreateRequestParams {
   category?: string;
   location?: string;
   assetId?: number;
+  
+  // Assetic required fields
+  workRequestSourceId?: string;
+  
+  // Requestor details (at least displayName OR firstName+surname required by Assetic)
+  requestorDisplayName?: string;
+  requestorFirstName?: string;
+  requestorSurname?: string;
+  requestorEmail?: string;
+  requestorPhone?: string;
+  requestorMobile?: string;
+  requestorTypeId?: string;
+  
+  // Optional Assetic fields
+  workRequestSubtypeId?: string;
+  workRequestPriorityId?: string;
+  externalIdentifier?: string;
+  supportingInformation?: string;
+  
+  // Physical location details
+  streetNumber?: string;
+  streetAddress?: string;
+  citySuburb?: string;
+  state?: string;
+  zipPostcode?: string;
+  country?: string;
+  otherLocation?: string;
+  whereLocation?: string;
+  
+  // Spatial location
+  spatialLocation?: string;
+  
+  // Reactive inspection
+  reactiveInspectorName?: string;
+  reactiveInspectionDate?: string;
 }
 
 interface UpdateRequestParams {
@@ -127,6 +172,22 @@ class MaintenanceService {
 
   async getCrafts() {
     const response = await axios.get(`${API_URL}/maintenance/crafts`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data;
+  }
+
+  // ─── Assetic Integration ──────────────────────────────────────────
+
+  async getWorkRequestTypes() {
+    const response = await axios.get(`${API_URL}/maintenance/assetic/work-request-types`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data;
+  }
+
+  async getWorkRequestSources() {
+    const response = await axios.get(`${API_URL}/maintenance/assetic/work-request-sources`, {
       headers: authService.getAuthHeader(),
     });
     return response.data;
