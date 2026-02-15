@@ -14,12 +14,15 @@ echo "🚀 Starting XeonB CRM in Codespaces..."
 if [ ! -f .env ]; then
     echo "📝 Creating .env file from .env.example..."
     cp .env.example .env
-    # Set default values for Codespaces
-    sed -i 's/DB_HOST=.*/DB_HOST=localhost/' .env
-    sed -i 's/DB_DIALECT=.*/DB_DIALECT=pg/' .env
-    sed -i 's/DB_PORT=.*/DB_PORT=5432/' .env
-    sed -i 's/DB_USER=.*/DB_USER=postgres/' .env
-    sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=postgres/' .env
+    # Set default values for Codespaces (works on Linux)
+    # Note: These sed commands are Linux-specific
+    if command -v sed >/dev/null 2>&1; then
+        sed -i 's/DB_HOST=.*/DB_HOST=localhost/' .env 2>/dev/null || true
+        sed -i 's/DB_DIALECT=.*/DB_DIALECT=pg/' .env 2>/dev/null || true
+        sed -i 's/DB_PORT=.*/DB_PORT=5432/' .env 2>/dev/null || true
+        sed -i 's/DB_USER=.*/DB_USER=postgres/' .env 2>/dev/null || true
+        sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=postgres/' .env 2>/dev/null || true
+    fi
 fi
 
 # Start the database container using Docker-in-Docker

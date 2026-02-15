@@ -38,9 +38,13 @@ A comprehensive Customer Relationship Management system for Brightly's Assetic A
 
 ### Option 1: GitHub Codespaces (Recommended)
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=Twiitchter/XeonB)
+Open this repository in GitHub Codespaces for instant setup with Docker-in-Docker:
 
-Click the badge above or "Code" → "Codespaces" → "Create codespace" on GitHub. Everything sets up automatically with Docker-in-Docker! See [CODESPACES.md](CODESPACES.md) for details.
+1. Click "Code" → "Codespaces" → "Create codespace" on GitHub
+2. Wait for the environment to build (2-3 minutes)
+3. Everything is configured automatically!
+
+See [CODESPACES.md](CODESPACES.md) for details.
 
 ### Option 2: Docker (Local Development)
 

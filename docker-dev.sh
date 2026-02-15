@@ -18,11 +18,11 @@ if [ -n "$CODESPACES" ] || [ -n "$CODESPACE_NAME" ]; then
     
     # In Codespaces, we only start the database via Docker
     # The app runs directly in the devcontainer
-    if [ "$1" == "up" ]; then
+    if [ "$1" = "up" ]; then
         echo "🐘 Starting database container..."
         docker compose -f $COMPOSE_FILE up db -d
         echo "✅ Database started. Run 'npm run dev' to start the application."
-    elif [ "$1" == "down" ]; then
+    elif [ "$1" = "down" ]; then
         docker compose -f $COMPOSE_FILE down "${@:2}"
     else
         docker compose -f $COMPOSE_FILE "$@"
