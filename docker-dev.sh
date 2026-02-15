@@ -32,7 +32,8 @@ else
     echo "📦 Using standard two-container setup..."
     
     # Check if DB_DIALECT is set to determine which profile to use
-    if [ -f .env ]; then
+    # If not set in environment, try to read from .env
+    if [ -z "$DB_DIALECT" ] && [ -f .env ]; then
         source .env
     fi
     
