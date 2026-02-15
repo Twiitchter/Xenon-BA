@@ -1,0 +1,43 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════════════════
+# XeonB CRM — Codespaces Startup Script
+# ═══════════════════════════════════════════════════════════════════════════════
+# This script automatically detects if running in Codespaces and starts the
+# database service using Docker-in-Docker.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+set -e
+
+echo "🚀 Starting XeonB CRM in Codespaces..."
+
+# Check if .env file exists, if not create from example
+if [ ! -f .env ]; then
+    echo "📝 Creating .env file from .env.example..."
+    cp .env.example .env
+    # Set default values for Codespaces
+    sed -i 's/DB_HOST=.*/DB_HOST=localhost/' .env
+    sed -i 's/DB_DIALECT=.*/DB_DIALECT=pg/' .env
+    sed -i 's/DB_PORT=.*/DB_PORT=5432/' .env
+    sed -i 's/DB_USER=.*/DB_USER=postgres/' .env
+    sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=postgres/' .env
+fi
+
+# Start the database container using Docker-in-Docker
+echo "🐘 Starting PostgreSQL database..."
+docker compose -f docker-compose.codespaces.yml up db -d
+
+# Wait for database to be ready
+echo "⏳ Waiting for database to be ready..."
+sleep 5
+
+# Run migrations
+echo "📊 Running database migrations..."
+npm run migrate || echo "⚠️  Migration failed. You may need to run 'npm run migrate' manually."
+
+echo "✅ Codespaces environment is ready!"
+echo ""
+echo "📌 To start the development server, run:"
+echo "   npm run dev"
+echo ""
+echo "📍 The API will be available at: http://localhost:3000"
+echo "📍 The client will be available at: http://localhost:3001"
