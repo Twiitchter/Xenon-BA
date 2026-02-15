@@ -401,6 +401,9 @@ nav a:hover {
   color: var(--text-muted);
   letter-spacing: 0.5px;
   padding: 8px 12px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .nav-link {
@@ -560,9 +563,19 @@ nav a:hover {
   color: #f87171;
 }
 
+.badge-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
 .badge-muted {
   background: rgba(100, 116, 139, 0.15);
   color: #94a3b8;
+}
+
+.badge-secondary {
+  background: rgba(100, 116, 139, 0.2);
+  color: #a0aec0;
 }
 
 /* ========== Tabs ========== */

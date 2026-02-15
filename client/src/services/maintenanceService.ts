@@ -87,6 +87,16 @@ interface UpdateWorkOrderParams {
 }
 
 class MaintenanceService {
+  // ─── My Items (Combined User View) ───────────────────────────────────
+
+  async getMyItems(params?: { status?: string; priority?: string; limit?: number; offset?: number }) {
+    const response = await axios.get(`${API_URL}/maintenance/my-items`, {
+      headers: authService.getAuthHeader(),
+      params,
+    });
+    return response.data;
+  }
+
   // ─── Maintenance Requests ───────────────────────────────────────────
 
   async getRequests(params?: { status?: string; priority?: string; limit?: number; offset?: number }) {

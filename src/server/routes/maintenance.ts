@@ -9,6 +9,69 @@ const router = Router();
 // All routes require authentication
 router.use(authenticateToken);
 
+// ─── My Items (Combined User View) ─────────────────────────────────────────
+
+/**
+ * GET /api/maintenance/my-items
+ * Get combined work requests and work orders for the current user
+ * When a work order exists for a work request, the work order takes precedence
+ */
+router.get('/my-items', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const { status, priority, limit = 100, offset = 0 } = req.query;
+
+    // Get work requests created by this user
+    let wrQuery = db('maintenance_requests as mr')
+      .leftJoin('users as u', 'mr.requested_by', 'u.id')
+      .leftJoin('work_orders as wo', 'mr.id', 'wo.request_id')
+      .select(
+        'mr.id',
+        'mr.title',
+        'mr.description',
+        'mr.priority',
+        'mr.status',
+        'mr.category',
+        'mr.location',
+        'mr.created_at',
+        'mr.updated_at',
+        db.raw('? as item_type', ['request']),
+        'wo.id as work_order_id',
+        'wo.status as work_order_status',
+        'wo.craft as work_order_craft',
+        db.raw('NULL as assigned_to_username'),
+        db.raw('NULL as scheduled_date')
+      )
+      .where('mr.requested_by', userId);
+
+    if (status) {
+      wrQuery = wrQuery.where('mr.status', status as string);
+    }
+    if (priority) {
+      wrQuery = wrQuery.where('mr.priority', priority as string);
+    }
+
+    const requests = await wrQuery.orderBy('mr.created_at', 'desc');
+
+    // Transform and combine results, applying display logic
+    const allItems = requests.map(r => ({
+      ...r,
+      // If work order exists, show work order status
+      display_type: r.work_order_id ? 'work_order' : 'request',
+      display_status: r.work_order_id ? r.work_order_status : r.status,
+    })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const total = allItems.length;
+    const items = allItems.slice(Number(offset), Number(offset) + Number(limit));
+
+    res.json({
+      items,
+      total,
+    });
+  } catch (error) {
+    console.error('Error fetching user items:', error);
+    res.status(500).json({ error: 'Failed to fetch items' });
+  }
 // Set Assetic logging context for Assetic API calls
 router.use((req: AuthRequest, _res: Response, next: Function) => {
   asseticClient.setContext(req.user?.id, 'maintenance');
