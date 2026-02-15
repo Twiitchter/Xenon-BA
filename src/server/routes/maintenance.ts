@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import db from '../database';
+import asseticClient from '../services/asseticClient';
 
 const router = Router();
 
@@ -71,6 +72,11 @@ router.get('/my-items', async (req: AuthRequest, res: Response) => {
     console.error('Error fetching user items:', error);
     res.status(500).json({ error: 'Failed to fetch items' });
   }
+// Set Assetic logging context for Assetic API calls
+router.use((req: AuthRequest, _res: Response, next: Function) => {
+  asseticClient.setContext(req.user?.id, 'maintenance');
+  _res.on('finish', () => asseticClient.clearContext());
+  next();
 });
 
 // ─── Maintenance Requests ───────────────────────────────────────────────────
@@ -148,6 +154,35 @@ router.post(
     body('category').optional().trim(),
     body('location').optional().trim(),
     body('assetId').optional().isInt(),
+    // Assetic required fields
+    body('workRequestSourceId').optional().trim(),
+    // Requestor fields
+    body('requestorDisplayName').optional().trim(),
+    body('requestorFirstName').optional().trim(),
+    body('requestorSurname').optional().trim(),
+    body('requestorEmail').optional().isEmail().normalizeEmail(),
+    body('requestorPhone').optional().trim(),
+    body('requestorMobile').optional().trim(),
+    body('requestorTypeId').optional().trim(),
+    // Optional Assetic fields
+    body('workRequestSubtypeId').optional().trim(),
+    body('workRequestPriorityId').optional().trim(),
+    body('externalIdentifier').optional().trim(),
+    body('supportingInformation').optional().trim(),
+    // Physical location fields
+    body('streetNumber').optional().trim(),
+    body('streetAddress').optional().trim(),
+    body('citySuburb').optional().trim(),
+    body('state').optional().trim(),
+    body('zipPostcode').optional().trim(),
+    body('country').optional().trim(),
+    body('otherLocation').optional().trim(),
+    body('whereLocation').optional().trim(),
+    // Spatial location
+    body('spatialLocation').optional().trim(),
+    // Reactive inspection
+    body('reactiveInspectorName').optional().trim(),
+    body('reactiveInspectionDate').optional().isISO8601(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -156,7 +191,15 @@ router.post(
     }
 
     try {
-      const { title, description, priority, category, location, assetId } = req.body;
+      const { 
+        title, description, priority, category, location, assetId,
+        workRequestSourceId, requestorDisplayName, requestorFirstName, requestorSurname,
+        requestorEmail, requestorPhone, requestorMobile, requestorTypeId,
+        workRequestSubtypeId, workRequestPriorityId, externalIdentifier, supportingInformation,
+        streetNumber, streetAddress, citySuburb, state, zipPostcode, country,
+        otherLocation, whereLocation, spatialLocation,
+        reactiveInspectorName, reactiveInspectionDate
+      } = req.body;
 
       const [inserted] = await db('maintenance_requests')
         .insert({
@@ -167,6 +210,30 @@ router.post(
           priority: priority || 'medium',
           category: category || null,
           location: location || null,
+          // Assetic fields
+          work_request_source_id: workRequestSourceId || null,
+          requestor_display_name: requestorDisplayName || null,
+          requestor_first_name: requestorFirstName || null,
+          requestor_surname: requestorSurname || null,
+          requestor_email: requestorEmail || null,
+          requestor_phone: requestorPhone || null,
+          requestor_mobile: requestorMobile || null,
+          requestor_type_id: requestorTypeId || null,
+          work_request_subtype_id: workRequestSubtypeId || null,
+          work_request_priority_id: workRequestPriorityId || null,
+          external_identifier: externalIdentifier || null,
+          supporting_information: supportingInformation || null,
+          street_number: streetNumber || null,
+          street_address: streetAddress || null,
+          city_suburb: citySuburb || null,
+          state: state || null,
+          zip_postcode: zipPostcode || null,
+          country: country || null,
+          other_location: otherLocation || null,
+          where_location: whereLocation || null,
+          spatial_location: spatialLocation || null,
+          reactive_inspector_name: reactiveInspectorName || null,
+          reactive_inspection_date: reactiveInspectionDate || null,
         })
         .returning('*');
 
@@ -510,6 +577,76 @@ router.get('/crafts', async (_req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Error fetching crafts:', error);
     res.status(500).json({ error: 'Failed to fetch crafts' });
+  }
+});
+
+// ─── Assetic Integration Endpoints ─────────────────────────────────────
+
+/**
+ * GET /api/maintenance/assetic/work-request-types
+ * Get available work request types from Assetic API
+ */
+router.get('/assetic/work-request-types', async (_req: AuthRequest, res: Response) => {
+  try {
+    const enabled = await asseticClient.isEnabled();
+    if (!enabled) {
+      return res.status(503).json({ error: 'Assetic integration is not enabled' });
+    }
+
+    const types = await asseticClient.getWorkRequestTypes();
+    res.json(types);
+  } catch (error) {
+    console.error('Error fetching work request types:', error);
+    res.status(500).json({ error: 'Failed to fetch work request types from Assetic' });
+  }
+});
+
+/**
+ * GET /api/maintenance/assetic/work-request-sources
+ * Get available work request sources from Assetic API
+ * This endpoint fetches work requests and extracts unique source IDs
+ * 
+ * NOTE: This is a temporary implementation that samples existing work requests
+ * to discover available sources. In production, consider:
+ * 1. Caching the sources list (with TTL)
+ * 2. Using a dedicated Assetic API endpoint if available
+ * 3. Storing sources in the database during sync operations
+ */
+router.get('/assetic/work-request-sources', async (_req: AuthRequest, res: Response) => {
+  try {
+    const enabled = await asseticClient.isEnabled();
+    if (!enabled) {
+      return res.status(503).json({ error: 'Assetic integration is not enabled' });
+    }
+
+    // Fetch a sample of work requests to extract source IDs
+    const data = await asseticClient.getWorkRequests({ pageSize: 100 });
+    
+    // Extract unique source IDs from the response
+    interface WorkRequestSource {
+      id: string;
+      name: string;
+    }
+    
+    const sources: WorkRequestSource[] = [];
+    const seenIds = new Set<string>();
+    
+    if (data && data.ResourceList) {
+      for (const wr of data.ResourceList) {
+        if (wr.WorkRequestSourceId && !seenIds.has(wr.WorkRequestSourceId)) {
+          seenIds.add(wr.WorkRequestSourceId);
+          sources.push({
+            id: wr.WorkRequestSourceId,
+            name: wr.WorkRequestSource || `Source ${wr.WorkRequestSourceId}`,
+          });
+        }
+      }
+    }
+
+    res.json({ sources });
+  } catch (error) {
+    console.error('Error fetching work request sources:', error);
+    res.status(500).json({ error: 'Failed to fetch work request sources from Assetic' });
   }
 });
 

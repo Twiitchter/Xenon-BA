@@ -1,0 +1,37 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# XeonB CRM — GitHub Codespaces Docker Compose (Docker-in-Docker)
+# ═══════════════════════════════════════════════════════════════════════════════
+# This configuration is used when running in GitHub Codespaces with Docker-in-Docker.
+# The app container serves as the development environment where you can run
+# docker commands, and the database runs as a sibling container via DinD.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  # ── Application Development Container ─────────────────────────────────────
+  app:
+    image: mcr.microsoft.com/devcontainers/typescript-node:20
+    volumes:
+      - .:/workspace:cached
+    command: sleep infinity
+    environment:
+      - NODE_ENV=development
+      - CODESPACES=true
+    network_mode: host
+    # Docker-in-Docker is enabled via the devcontainer feature
+    # This allows running docker commands inside the container
+
+  # ── PostgreSQL Database ────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-xeonb_crm}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pgdata-codespaces:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  pgdata-codespaces:
