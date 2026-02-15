@@ -2,10 +2,41 @@
 
 This project supports running in Docker containers for development, with separate containers for the application (API + React client) and the database.
 
+## Quick Start
+
+The easiest way to use Docker is with the **smart launcher script** that automatically detects your environment:
+
+```bash
+# Start containers (auto-detects Codespaces or local dev)
+./docker-dev.sh up --build
+
+# Stop containers
+./docker-dev.sh down
+
+# View logs
+./docker-dev.sh logs -f
+
+# Run migrations
+./docker-dev.sh exec app npm run migrate
+```
+
+The script will:
+- ✅ Detect if you're in GitHub Codespaces and use Docker-in-Docker
+- ✅ Detect your local environment and use the appropriate database profile
+- ✅ Automatically select the right docker-compose file
+
+For Codespaces-specific information, see [CODESPACES.md](CODESPACES.md).
+
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
 - Docker Compose v2+ (included with Docker Desktop)
+
+---
+
+## Manual Docker Compose Commands
+
+If you prefer to use docker compose directly instead of the `./docker-dev.sh` script:
 
 ## Supported Databases
 
@@ -18,6 +49,13 @@ This project supports running in Docker containers for development, with separat
 ---
 
 ## Quick Start with Docker (Development)
+
+**Recommended:** Use the smart launcher script:
+```bash
+./docker-dev.sh up --build
+```
+
+**Or use docker compose directly:**
 
 ### 1. Configure Environment
 

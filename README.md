@@ -36,6 +36,37 @@ A comprehensive Customer Relationship Management system for Brightly's Assetic A
 
 ## Quick Start
 
+### Option 1: GitHub Codespaces (Recommended)
+
+Open this repository in GitHub Codespaces for instant setup with Docker-in-Docker:
+
+1. Click "Code" → "Codespaces" → "Create codespace" on GitHub
+2. Wait for the environment to build (2-3 minutes)
+3. Everything is configured automatically!
+
+See [CODESPACES.md](CODESPACES.md) for details.
+
+### Option 2: Docker (Local Development)
+
+```bash
+# Clone the repository
+git clone https://github.com/Twiitchter/XeonB.git
+cd XeonB
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start with the smart launcher (auto-detects environment)
+./docker-dev.sh up --build
+
+# Run migrations
+docker compose -f docker-compose.dev.yml exec app npm run migrate
+# Or if using docker-dev.sh: ./docker-dev.sh exec app npm run migrate
+```
+
+### Option 3: Local Development (Without Docker)
+
 ```bash
 # Install dependencies
 npm install
@@ -45,7 +76,7 @@ cd client && npm install && cd ..
 cp .env.example .env
 # Edit .env with your configuration
 
-# Run database migrations
+# Run database migrations (requires PostgreSQL installed)
 npm run migrate
 
 # Start development server
@@ -59,6 +90,8 @@ The application will be available at:
 ## Documentation
 
 - [Installation Guide](INSTALLATION.md) - Detailed setup instructions
+- [Docker Guide](DOCKER.md) - Docker development setup
+- [Codespaces Guide](CODESPACES.md) - GitHub Codespaces with Docker-in-Docker
 - [API Reference](INSTALLATION.md#api-endpoints) - Complete API documentation
 - [Brightly Assetic API](https://help.brightlysoftware.com/Content/Documentation/Assetic/Integration/Assetic%20REST%20API%20Introduction/REST%20API%20Introduction.html)
 
