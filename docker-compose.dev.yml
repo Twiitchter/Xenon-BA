@@ -61,12 +61,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          '/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT 1" || exit 1',
+          '/opt/mssql-tools18/bin/sqlcmd -C -S 127.0.0.1 -U sa -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT 1" -l 3 || exit 1',
         ]
       interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
+      timeout: 10s
+      retries: 18
+      start_period: 40s
     volumes:
       - mssqldata:/var/opt/mssql
     restart: unless-stopped

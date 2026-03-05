@@ -40,6 +40,10 @@ Optional if host port `1433` is already in use:
 MSSQL_HOST_PORT=11433
 ```
 
+In GitHub Codespaces, `docker-dev.sh` now defaults to `MSSQL_HOST_PORT=11433`
+automatically (unless you override it) to avoid collisions with the
+Codespaces helper DB container that can already reserve `1433`.
+
 Notes:
 
 - `DB_HOST` in `.env` can stay as `localhost` for bare-metal development.
@@ -67,7 +71,7 @@ docker compose -f docker-compose.dev.yml down -v
 - Frontend: `http://localhost:3001`
 - Backend API: `http://localhost:3000`
 - DB health: `http://localhost:3000/api/health/db`
-- SQL Server: `localhost:${MSSQL_HOST_PORT:-1433}`
+- SQL Server: `localhost:${MSSQL_HOST_PORT:-11433}`
 
 ## Codespaces
 

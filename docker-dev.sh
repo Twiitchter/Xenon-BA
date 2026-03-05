@@ -28,4 +28,12 @@ if [ "$1" = "--codespaces-db" ]; then
 fi
 
 echo "📦 Using three-container dev stack (frontend + backend + mssql)..."
+
+# In Codespaces, another helper DB container may already publish 1433.
+# Default to a non-conflicting host port unless explicitly overridden.
+if [ -n "$CODESPACES" ] && [ -z "$MSSQL_HOST_PORT" ]; then
+    export MSSQL_HOST_PORT=11433
+    echo "🛠️  Codespaces detected: using MSSQL host port ${MSSQL_HOST_PORT} to avoid 1433 conflicts"
+fi
+
 docker compose -f docker-compose.dev.yml "$@"

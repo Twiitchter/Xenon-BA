@@ -65,6 +65,9 @@ cp .env.example .env
 # Start with the smart launcher (auto-detects environment)
 ./docker-dev.sh up --build
 
+# In Codespaces, this automatically remaps MSSQL host port to 11433
+# to avoid conflicts with the helper DB container on 1433.
+
 # Run migrations
 docker compose -f docker-compose.dev.yml exec backend npm run migrate
 # Or if using docker-dev.sh: ./docker-dev.sh exec backend npm run migrate
