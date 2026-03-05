@@ -11,6 +11,40 @@ import asseticLocationHierarchyService from "../services/asseticLocationHierarch
 
 const router = Router();
 
+function buildAsseticHierarchyError(error: any): {
+  status: number;
+  message: string;
+  log: string;
+} {
+  const status = error?.response?.status;
+  const upstream =
+    error?.response?.data?.Message || error?.response?.data?.message;
+
+  if (status === 401 || status === 403) {
+    return {
+      status: 502,
+      message:
+        "Assetic credentials are valid for login but do not have permission to read location hierarchy endpoints (/assets or /functionallocations). Update API permissions or use a service account with read access.",
+      log: `Assetic hierarchy unauthorized (${status})${upstream ? `: ${upstream}` : ""}`,
+    };
+  }
+
+  if (status === 404) {
+    return {
+      status: 502,
+      message:
+        "Assetic endpoint was not found while fetching hierarchy. Check API base URL and version settings.",
+      log: `Assetic hierarchy endpoint missing (404)${upstream ? `: ${upstream}` : ""}`,
+    };
+  }
+
+  return {
+    status: 500,
+    message: "Failed to fetch location hierarchy",
+    log: `Assetic hierarchy fetch failed${status ? ` (status ${status})` : ""}${upstream ? `: ${upstream}` : ""}`,
+  };
+}
+
 // All admin routes require authentication
 router.use(authenticateToken);
 
@@ -118,20 +152,20 @@ router.post(
       const apiUsername = await settingsService.get("assetic_api_username");
 
       if (!apiUrl || !apiKey || !apiUsername) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Assetic site URL, username, and API key must be configured first",
-          });
+        return res.status(400).json({
+          error:
+            "Assetic site URL, username, and API key must be configured first",
+        });
       }
 
-      // Use the asseticClient directly — it handles auth, URL construction, and rate limiting
+      // Validate login, then validate read access for hierarchy source endpoint.
       const result = await asseticClient.validateLogin();
+      await asseticClient.getAssets({ page: 1, pageSize: 1 });
 
       res.json({
         success: true,
-        message: "Assetic connection successful — credentials validated",
+        message:
+          "Assetic connection successful - credentials and asset read access validated",
         status: 200,
         data: result,
       });
@@ -140,11 +174,12 @@ router.post(
       let message =
         error.response?.data?.message || error.message || "Connection failed";
 
-      if (status === 401) {
-        message = "Authentication failed — check your username and API key";
+      if (status === 401 || status === 403) {
+        message =
+          "Authentication/authorization failed - ensure this account can read /auth and /assets endpoints";
       } else if (status === 404) {
         message =
-          "Endpoint not found — check your Assetic site URL (should be e.g. https://yoursite.assetic.net)";
+          "Endpoint not found - check your Assetic site URL (should be e.g. https://yoursite.assetic.net)";
       }
 
       res.json({ success: false, message, status });
@@ -211,8 +246,9 @@ router.get(
 
       res.json(hierarchy);
     } catch (error: any) {
-      console.error("Error fetching Assetic location hierarchy:", error);
-      res.status(500).json({ error: "Failed to fetch location hierarchy" });
+      const mapped = buildAsseticHierarchyError(error);
+      console.error(`Error fetching Assetic location hierarchy: ${mapped.log}`);
+      res.status(mapped.status).json({ error: mapped.message });
     }
   },
 );

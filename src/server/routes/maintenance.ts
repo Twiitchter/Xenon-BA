@@ -7,6 +7,40 @@ import asseticLocationHierarchyService from "../services/asseticLocationHierarch
 
 const router = Router();
 
+function buildAsseticHierarchyError(error: any): {
+  status: number;
+  message: string;
+  log: string;
+} {
+  const status = error?.response?.status;
+  const upstream =
+    error?.response?.data?.Message || error?.response?.data?.message;
+
+  if (status === 401 || status === 403) {
+    return {
+      status: 502,
+      message:
+        "Assetic rejected hierarchy pull due to insufficient API permissions on /assets or /functionallocations.",
+      log: `Assetic hierarchy unauthorized (${status})${upstream ? `: ${upstream}` : ""}`,
+    };
+  }
+
+  if (status === 404) {
+    return {
+      status: 502,
+      message:
+        "Assetic hierarchy endpoint not found. Verify Assetic API URL/version settings.",
+      log: `Assetic hierarchy endpoint missing (404)${upstream ? `: ${upstream}` : ""}`,
+    };
+  }
+
+  return {
+    status: 500,
+    message: "Failed to fetch location hierarchy from Assetic",
+    log: `Assetic hierarchy fetch failed${status ? ` (status ${status})` : ""}${upstream ? `: ${upstream}` : ""}`,
+  };
+}
+
 // All routes require authentication
 router.use(authenticateToken);
 
@@ -676,11 +710,10 @@ router.get(
         : await asseticLocationHierarchyService.getOrRefresh();
 
       res.json(hierarchy);
-    } catch (error) {
-      console.error("Error fetching Assetic location hierarchy:", error);
-      res
-        .status(500)
-        .json({ error: "Failed to fetch location hierarchy from Assetic" });
+    } catch (error: any) {
+      const mapped = buildAsseticHierarchyError(error);
+      console.error(`Error fetching Assetic location hierarchy: ${mapped.log}`);
+      res.status(mapped.status).json({ error: mapped.message });
     }
   },
 );

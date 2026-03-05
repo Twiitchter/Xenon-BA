@@ -90,26 +90,28 @@ async function startServer() {
     await settingsService.loadCache();
     console.log("Settings cache loaded");
 
-    // Preload location hierarchy so region/site/building selectors are ready on first use.
-    try {
-      const asseticEnabled = await settingsService.getBool(
-        "assetic_sync_enabled",
-      );
-      if (asseticEnabled) {
-        const hierarchy =
-          await asseticLocationHierarchyService.refreshFromAssetic();
-        console.log(
-          `[AsseticHierarchy] Preloaded ${hierarchy.regions.length} region(s) from ${hierarchy.source}`,
-        );
-      }
-    } catch (error) {
-      console.warn("[AsseticHierarchy] Startup preload failed:", error);
-    }
-
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     });
+
+    // Preload location hierarchy in the background so API startup is never blocked.
+    void (async () => {
+      try {
+        const asseticEnabled = await settingsService.getBool(
+          "assetic_sync_enabled",
+        );
+        if (asseticEnabled) {
+          const hierarchy =
+            await asseticLocationHierarchyService.refreshFromAssetic();
+          console.log(
+            `[AsseticHierarchy] Preloaded ${hierarchy.regions.length} region(s) from ${hierarchy.source}`,
+          );
+        }
+      } catch (error) {
+        console.warn("[AsseticHierarchy] Startup preload failed:", error);
+      }
+    })();
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
