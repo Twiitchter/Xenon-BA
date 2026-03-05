@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { maintenanceService } from '../services/maintenanceService';
+import React, { useState, useEffect } from "react";
+import {
+  LocationHierarchyResponse,
+  maintenanceService,
+} from "../services/maintenanceService";
 
 interface WorkRequestSource {
   id: string;
@@ -14,42 +17,50 @@ interface WorkRequestType {
 const Maintenance: React.FC = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [filters, setFilters] = useState({ status: '', priority: '' });
+  const [filters, setFilters] = useState({ status: "", priority: "" });
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    priority: 'medium',
-    category: '',
-    location: '',
+    title: "",
+    description: "",
+    priority: "medium",
+    category: "",
+    location: "",
     // Requestor information
-    requestorDisplayName: '',
-    requestorEmail: '',
-    requestorPhone: '',
-    requestorMobile: '',
+    requestorDisplayName: "",
+    requestorEmail: "",
+    requestorPhone: "",
+    requestorMobile: "",
     // Physical location details
-    streetAddress: '',
-    citySuburb: '',
-    state: '',
-    zipPostcode: '',
-    country: '',
+    streetAddress: "",
+    citySuburb: "",
+    state: "",
+    zipPostcode: "",
+    country: "",
     // Optional fields
-    supportingInformation: '',
+    supportingInformation: "",
     // Assetic fields
-    workRequestSourceId: '',
-    workRequestSubtypeId: '',
+    workRequestSourceId: "",
+    workRequestSubtypeId: "",
   });
 
   // Assetic integration state
-  const [workRequestSources, setWorkRequestSources] = useState<WorkRequestSource[]>([]);
-  const [workRequestTypes, setWorkRequestTypes] = useState<WorkRequestType[]>([]);
+  const [workRequestSources, setWorkRequestSources] = useState<
+    WorkRequestSource[]
+  >([]);
+  const [workRequestTypes, setWorkRequestTypes] = useState<WorkRequestType[]>(
+    [],
+  );
   const [asseticEnabled, setAsseticEnabled] = useState(false);
+  const [locationHierarchy, setLocationHierarchy] =
+    useState<LocationHierarchyResponse | null>(null);
 
   // Messages state
-  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(null);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(
+    null,
+  );
   const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
 
   useEffect(() => {
@@ -60,33 +71,41 @@ const Maintenance: React.FC = () => {
   const fetchAsseticData = async () => {
     try {
       // Try to fetch Assetic data, but don't fail if integration is not enabled
-      const [sourcesRes, typesRes] = await Promise.allSettled([
+      const [sourcesRes, typesRes, hierarchyRes] = await Promise.allSettled([
         maintenanceService.getWorkRequestSources(),
         maintenanceService.getWorkRequestTypes(),
+        maintenanceService.getLocationHierarchy(),
       ]);
 
-      if (sourcesRes.status === 'fulfilled' && sourcesRes.value?.sources) {
+      if (sourcesRes.status === "fulfilled" && sourcesRes.value?.sources) {
         setWorkRequestSources(sourcesRes.value.sources);
         setAsseticEnabled(true);
       }
 
-      if (typesRes.status === 'fulfilled' && typesRes.value?.ResourceList) {
+      if (typesRes.status === "fulfilled" && typesRes.value?.ResourceList) {
         setWorkRequestTypes(typesRes.value.ResourceList);
+      }
+
+      if (hierarchyRes.status === "fulfilled" && hierarchyRes.value?.regions) {
+        setLocationHierarchy(hierarchyRes.value);
+        setAsseticEnabled(true);
       }
     } catch (err) {
       // Silently fail - Assetic integration may not be enabled
-      console.log('Assetic integration not available');
+      console.log("Assetic integration not available");
     }
   };
 
   const fetchRequests = async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const data = await maintenanceService.getRequests(filters);
       setRequests(data.requests || []);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch maintenance requests');
+      setError(
+        err.response?.data?.error || "Failed to fetch maintenance requests",
+      );
     } finally {
       setLoading(false);
     }
@@ -94,32 +113,32 @@ const Maintenance: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     try {
       await maintenanceService.createRequest(formData);
       setShowForm(false);
-      setFormData({ 
-        title: '', 
-        description: '', 
-        priority: 'medium', 
-        category: '', 
-        location: '',
-        requestorDisplayName: '',
-        requestorEmail: '',
-        requestorPhone: '',
-        requestorMobile: '',
-        streetAddress: '',
-        citySuburb: '',
-        state: '',
-        zipPostcode: '',
-        country: '',
-        supportingInformation: '',
-        workRequestSourceId: '',
-        workRequestSubtypeId: '',
+      setFormData({
+        title: "",
+        description: "",
+        priority: "medium",
+        category: "",
+        location: "",
+        requestorDisplayName: "",
+        requestorEmail: "",
+        requestorPhone: "",
+        requestorMobile: "",
+        streetAddress: "",
+        citySuburb: "",
+        state: "",
+        zipPostcode: "",
+        country: "",
+        supportingInformation: "",
+        workRequestSourceId: "",
+        workRequestSubtypeId: "",
       });
       fetchRequests();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create request');
+      setError(err.response?.data?.error || "Failed to create request");
     }
   };
 
@@ -134,7 +153,7 @@ const Maintenance: React.FC = () => {
       const data = await maintenanceService.getMessages(workOrderId);
       setMessages(data.messages || []);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch messages');
+      setError(err.response?.data?.error || "Failed to fetch messages");
     } finally {
       setMessagesLoading(false);
     }
@@ -145,10 +164,10 @@ const Maintenance: React.FC = () => {
     if (!selectedWorkOrderId || !newMessage.trim()) return;
     try {
       await maintenanceService.sendMessage(selectedWorkOrderId, newMessage);
-      setNewMessage('');
+      setNewMessage("");
       openMessages(selectedWorkOrderId);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send message');
+      setError(err.response?.data?.error || "Failed to send message");
     }
   };
 
@@ -157,7 +176,7 @@ const Maintenance: React.FC = () => {
       <div className="page-header">
         <h2>Work Requests</h2>
         <button onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : '+ New Request'}
+          {showForm ? "Cancel" : "+ New Request"}
         </button>
       </div>
 
@@ -170,7 +189,9 @@ const Maintenance: React.FC = () => {
               <input
                 type="text"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
                 required
                 aria-required="true"
               />
@@ -179,19 +200,34 @@ const Maintenance: React.FC = () => {
               <label>Description</label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 rows={3}
               />
             </div>
-            
-            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Contact Information</h4>
-            <div style={{ display: 'flex', gap: '10px' }}>
+
+            <h4
+              style={{
+                marginTop: "20px",
+                marginBottom: "10px",
+                fontSize: "16px",
+              }}
+            >
+              Contact Information
+            </h4>
+            <div style={{ display: "flex", gap: "10px" }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label>Contact Name *</label>
                 <input
                   type="text"
                   value={formData.requestorDisplayName}
-                  onChange={(e) => setFormData({ ...formData, requestorDisplayName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      requestorDisplayName: e.target.value,
+                    })
+                  }
                   placeholder="Your full name"
                   required
                   aria-required="true"
@@ -202,18 +238,22 @@ const Maintenance: React.FC = () => {
                 <input
                   type="email"
                   value={formData.requestorEmail}
-                  onChange={(e) => setFormData({ ...formData, requestorEmail: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, requestorEmail: e.target.value })
+                  }
                   placeholder="contact@example.com"
                 />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: "flex", gap: "10px" }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label>Phone</label>
                 <input
                   type="tel"
                   value={formData.requestorPhone}
-                  onChange={(e) => setFormData({ ...formData, requestorPhone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, requestorPhone: e.target.value })
+                  }
                   placeholder="Office phone"
                 />
               </div>
@@ -222,19 +262,34 @@ const Maintenance: React.FC = () => {
                 <input
                   type="tel"
                   value={formData.requestorMobile}
-                  onChange={(e) => setFormData({ ...formData, requestorMobile: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      requestorMobile: e.target.value,
+                    })
+                  }
                   placeholder="Mobile phone"
                 />
               </div>
             </div>
 
-            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Request Details</h4>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <h4
+              style={{
+                marginTop: "20px",
+                marginBottom: "10px",
+                fontSize: "16px",
+              }}
+            >
+              Request Details
+            </h4>
+            <div style={{ display: "flex", gap: "10px" }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label>Priority</label>
                 <select
                   value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, priority: e.target.value })
+                  }
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -247,19 +302,26 @@ const Maintenance: React.FC = () => {
                 <input
                   type="text"
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
                   placeholder="e.g. Plumbing, Electrical"
                 />
               </div>
             </div>
 
             {asseticEnabled && workRequestSources.length > 0 && (
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: "flex", gap: "10px" }}>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label>Request Source</label>
                   <select
                     value={formData.workRequestSourceId}
-                    onChange={(e) => setFormData({ ...formData, workRequestSourceId: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        workRequestSourceId: e.target.value,
+                      })
+                    }
                   >
                     <option value="">Select a source...</option>
                     {workRequestSources.map((source) => (
@@ -274,7 +336,12 @@ const Maintenance: React.FC = () => {
                     <label>Request Type</label>
                     <select
                       value={formData.workRequestSubtypeId}
-                      onChange={(e) => setFormData({ ...formData, workRequestSubtypeId: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          workRequestSubtypeId: e.target.value,
+                        })
+                      }
                     >
                       <option value="">Select a type...</option>
                       {workRequestTypes.map((type: any) => (
@@ -288,23 +355,47 @@ const Maintenance: React.FC = () => {
               </div>
             )}
 
-            <h4 style={{ marginTop: '20px', marginBottom: '10px', fontSize: '16px' }}>Location Information</h4>
+            <h4
+              style={{
+                marginTop: "20px",
+                marginBottom: "10px",
+                fontSize: "16px",
+              }}
+            >
+              Location Information
+            </h4>
+            {locationHierarchy && (
+              <div
+                style={{
+                  marginBottom: "10px",
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Loaded {locationHierarchy.regions.length} regions from Assetic (
+                {locationHierarchy.source}).
+              </div>
+            )}
             <div className="form-group">
               <label>General Location</label>
               <input
                 type="text"
                 value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
                 placeholder="e.g. Building A, Room 101"
               />
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: "flex", gap: "10px" }}>
               <div className="form-group" style={{ flex: 2 }}>
                 <label>Street Address</label>
                 <input
                   type="text"
                   value={formData.streetAddress}
-                  onChange={(e) => setFormData({ ...formData, streetAddress: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, streetAddress: e.target.value })
+                  }
                   placeholder="Street address"
                 />
               </div>
@@ -313,18 +404,22 @@ const Maintenance: React.FC = () => {
                 <input
                   type="text"
                   value={formData.citySuburb}
-                  onChange={(e) => setFormData({ ...formData, citySuburb: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, citySuburb: e.target.value })
+                  }
                   placeholder="City"
                 />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: "flex", gap: "10px" }}>
               <div className="form-group" style={{ flex: 1 }}>
                 <label>State</label>
                 <input
                   type="text"
                   value={formData.state}
-                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, state: e.target.value })
+                  }
                   placeholder="State"
                 />
               </div>
@@ -333,7 +428,9 @@ const Maintenance: React.FC = () => {
                 <input
                   type="text"
                   value={formData.zipPostcode}
-                  onChange={(e) => setFormData({ ...formData, zipPostcode: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, zipPostcode: e.target.value })
+                  }
                   placeholder="Postcode"
                 />
               </div>
@@ -342,7 +439,9 @@ const Maintenance: React.FC = () => {
                 <input
                   type="text"
                   value={formData.country}
-                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, country: e.target.value })
+                  }
                   placeholder="Country"
                 />
               </div>
@@ -352,7 +451,12 @@ const Maintenance: React.FC = () => {
               <label>Supporting Information</label>
               <textarea
                 value={formData.supportingInformation}
-                onChange={(e) => setFormData({ ...formData, supportingInformation: e.target.value })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    supportingInformation: e.target.value,
+                  })
+                }
                 rows={2}
                 placeholder="Any additional details that might be helpful"
               />
@@ -365,10 +469,14 @@ const Maintenance: React.FC = () => {
 
       <div className="card">
         <h3>Filters</h3>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
           <div className="form-group" style={{ flex: 1 }}>
             <label>Status</label>
-            <select name="status" value={filters.status} onChange={handleFilterChange}>
+            <select
+              name="status"
+              value={filters.status}
+              onChange={handleFilterChange}
+            >
               <option value="">All</option>
               <option value="open">Open</option>
               <option value="in_progress">In Progress</option>
@@ -378,7 +486,11 @@ const Maintenance: React.FC = () => {
           </div>
           <div className="form-group" style={{ flex: 1 }}>
             <label>Priority</label>
-            <select name="priority" value={filters.priority} onChange={handleFilterChange}>
+            <select
+              name="priority"
+              value={filters.priority}
+              onChange={handleFilterChange}
+            >
               <option value="">All</option>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -396,7 +508,13 @@ const Maintenance: React.FC = () => {
         {loading ? (
           <div className="loading">Loading requests...</div>
         ) : requests.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px",
+              color: "var(--text-muted)",
+            }}
+          >
             No work requests found. Click "+ New Request" to create one.
           </div>
         ) : (
@@ -419,8 +537,8 @@ const Maintenance: React.FC = () => {
                   <td>{req.title}</td>
                   <td>{req.priority}</td>
                   <td>{req.status}</td>
-                  <td>{req.category || 'N/A'}</td>
-                  <td>{req.location || 'N/A'}</td>
+                  <td>{req.category || "N/A"}</td>
+                  <td>{req.location || "N/A"}</td>
                   <td>{new Date(req.created_at).toLocaleString()}</td>
                 </tr>
               ))}
@@ -432,7 +550,13 @@ const Maintenance: React.FC = () => {
       {/* Messages panel */}
       {selectedWorkOrderId && (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <h3>Work Order #{selectedWorkOrderId} Messages</h3>
             <button onClick={() => setSelectedWorkOrderId(null)}>Close</button>
           </div>
@@ -442,20 +566,23 @@ const Maintenance: React.FC = () => {
             <>
               <div className="messages-box">
                 {messages.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)' }}>No messages yet.</p>
+                  <p style={{ color: "var(--text-muted)" }}>No messages yet.</p>
                 ) : (
                   messages.map((msg) => (
                     <div key={msg.id} className="message-bubble">
-                      <strong>{msg.sender_username || 'Unknown'}</strong>
+                      <strong>{msg.sender_username || "Unknown"}</strong>
                       <span className="message-meta">
                         {new Date(msg.created_at).toLocaleString()}
                       </span>
-                      <p style={{ margin: '4px 0 0 0' }}>{msg.message}</p>
+                      <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
                     </div>
                   ))
                 )}
               </div>
-              <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px' }}>
+              <form
+                onSubmit={handleSendMessage}
+                style={{ display: "flex", gap: "10px" }}
+              >
                 <input
                   type="text"
                   value={newMessage}

@@ -1,14 +1,12 @@
 {
   "name": "XeonB CRM Development",
-  "dockerComposeFile": [
-    "../docker-compose.codespaces.yml"
-  ],
+  "dockerComposeFile": ["../docker-compose.codespaces.yml"],
   "service": "app",
   "workspaceFolder": "/workspace",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest",
-      "moby": true,
+      "moby": false,
       "dockerDashComposeVersion": "v2"
     }
   },
@@ -29,7 +27,7 @@
       }
     }
   },
-  "forwardPorts": [3000, 3001, 5432],
+  "forwardPorts": [3000, 3001, 1433],
   "portsAttributes": {
     "3000": {
       "label": "API Server",
@@ -39,8 +37,8 @@
       "label": "Vite Dev Server",
       "onAutoForward": "notify"
     },
-    "5432": {
-      "label": "PostgreSQL",
+    "1433": {
+      "label": "SQL Server",
       "onAutoForward": "silent"
     }
   },

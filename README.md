@@ -5,30 +5,35 @@ A comprehensive Customer Relationship Management system for Brightly's Assetic A
 ## Features
 
 ✅ **Authentication System**
+
 - Simple username/password authentication
 - SSO support via OAuth2
 - SSO support via SAML
 - JWT-based token management
 
 ✅ **Brightly Assetic API Integration**
+
 - Middleware API to communicate with Assetic API
 - Asset synchronization
 - Change tracking and monitoring
 - Real-time data updates
 
 ✅ **Database Management**
+
 - PostgreSQL database for asset tracking
 - Asset change history and audit logs
 - Email and report logging
 - Optimized indexes for performance
 
 ✅ **PDF Report Generation**
+
 - Asset reports with customizable filters
 - Change reports for auditing
 - Professional PDF formatting
 - Automated report generation
 
 ✅ **Email Capabilities**
+
 - SMTP email service
 - Email with PDF attachments
 - Change notifications
@@ -61,8 +66,8 @@ cp .env.example .env
 ./docker-dev.sh up --build
 
 # Run migrations
-docker compose -f docker-compose.dev.yml exec app npm run migrate
-# Or if using docker-dev.sh: ./docker-dev.sh exec app npm run migrate
+docker compose -f docker-compose.dev.yml exec backend npm run migrate
+# Or if using docker-dev.sh: ./docker-dev.sh exec backend npm run migrate
 ```
 
 ### Option 3: Local Development (Without Docker)
@@ -84,6 +89,7 @@ npm run dev
 ```
 
 The application will be available at:
+
 - Frontend: http://localhost:3001
 - Backend API: http://localhost:3000
 
@@ -117,6 +123,7 @@ XeonB/
 ## Technology Stack
 
 **Backend:**
+
 - Node.js & Express
 - TypeScript
 - PostgreSQL
@@ -126,6 +133,7 @@ XeonB/
 - Axios (HTTP client)
 
 **Frontend:**
+
 - React 18
 - TypeScript
 - Vite (Build tool)

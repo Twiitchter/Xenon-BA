@@ -20,18 +20,18 @@ services:
     # Docker-in-Docker is enabled via the devcontainer feature
     # This allows running docker commands inside the container
 
-  # ── PostgreSQL Database ────────────────────────────────────────────────────
+  # ── SQL Server (MSSQL) Database ───────────────────────────────────────────
   db:
-    image: postgres:16-alpine
+    image: mcr.microsoft.com/mssql/server:2022-latest
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME:-xeonb_crm}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD:-YourStrong!Passw0rd}
+      MSSQL_PID: Developer
     volumes:
-      - pgdata-codespaces:/var/lib/postgresql/data
+      - mssqldata-codespaces:/var/opt/mssql
     ports:
-      - "5432:5432"
+      - "1433:1433"
 
 volumes:
-  pgdata-codespaces:
+  mssqldata-codespaces:

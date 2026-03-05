@@ -1,16 +1,43 @@
-import axios from 'axios';
-import { authService } from './authService';
+import axios from "axios";
+import { authService } from "./authService";
 
-const API_URL = '/api';
+const API_URL = "/api";
 
-interface WorkRequestSource {
+export interface WorkRequestSource {
   id: string;
   name: string;
 }
 
-interface WorkRequestType {
+export interface WorkRequestType {
   Id: string;
   Name: string;
+}
+
+export interface LocationHierarchyBuilding {
+  id: string;
+  name: string;
+  siteId: string;
+  regionId: string;
+}
+
+export interface LocationHierarchySite {
+  id: string;
+  name: string;
+  regionId: string;
+  buildings: LocationHierarchyBuilding[];
+}
+
+export interface LocationHierarchyRegion {
+  id: string;
+  name: string;
+  sites: LocationHierarchySite[];
+}
+
+export interface LocationHierarchyResponse {
+  source: "functionallocations" | "assets";
+  generatedAt: string;
+  rawNodeCount: number;
+  regions: LocationHierarchyRegion[];
 }
 
 interface CreateRequestParams {
@@ -20,10 +47,10 @@ interface CreateRequestParams {
   category?: string;
   location?: string;
   assetId?: number;
-  
+
   // Assetic required fields
   workRequestSourceId?: string;
-  
+
   // Requestor details (at least displayName OR firstName+surname required by Assetic)
   requestorDisplayName?: string;
   requestorFirstName?: string;
@@ -32,13 +59,13 @@ interface CreateRequestParams {
   requestorPhone?: string;
   requestorMobile?: string;
   requestorTypeId?: string;
-  
+
   // Optional Assetic fields
   workRequestSubtypeId?: string;
   workRequestPriorityId?: string;
   externalIdentifier?: string;
   supportingInformation?: string;
-  
+
   // Physical location details
   streetNumber?: string;
   streetAddress?: string;
@@ -48,10 +75,10 @@ interface CreateRequestParams {
   country?: string;
   otherLocation?: string;
   whereLocation?: string;
-  
+
   // Spatial location
   spatialLocation?: string;
-  
+
   // Reactive inspection
   reactiveInspectorName?: string;
   reactiveInspectionDate?: string;
@@ -89,7 +116,12 @@ interface UpdateWorkOrderParams {
 class MaintenanceService {
   // ─── My Items (Combined User View) ───────────────────────────────────
 
-  async getMyItems(params?: { status?: string; priority?: string; limit?: number; offset?: number }) {
+  async getMyItems(params?: {
+    status?: string;
+    priority?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const response = await axios.get(`${API_URL}/maintenance/my-items`, {
       headers: authService.getAuthHeader(),
       params,
@@ -99,7 +131,12 @@ class MaintenanceService {
 
   // ─── Maintenance Requests ───────────────────────────────────────────
 
-  async getRequests(params?: { status?: string; priority?: string; limit?: number; offset?: number }) {
+  async getRequests(params?: {
+    status?: string;
+    priority?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const response = await axios.get(`${API_URL}/maintenance/requests`, {
       headers: authService.getAuthHeader(),
       params,
@@ -122,15 +159,24 @@ class MaintenanceService {
   }
 
   async updateRequest(id: number, data: UpdateRequestParams) {
-    const response = await axios.put(`${API_URL}/maintenance/requests/${id}`, data, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.put(
+      `${API_URL}/maintenance/requests/${id}`,
+      data,
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data;
   }
 
   // ─── Work Orders ──────────────────────────────────────────────────
 
-  async getWorkOrders(params?: { status?: string; craft?: string; limit?: number; offset?: number }) {
+  async getWorkOrders(params?: {
+    status?: string;
+    craft?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const response = await axios.get(`${API_URL}/maintenance/work-orders`, {
       headers: authService.getAuthHeader(),
       params,
@@ -139,33 +185,50 @@ class MaintenanceService {
   }
 
   async getWorkOrder(id: number) {
-    const response = await axios.get(`${API_URL}/maintenance/work-orders/${id}`, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.get(
+      `${API_URL}/maintenance/work-orders/${id}`,
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data;
   }
 
   async createWorkOrder(data: CreateWorkOrderParams) {
-    const response = await axios.post(`${API_URL}/maintenance/work-orders`, data, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.post(
+      `${API_URL}/maintenance/work-orders`,
+      data,
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data;
   }
 
   async updateWorkOrder(id: number, data: UpdateWorkOrderParams) {
-    const response = await axios.put(`${API_URL}/maintenance/work-orders/${id}`, data, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.put(
+      `${API_URL}/maintenance/work-orders/${id}`,
+      data,
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data;
   }
 
   // ─── Messages ─────────────────────────────────────────────────────
 
-  async getMessages(workOrderId: number, params?: { limit?: number; offset?: number }) {
-    const response = await axios.get(`${API_URL}/maintenance/work-orders/${workOrderId}/messages`, {
-      headers: authService.getAuthHeader(),
-      params,
-    });
+  async getMessages(
+    workOrderId: number,
+    params?: { limit?: number; offset?: number },
+  ) {
+    const response = await axios.get(
+      `${API_URL}/maintenance/work-orders/${workOrderId}/messages`,
+      {
+        headers: authService.getAuthHeader(),
+        params,
+      },
+    );
     return response.data;
   }
 
@@ -173,7 +236,7 @@ class MaintenanceService {
     const response = await axios.post(
       `${API_URL}/maintenance/work-orders/${workOrderId}/messages`,
       { message },
-      { headers: authService.getAuthHeader() }
+      { headers: authService.getAuthHeader() },
     );
     return response.data;
   }
@@ -190,16 +253,35 @@ class MaintenanceService {
   // ─── Assetic Integration ──────────────────────────────────────────
 
   async getWorkRequestTypes() {
-    const response = await axios.get(`${API_URL}/maintenance/assetic/work-request-types`, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.get(
+      `${API_URL}/maintenance/assetic/work-request-types`,
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data;
   }
 
   async getWorkRequestSources() {
-    const response = await axios.get(`${API_URL}/maintenance/assetic/work-request-sources`, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.get(
+      `${API_URL}/maintenance/assetic/work-request-sources`,
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
+    return response.data;
+  }
+
+  async getLocationHierarchy(
+    refresh = false,
+  ): Promise<LocationHierarchyResponse> {
+    const response = await axios.get(
+      `${API_URL}/maintenance/assetic/location-hierarchy`,
+      {
+        headers: authService.getAuthHeader(),
+        params: refresh ? { refresh: true } : undefined,
+      },
+    );
     return response.data;
   }
 }

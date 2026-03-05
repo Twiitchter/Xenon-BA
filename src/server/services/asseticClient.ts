@@ -1,7 +1,7 @@
-import { AxiosInstance, AxiosResponse } from 'axios';
-import settingsService from './settingsService';
-import { asseticWorkerPool } from './asseticWorkerPool';
-import { asseticApiLogger, ApiLogEntityType } from './asseticApiLogger';
+import { AxiosInstance, AxiosResponse } from "axios";
+import settingsService from "./settingsService";
+import { asseticWorkerPool } from "./asseticWorkerPool";
+import { asseticApiLogger, ApiLogEntityType } from "./asseticApiLogger";
 
 /**
  * Assetic REST API client.
@@ -29,24 +29,29 @@ import { asseticApiLogger, ApiLogEntityType } from './asseticApiLogger';
 export interface AsseticQueryParams {
   page?: number;
   pageSize?: number;
-  filters?: string;       // e.g. "Id~eq~'abc'" or "Status~contains~'Open'"
-  sorts?: string;         // e.g. "CreatedDateTime-desc"
-  attributes?: string;    // e.g. "Comment,DimensionDetail"
+  filters?: string; // e.g. "Id~eq~'abc'" or "Status~contains~'Open'"
+  sorts?: string; // e.g. "CreatedDateTime-desc"
+  attributes?: string; // e.g. "Comment,DimensionDetail"
   [key: string]: any;
 }
 
 /** Convert our friendly params into Assetic's requestParams.* format */
-function toAsseticParams(p?: AsseticQueryParams): Record<string, any> | undefined {
+function toAsseticParams(
+  p?: AsseticQueryParams,
+): Record<string, any> | undefined {
   if (!p) return undefined;
   const out: Record<string, any> = {};
-  if (p.page != null)       out['requestParams.page'] = p.page;
-  if (p.pageSize != null)   out['requestParams.pageSize'] = p.pageSize;
-  if (p.filters)            out['requestParams.filters'] = p.filters;
-  if (p.sorts)              out['requestParams.sorts'] = p.sorts;
-  if (p.attributes)         out['attributes'] = p.attributes;
+  if (p.page != null) out["requestParams.page"] = p.page;
+  if (p.pageSize != null) out["requestParams.pageSize"] = p.pageSize;
+  if (p.filters) out["requestParams.filters"] = p.filters;
+  if (p.sorts) out["requestParams.sorts"] = p.sorts;
+  if (p.attributes) out["attributes"] = p.attributes;
   // Pass through any extra keys untouched
   for (const [k, v] of Object.entries(p)) {
-    if (!['page', 'pageSize', 'filters', 'sorts', 'attributes'].includes(k) && v != null) {
+    if (
+      !["page", "pageSize", "filters", "sorts", "attributes"].includes(k) &&
+      v != null
+    ) {
       out[k] = v;
     }
   }
@@ -124,7 +129,7 @@ class AsseticClient {
         durationMs,
         performedBy: this._contextUserId,
         source: this._contextSource,
-        status: 'success',
+        status: "success",
       });
 
       return response.data;
@@ -132,7 +137,7 @@ class AsseticClient {
       const durationMs = Date.now() - start;
       const httpStatus = error.response?.status;
       const responseBody = error.response?.data;
-      const errorMessage = error.message || 'Unknown error';
+      const errorMessage = error.message || "Unknown error";
 
       // Log failure — fire-and-forget
       asseticApiLogger.log({
@@ -148,7 +153,7 @@ class AsseticClient {
         durationMs,
         performedBy: this._contextUserId,
         source: this._contextSource,
-        status: httpStatus ? 'error' : 'timeout',
+        status: httpStatus ? "error" : "timeout",
       });
 
       throw error;
@@ -157,7 +162,7 @@ class AsseticClient {
 
   /** Check whether Assetic sync is enabled in settings. */
   async isEnabled(): Promise<boolean> {
-    return settingsService.getBool('assetic_sync_enabled');
+    return settingsService.getBool("assetic_sync_enabled");
   }
 
   /** Return current rate-limit / queue status (exposed for the admin endpoint). */
@@ -177,8 +182,8 @@ class AsseticClient {
   /** Validate Login — GET /api/v2/auth */
   async validateLogin() {
     return this.call(
-      (c) => c.get('/auth').then((r) => r.data),
-      'GET /auth (validate login)',
+      (c) => c.get("/auth").then((r) => r.data),
+      "GET /auth (validate login)",
     );
   }
 
@@ -188,21 +193,21 @@ class AsseticClient {
 
   async getWorkRequests(params?: AsseticQueryParams) {
     return this.loggedCall({
-      method: 'GET',
-      endpoint: '/workrequest',
-      description: 'GET /workrequest',
-      entityType: 'work_request',
+      method: "GET",
+      endpoint: "/workrequest",
+      description: "GET /workrequest",
+      entityType: "work_request",
       requestBody: toAsseticParams(params),
-      fn: (c) => c.get('/workrequest', { params: toAsseticParams(params) }),
+      fn: (c) => c.get("/workrequest", { params: toAsseticParams(params) }),
     });
   }
 
   async getWorkRequest(guid: string) {
     return this.loggedCall({
-      method: 'GET',
+      method: "GET",
       endpoint: `/workrequest/${guid}`,
       description: `GET /workrequest/${guid}`,
-      entityType: 'work_request',
+      entityType: "work_request",
       entityGuid: guid,
       fn: (c) => c.get(`/workrequest/${guid}`),
     });
@@ -210,21 +215,21 @@ class AsseticClient {
 
   async createWorkRequest(data: any) {
     return this.loggedCall({
-      method: 'POST',
-      endpoint: '/workrequest',
-      description: 'POST /workrequest',
-      entityType: 'work_request',
+      method: "POST",
+      endpoint: "/workrequest",
+      description: "POST /workrequest",
+      entityType: "work_request",
       requestBody: data,
-      fn: (c) => c.post('/workrequest/', data),
+      fn: (c) => c.post("/workrequest/", data),
     });
   }
 
   async updateWorkRequest(guid: string, data: any) {
     return this.loggedCall({
-      method: 'PUT',
+      method: "PUT",
       endpoint: `/workrequest/${guid}`,
       description: `PUT /workrequest/${guid}`,
-      entityType: 'work_request',
+      entityType: "work_request",
       entityGuid: guid,
       requestBody: data,
       fn: (c) => c.put(`/workrequest/${guid}/`, data),
@@ -233,18 +238,18 @@ class AsseticClient {
 
   async getWorkRequestTypes() {
     return this.call(
-      (c) => c.get('/workrequesttype').then((r) => r.data),
-      'GET /workrequesttype',
+      (c) => c.get("/workrequesttype").then((r) => r.data),
+      "GET /workrequesttype",
     );
   }
 
   /** Add a comment / supporting info to a work request */
   async addWorkRequestComment(guid: string, data: any) {
     return this.loggedCall({
-      method: 'POST',
+      method: "POST",
       endpoint: `/workrequest/${guid}/supportinginfo`,
       description: `POST /workrequest/${guid}/supportinginfo`,
-      entityType: 'work_request',
+      entityType: "work_request",
       entityGuid: guid,
       requestBody: data,
       fn: (c) => c.post(`/workrequest/${guid}/supportinginfo`, data),
@@ -254,10 +259,10 @@ class AsseticClient {
   /** Get supporting info / comments for a work request */
   async getWorkRequestComments(guid: string) {
     return this.loggedCall({
-      method: 'GET',
+      method: "GET",
       endpoint: `/workrequest/${guid}/supportinginfo`,
       description: `GET /workrequest/${guid}/supportinginfo`,
-      entityType: 'work_request',
+      entityType: "work_request",
       entityGuid: guid,
       fn: (c) => c.get(`/workrequest/${guid}/supportinginfo`),
     });
@@ -269,8 +274,11 @@ class AsseticClient {
 
   async getWorkOrders(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/workorder', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /workorder',
+      (c) =>
+        c
+          .get("/workorder", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /workorder",
     );
   }
 
@@ -283,22 +291,22 @@ class AsseticClient {
 
   async createWorkOrder(data: any) {
     return this.loggedCall({
-      method: 'POST',
-      endpoint: '/workorder',
-      description: 'POST /workorder',
-      entityType: 'work_order',
+      method: "POST",
+      endpoint: "/workorder",
+      description: "POST /workorder",
+      entityType: "work_order",
       requestBody: data,
-      fn: (c) => c.post('/workorder', data),
+      fn: (c) => c.post("/workorder", data),
     });
   }
 
   /** Update a work order (also used to add comments via the body) */
   async updateWorkOrder(guid: string, data: any) {
     return this.loggedCall({
-      method: 'PUT',
+      method: "PUT",
       endpoint: `/workorder/${guid}`,
       description: `PUT /workorder/${guid}`,
-      entityType: 'work_order',
+      entityType: "work_order",
       entityGuid: guid,
       requestBody: data,
       fn: (c) => c.put(`/workorder/${guid}`, data),
@@ -307,8 +315,8 @@ class AsseticClient {
 
   async getWorkTypes() {
     return this.call(
-      (c) => c.get('/worktype').then((r) => r.data),
-      'GET /worktype',
+      (c) => c.get("/worktype").then((r) => r.data),
+      "GET /worktype",
     );
   }
 
@@ -318,8 +326,11 @@ class AsseticClient {
 
   async getAssets(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/assets', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /assets',
+      (c) =>
+        c
+          .get("/assets", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /assets",
     );
   }
 
@@ -336,29 +347,41 @@ class AsseticClient {
 
   async getAssetTypes(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/assettype', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /assettype',
+      (c) =>
+        c
+          .get("/assettype", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /assettype",
     );
   }
 
   async getAssetClasses(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/assetclass', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /assetclass',
+      (c) =>
+        c
+          .get("/assetclass", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /assetclass",
     );
   }
 
   async getAssetCategories(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/assetcategory', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /assetcategory',
+      (c) =>
+        c
+          .get("/assetcategory", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /assetcategory",
     );
   }
 
   async getWorkgroups(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/workgroup', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /workgroup',
+      (c) =>
+        c
+          .get("/workgroup", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /workgroup",
     );
   }
 
@@ -368,22 +391,36 @@ class AsseticClient {
 
   async getFunctionalLocationTypes(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/functionallocationtypes', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /functionallocationtypes',
+      (c) =>
+        c
+          .get("/functionallocationtypes", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /functionallocationtypes",
     );
   }
 
   async getFunctionalLocation(assetGuid: string) {
     return this.call(
-      (c) => c.get(`/assets/${assetGuid}/functionallocation`).then((r) => r.data),
+      (c) =>
+        c.get(`/assets/${assetGuid}/functionallocation`).then((r) => r.data),
       `GET /assets/${assetGuid}/functionallocation`,
+    );
+  }
+
+  async getFunctionalLocations(params?: AsseticQueryParams) {
+    return this.call(
+      (c) =>
+        c
+          .get("/functionallocations", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /functionallocations",
     );
   }
 
   async createFunctionalLocation(data: any) {
     return this.call(
-      (c) => c.post('/functionallocations', data).then((r) => r.data),
-      'POST /functionallocations',
+      (c) => c.post("/functionallocations", data).then((r) => r.data),
+      "POST /functionallocations",
     );
   }
 
@@ -393,8 +430,11 @@ class AsseticClient {
 
   async getResources(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/resource', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /resource',
+      (c) =>
+        c
+          .get("/resource", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /resource",
     );
   }
 
@@ -404,8 +444,11 @@ class AsseticClient {
 
   async getDocuments(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/document', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /document',
+      (c) =>
+        c
+          .get("/document", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /document",
     );
   }
 
@@ -418,14 +461,17 @@ class AsseticClient {
 
   async uploadDocument(data: any) {
     return this.call(
-      (c) => c.post('/document', data).then((r) => r.data),
-      'POST /document',
+      (c) => c.post("/document", data).then((r) => r.data),
+      "POST /document",
     );
   }
 
   async getDocumentFile(id: string) {
     return this.call(
-      (c) => c.get(`/document/${id}/file`, { responseType: 'arraybuffer' }).then((r) => r.data),
+      (c) =>
+        c
+          .get(`/document/${id}/file`, { responseType: "arraybuffer" })
+          .then((r) => r.data),
       `GET /document/${id}/file`,
     );
   }
@@ -436,15 +482,18 @@ class AsseticClient {
 
   async getServiceActivities(params?: AsseticQueryParams) {
     return this.call(
-      (c) => c.get('/serviceactivity', { params: toAsseticParams(params) }).then((r) => r.data),
-      'GET /serviceactivity',
+      (c) =>
+        c
+          .get("/serviceactivity", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /serviceactivity",
     );
   }
 
   async getMaintenanceAssetTypes() {
     return this.call(
-      (c) => c.get('/maintenanceassettype').then((r) => r.data),
-      'GET /maintenanceassettype',
+      (c) => c.get("/maintenanceassettype").then((r) => r.data),
+      "GET /maintenanceassettype",
     );
   }
 
@@ -454,8 +503,8 @@ class AsseticClient {
 
   async getVersion() {
     return this.call(
-      (c) => c.get('/version').then((r) => r.data),
-      'GET /version',
+      (c) => c.get("/version").then((r) => r.data),
+      "GET /version",
     );
   }
 }

@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { authService } from '../services/authService';
-import { maintenanceService } from '../services/maintenanceService';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { authService } from "../services/authService";
+import { maintenanceService } from "../services/maintenanceService";
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState({
     myOpenRequests: 0,
@@ -25,12 +27,16 @@ const Dashboard: React.FC = () => {
         maintenanceService.getRequests({ limit: 5 }),
         maintenanceService.getWorkOrders({ limit: 5 }),
       ]);
-      
+
       const requests = requestsData.requests || [];
       setStats({
-        myOpenRequests: requests.filter((r: any) => r.status === 'open').length,
-        myInProgressRequests: requests.filter((r: any) => r.status === 'in_progress').length,
-        myCompletedRequests: requests.filter((r: any) => r.status === 'completed').length,
+        myOpenRequests: requests.filter((r: any) => r.status === "open").length,
+        myInProgressRequests: requests.filter(
+          (r: any) => r.status === "in_progress",
+        ).length,
+        myCompletedRequests: requests.filter(
+          (r: any) => r.status === "completed",
+        ).length,
         recentRequests: requests.slice(0, 5),
         recentWorkOrders: (workOrdersData.workOrders || []).slice(0, 5),
       });
@@ -43,30 +49,43 @@ const Dashboard: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      open: 'badge-info',
-      pending: 'badge-warning',
-      in_progress: 'badge-warning',
-      completed: 'badge-success',
-      cancelled: 'badge-muted',
+      open: "badge-info",
+      pending: "badge-warning",
+      in_progress: "badge-warning",
+      completed: "badge-success",
+      cancelled: "badge-muted",
     };
-    return `badge ${colors[status] || 'badge-muted'}`;
+    return `badge ${colors[status] || "badge-muted"}`;
   };
 
   const getPriorityBadge = (priority: string) => {
     const colors: Record<string, string> = {
-      low: 'badge-muted',
-      medium: 'badge-info',
-      high: 'badge-warning',
-      critical: 'badge-error',
+      low: "badge-muted",
+      medium: "badge-info",
+      high: "badge-warning",
+      critical: "badge-error",
     };
-    return `badge ${colors[priority] || 'badge-muted'}`;
+    return `badge ${colors[priority] || "badge-muted"}`;
+  };
+
+  const isAdmin = user?.role === "admin";
+
+  const handleNewRequest = () => {
+    if (isAdmin) {
+      navigate("/requests");
+      return;
+    }
+
+    navigate("/my-requests?new=1");
   };
 
   return (
     <div className="container">
       <div className="page-header">
         <h2>Dashboard</h2>
-        <p style={{ color: 'var(--text-secondary)' }}>Welcome back, {user?.firstName || user?.username || 'User'}</p>
+        <p style={{ color: "var(--text-secondary)" }}>
+          Welcome back, {user?.firstName || user?.username || "User"}
+        </p>
       </div>
 
       {/* Stats Cards */}
@@ -90,39 +109,67 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="card" style={{ marginTop: '20px' }}>
-        <h3 style={{ marginBottom: '12px' }}>Quick Actions</h3>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button onClick={() => (window.location.href = '/requests')}>
-            New Maintenance Request
-          </button>
-          <button className="btn-outline" onClick={() => (window.location.href = '/work-orders')}>
+      <div className="card" style={{ marginTop: "20px" }}>
+        <h3 style={{ marginBottom: "12px" }}>Quick Actions</h3>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button onClick={handleNewRequest}>New Maintenance Request</button>
+          <button
+            className="btn-outline"
+            onClick={() => navigate("/work-orders")}
+          >
             View Work Orders
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "20px",
+          marginTop: "20px",
+        }}
+      >
         {/* Recent Requests */}
         <div className="card">
-          <h3 style={{ marginBottom: '12px' }}>Recent Requests</h3>
+          <h3 style={{ marginBottom: "12px" }}>Recent Requests</h3>
           {loading ? (
             <div className="loading">Loading...</div>
           ) : stats.recentRequests.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)' }}>No maintenance requests yet.</p>
+            <p style={{ color: "var(--text-muted)" }}>
+              No maintenance requests yet.
+            </p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
               {stats.recentRequests.map((req) => (
-                <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div
+                  key={req.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid var(--border)",
+                  }}
+                >
                   <div>
                     <div style={{ fontWeight: 500 }}>{req.title}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {req.location || req.category || 'No location'} · {new Date(req.created_at).toLocaleDateString()}
+                    <div
+                      style={{ fontSize: "12px", color: "var(--text-muted)" }}
+                    >
+                      {req.location || req.category || "No location"} ·{" "}
+                      {new Date(req.created_at).toLocaleDateString()}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <span className={getPriorityBadge(req.priority)}>{req.priority}</span>
-                    <span className={getStatusBadge(req.status)}>{req.status.replace('_', ' ')}</span>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <span className={getPriorityBadge(req.priority)}>
+                      {req.priority}
+                    </span>
+                    <span className={getStatusBadge(req.status)}>
+                      {req.status.replace("_", " ")}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -132,22 +179,38 @@ const Dashboard: React.FC = () => {
 
         {/* Recent Work Orders */}
         <div className="card">
-          <h3 style={{ marginBottom: '12px' }}>Recent Work Orders</h3>
+          <h3 style={{ marginBottom: "12px" }}>Recent Work Orders</h3>
           {loading ? (
             <div className="loading">Loading...</div>
           ) : stats.recentWorkOrders.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)' }}>No work orders yet.</p>
+            <p style={{ color: "var(--text-muted)" }}>No work orders yet.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
               {stats.recentWorkOrders.map((wo) => (
-                <div key={wo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div
+                  key={wo.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 0",
+                    borderBottom: "1px solid var(--border)",
+                  }}
+                >
                   <div>
                     <div style={{ fontWeight: 500 }}>{wo.title}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {wo.craft || 'Unassigned'} · {wo.assigned_to_username || 'Unassigned'}
+                    <div
+                      style={{ fontSize: "12px", color: "var(--text-muted)" }}
+                    >
+                      {wo.craft || "Unassigned"} ·{" "}
+                      {wo.assigned_to_username || "Unassigned"}
                     </div>
                   </div>
-                  <span className={getStatusBadge(wo.status)}>{wo.status.replace('_', ' ')}</span>
+                  <span className={getStatusBadge(wo.status)}>
+                    {wo.status.replace("_", " ")}
+                  </span>
                 </div>
               ))}
             </div>

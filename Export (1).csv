@@ -1,0 +1,398 @@
+﻿Functional Location Name L4,Functional Location Type L4,Functional Location Id L4,Functional Location Name L3,Functional Location Type L3,Functional Location Id L3,Functional Location Name L2,Functional Location Type L2,Functional Location Id L2,Functional Location Name L1,Functional Location Type L1,Functional Location Id L1,Asset Id,Asset Name,Asset Status
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Paint Shed ,Building,104781,BLD163420,(NWRHP) Paint Shed  (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Other Organisations,Site,104887,Hobart Reception Prison,Building,104883,BLD163440,(OO) Hobart Reception Prison (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cambridge Kitchen Facility (CKF),Site,104777,Cambridge Kitchen,Building,104876,BLD163421,(CKF) Cambridge Kitchen (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Hellyer Community Nursing (HCN),Site,104888,Hellyer Community Nursing,Building,104882,BLD163439,(HCN) Hellyer Community Nursing (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Other Organisations,Site,104886,Launceston Reception Prison,Building,104879,BLD163436,(OO) Launceston Reception Prison (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Cameron Street Child Mental Health,Building,104884,BLD163441,(LGHP) Cameron Street Child Mental Health (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Other Organisations,Site,104886,Ashley Youth Detention Centre,Building,104878,BLD163432,(OO) Ashley Youth Detention Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Other Organisations,Site,104887,Huon Regional Care (Dover Building),Building,104881,BLD163437,(OO) Huon Regional Care (Dover Building) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Liverpool Clinic (RHHLC),Site,104771,RHH Liverpool Clinics,Building,104772,BLD163430,(RHHLC) RHH Liverpool Clinics (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Ambulance Tasmania Aeromedical (ATA),Site,104889,Aeromedical Ambulance North,Building,104885,BLD163442,(ATA) Aeromedical Ambulance North (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,West Coast District Hospital (WCDH),Site,102176,Flat 1,Building,101812,BLD163241,WCDH Flat 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Beaconsfield District Health Centre (BDHC),Site,102092,Generator Room,Building,101759,BLD163252,BDHC Generator Room (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Parenting Centre New Town (PCNT),Site,102163,Parenting Centre,Building,101699,BLD163382,PCNT Parenting Centre (0295)(BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Gellibrand Building,Building,101798,BLD163098,SJP Gellibrand Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,District Hospital,Building,101802,BLD163102,SDHP District Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Cottage,Building,101815,BLD163094,SJP Cottage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Midlands Multi Purpose Health Centre (MMPHC),Site,102169,Consulting Rooms,Building,101813,BLD163237,MMPHC Consulting rooms (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,District Hospital,Building,101734,BLD163191,KIDHCHC District Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Bruny Island Community Health Centre Precinct (BICHCP),Site,102090,Pharmacy,Building,101762,BLD163116,BICHCP Pharmacy (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,New Norfolk District Hospital and Community Health Centre (NNDHCHC),Site,102158,Derwent Valley Medical Centre,Building,101827,BLD163132,NNDHCHC Derwent Valley Medical Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Gate House - 1,Building,101822,BLD163100,SJP Gate House - 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Peacock Centre MHS (PCMHS),Site,102217,Peacock Centre,Building,101718,BLD163357,PCMHS Peacock Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Day Centre,Building,101821,BLD163139,SJP Day Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,GP Clinics,Building,101814,BLD163176,CHCHC GP Clinics (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Deloraine District Hospital (DDH),Site,102112,Day Centre,Building,101739,BLD163123,DDH Day Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Garage,Building,101727,BLD163329,KIDHCHC Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,West Coast District Hospital (WCDH),Site,102176,Gaiety Hall,Building,101824,BLD163224,WCDH Gaiety Hall (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Millbrook Rise (MBR),Site,102157,Derwent Unit,Building,101677,BLD163381,MBR Derwent Unit (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,North East Soldiers Memorial Hospital (NESMH),Site,102096,Day Centre & UTAS Student Accommodation,Building,101831,BLD163126,NESMH Day Centre & UTAS Student Accommodation (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Parish Centre,Building,101696,BLD163095,SJP Parish Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Spring Bay Community Health Centre (SBCHC),Site,102197,Health Centre,Building,101716,BLD163212,SBCHC Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,West Coast District Hospital (WCDH),Site,102176,Flat 2,Building,101789,BLD163304,WCDH Flat 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Helens District Hospital (SHDH),Site,102190,District Hospital,Building,101793,BLD163328,SHDH District Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,George Town Hospital Precinct (GTHP),Site,102117,District Hospital,Building,101769,BLD163169,GTHP District Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Invermay Day Care Centre (IDCC),Site,102136,Day Centre,Building,101967,BLD163155,IDCC Day Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Family Accommodation Unit,Building,101953,BLD163292,NWRHP Family Accommodation Unit (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Gardener's Sheds,Building,101994,BLD163286,MCHP Gardener's Sheds (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Garage,Building,102036,BLD163321,LGHP Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Eureka Clubhouse (ECH),Site,102152,Day Centre,Building,102089,BLD163229,ECH Day Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation 3 studios (conjoined),Building,101971,BLD163302,NWRHP Patient Accommodation 3 studios  (conjoined) (0868) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Deloraine District Hospital (DDH),Site,102112,District Hospital,Building,101741,BLD163122,DDH District Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Brighton Community Health Centre (BCHC),Site,102094,Consulting Rooms,Building,101728,BLD163243,BCHC Consulting rooms (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Millbrook Rise (MBR),Site,102157,Day Centre,Building,101778,BLD163242,MBR Day Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Gate House  - 2,Building,101704,BLD163101,SJP Gate House - 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Glenora (GLA),Site,102131,Glenora,Building,101954,BLD163358,GLA Glenora (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,West Coast District Hospital (WCDH),Site,102176,District Hospital,Building,101806,BLD163225,WCDH District Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Beaconsfield District Health Centre (BDHC),Site,102092,Garage & Workshop,Building,101747,BLD163253,BDHC Garage & Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,North East Soldiers Memorial Hospital (NESMH),Site,102096,District Hospital,Building,101999,BLD163127,NESMH District Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Westbury Community Health Centre (WCHC),Site,102207,Garage,Building,101712,BLD163262,WCHC Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,The Corner Launceston (TCL),Site,102145,Headspace Inc,Building,101957,BLD163347,TCL Headspace Inc (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,Garage,Building,101805,BLD163325,SDHP Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Wilfred Lopes Secure Mental Health Facility (WLSMHF),Site,102215,Gym,Building,101722,BLD163255,WLSMHF Gym (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,West Coast District Hospital (WCDH),Site,102176,Flat 3,Building,101829,BLD163308,WCDH Flat 3 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Kingston Health Centre (KHC),Site,102138,Health Centre,Building,101767,BLD163330,KHC Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation 1x 2 bedroom units,Building,101997,BLD163300,NWRHP Patient Accommodation 1x 2 bedroom units (0867)(BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Parenting Centre New Town (PCNT),Site,102163,Parenting Centre,Building,102078,BLD163410,(PCNT) Parenting Centre (2080)(BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Strahan Medical Centre (SMC),Site,102193,Residence,Building,101709,BLD163244,SMC Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Wingfield Building,Building,101781,BLD163092,SJP Wingfield Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Residence (329),Building,101735,BLD163189,KIDHCHC Residence (0329) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Woodhouse Building,Building,101809,BLD163373,SJP Woodhouse Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,Services Building,Building,101820,BLD163103,SDHP Services Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,George Town Hospital Precinct (GTHP),Site,102117,Residence,Building,101757,BLD163341,GTHP Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Southern Community Equipment Scheme Building,Building,101753,BLD163202,RPTC Southern Community Equipment Scheme Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Midlands Multi Purpose Health Centre (MMPHC),Site,102169,Physio Building,Building,101832,BLD163238,MMPHC Physio Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,New Norfolk District Hospital and Community Health Centre (NNDHCHC),Site,102158,Services Building,Building,101779,BLD163131,NNDHCHC Services Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,Plant Room and Garage,Building,101794,BLD163175,CHCHC Plant Room and Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Multipurpose Service Centre (CTMPSC),Site,102105,Pump house,Building,101725,BLD163245,CTMPSC Pump house (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Bruny Island Community Health Centre Precinct (BICHCP),Site,102090,Residence,Building,101754,BLD163205,BICHCP Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - Consultant office,Building,101941,BLD163183,RHHP RHH - Consultant office (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,District Hospital Services Building,Building,101682,BLD163192,KIDHCHC Services Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Deloraine UTAS accommodation (DDHCUA),Site,102111,Residence - UTAS,Building,101731,BLD163298,DDHCUA Residence - UTAS (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Oatlands THS staff residence (OTSR),Site,102168,Residence,Building,102028,BLD163307,OTSR Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Residence (0992),Building,101890,BLD163215,MCHP Residence (0992) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Burnie Community Health Service (BCHS),Site,102097,Services Building,Building,101732,BLD163157,BCHS Services Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Residence - Unit 7 & 8,Building,101931,BLD163279,NWRHP Residence - Unit 7 & 8 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Services Building,Building,101752,BLD163204,RPTC Services Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Southern Dental Centre (SDC),Site,102160,Southern Dental Centre,Building,102086,BLD163081,SDC Southern Dental Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Residential Units,Building,101926,BLD163194,KIDHCHC Residential Units (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Residence - Units 1 & 2,Building,101925,BLD163274,MCHP Residence - Units 1 & 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Mary's Community Health Centre (SMCHC),Site,102192,Residence - UTAS,Building,101693,BLD163170,SMCHC Residence - UTAS (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island  Doctor/Nurses' Residence (FIMPSCNR),Site,102208,Residence,Building,101881,BLD163160,FIMPSCNR Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Whitemark Residence (FIMPSCR),Site,102210,Residence,Building,101911,BLD163319,FIMPSCR Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Residence,Building,101882,BLD163350,FIMPSC Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Residence - Unit 3 & 4,Building,101988,BLD163275,NWRHP Residence - Unit 3 & 4 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Ronald McDonald House (RMDH),Site,102126,Ronald McDonald House,Building,101932,BLD163278,RMDH Ronald McDonald House (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Workshop & Morgue,Building,101981,BLD163272,MCHP Workshop & Morgue (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cygnet Child Care Centre (CCCC),Site,102110,Schoolhouse Library,Building,101749,BLD163251,CCCC Schoolhouse Library (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,North East Soldiers Memorial Hospital (NESMH),Site,102096,Residence (Bridport),Building,101992,BLD163167,NESMH Residence  (Bridport) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Queenstown THS  Staff Accommodation (QTSA),Site,102174,Residence,Building,102051,BLD163144,QTSA Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Records storage,Building,101995,BLD163271,MCHP Records storage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Westbury Community Health Centre (WCHC),Site,102207,Shed,Building,101719,BLD163263,WCHC Shed (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Zeehan Residence (ZSR),Site,102213,Residence (Unit 5),Building,101906,BLD163352,ZSR Residence  (Unit 5) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Residence - Unit 5 & 6,Building,101965,BLD163282,NWRHP Residence - Unit 5 & 6 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Residence - Unit 9 & 10,Building,101958,BLD163281,NWRHP Residence - Unit 9 & 10 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Services Building,Building,102075,BLD163333,LGHP Services Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Wilfred Lopes Secure Mental Health Facility (WLSMHF),Site,102215,Semi Independent Living Units (SILU),Building,101690,BLD163257,WLSMHF Semi Independent Living Units  (SILU) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Queenstown Ambulance Residence (QTAR),Site,102173,Residence,Building,102043,BLD163141,QTAR Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Residence - Units 3 & 4,Building,101927,BLD163277,MCHP Residence - Units 3 & 4 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Residence - Unit 11 & 12,Building,101972,BLD163280,NWRHP Residence - Unit 11 & 12 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Residence - Unit 1 & 2,Building,101938,BLD163276,NWRHP Residence - Unit 1 & 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Spurr Wing Accommodation,Building,101973,BLD163154,LGHP Spurr Wing Accommodation (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Sexual Health Building,Building,102021,BLD163220,LGHP Sexual Health Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Wilfred Lopes Secure Mental Health Facility (WLSMHF),Site,102215,Plant Room (Utilities),Building,101723,BLD163289,WLSMHF Plant Room  (Utilities) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Residence (0516),Building,101894,BLD163396,MCHP Residence (0516) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Residence (330),Building,101761,BLD163390,KIDHCHC Residence (0330) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Residence (331),Building,101751,BLD163389,KIDHCHC Residence (0331) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Residence (0993),Building,101904,BLD163397,MCHP Residence (0993) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Parkside (PKS),Site,102100,Parkside - Renal Unit,Building,101996,BLD163403,(PKS) Parkside - Renal Unit (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Residence (0207),Building,101909,BLD163395,MCHP Residence (0207) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,The Piggery,Building,102035,BLD163406,(SJP) The Piggery (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Residence (0517),Building,101877,BLD163399,MCHP Residence (0517) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Residence (0334),Building,101775,BLD163391,KIDHCHC Residence (0334) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,17 St Johns Avenue,Building,102049,BLD163405,(SJP) 17 St Johns Avenue (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Parkside (PKS),Site,102100,Parkside - Tower,Building,101921,BLD163401,(PKS) Parkside - Tower (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island - Residence complex (KIDHR),Site,102218,Unit 1,Building,101835,BLD163362,KIDHR Unit 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Burnie Community Health Service (BCHS),Site,102097,Store / Workshop,Building,101729,BLD163247,BCHS Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Store / Workshop,Building,101899,BLD163161,FIMPSC Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Vicarage,Building,101700,BLD163137,SJP Vicarage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Store / Workshop,Building,101933,BLD163270,MCHP Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island - Residence complex (KIDHR),Site,102218,Unit 3,Building,101839,BLD163364,KIDHR Unit 3 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Orthotic Prosthetic Services and Artificial Limb Centre,Building,101765,BLD163178,RPTC Orthotic Prosthetic Services and Artificial Limb Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Nelumie Flats Units 19 - 24,Building,102033,BLD163236,LGHP Nelumie Flats Units 19 - 24 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Mary's Community Health Centre (SMCHC),Site,102192,Stores Building,Building,101720,BLD163171,SMCHC Stores Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Store / Workshop - Mortuary (near Woodhouse),Building,101797,BLD163196,SJP Store / Workshop - Mortuary  (near Woodhouse) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Unit 4,Building,101949,BLD163288,MCHP Unit 4 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Transport Garage Compound,Building,101804,BLD163323,SJP Transport Garage Compound (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,Wellington Centre,Building,101887,BLD163408,(RHHP) Wellington Centre (0871)(BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Ulverstone - Oral Health Clinic (UOHC),Site,102202,Oral Health Services,Building,101862,BLD163197,UOHC Oral Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,Wellington Centre,Building,101887,BLD163407,(RHHP) Wellington Centre (2059)(BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Inga Building,Building,101698,BLD163378,SJP Inga Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Unit 6,Building,101863,BLD163334,FIMPSC Unit 6 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Unit 5,Building,101910,BLD163313,FIMPSC Unit 5 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Tasman Multi Purpose Service Centre Precinct (TMPSCP),Site,102166,Home Care Services,Building,102055,BLD163240,TMPSCP Home Care Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Beaconsfield District Health Centre (BDHC),Site,102092,Nurses Home,Building,101743,BLD163125,BDHC Nurses Home (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Oakrise (Kelham St),Building,102066,BLD163109,LGHP Oakrise  (Kelham St) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Tolosa Street MHS (TOMHS),Site,102119,Unit 110B,Building,101991,BLD163232,TOMHS Unit 110B (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Sub Station/Pump Station,Building,101928,BLD163273,MCHP Sub Station/Pump Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Southern Dental Centre (SDC),Site,102160,Warragul Ave Building,Building,102040,BLD163084,SDC Warragul Ave Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Store / Workshop,Building,101744,BLD163248,RPTC Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Nurse's Home 2,Building,102008,BLD163285,LGHP Nurse's Home 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,The Hall,Building,101830,BLD163097,SJP The Hall (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Oral Health Services,Building,101948,BLD163198,MCHP Oral Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,Unit 2,Building,101786,BLD163291,CHCHC Unit 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Nelumie Flats Units 1 - 6,Building,102022,BLD163086,LGHP Nelumie Flats Units 1 - 6 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Store / Workshop (near Day Centre),Building,101807,BLD163087,SJP Store / Workshop  (near Day Centre) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,Staff and Student Accommodation,Building,101810,BLD163104,SDHP Staff and Student Accommodation (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,New Norfolk District Hospital and Community Health Centre (NNDHCHC),Site,102158,Old Matron's Flat,Building,101788,BLD163351,NNDHCHC Old Matron's Flat (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Multipurpose Service Centre (CTMPSC),Site,102105,Nurses Home,Building,101766,BLD163085,CTMPSC Nurses Home (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island - Residence complex (KIDHR),Site,102218,Unit 4,Building,101838,BLD163386,KIDHR Unit 4 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Mowbray - Oral Health & Child Health Clinic (MOH&CHC),Site,102156,Oral Health & Child Health Clinic,Building,102013,BLD163346,MOH&CHC Oral Health & Child Health Clinic (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,Temporary Bld above Entrance RHHRedevelopment,Building,101913,BLD163326,RHHP Temporary Bld above Entrance RHHRedevelopment (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Sub Station (0344),Building,102023,BLD163394,SJP Sub Station (0344) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Strahan Medical Centre (SMC),Site,102193,Strahan Medical Centre,Building,101691,BLD163146,SMC Strahan Medical Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Northern Dental Health Centre (NDHC),Site,102142,Oral Health Services,Building,101935,BLD163344,NDHC Oral Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island - Residence complex (KIDHR),Site,102218,Unit 2,Building,101837,BLD163363,KIDHR Unit 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Midwifery Group Practice (MGP),Site,102120,Midwifery Group,Building,101726,BLD163186,MGP  Midwifery Group (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Southern Dental Centre (SDC),Site,102160,Oral Health Admin Office (45 NewTownRd),Building,102079,BLD163083,SDC Oral Health Admin Office  (45 NewTownRd) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Unit 1,Building,101868,BLD163337,FIMPSC Unit 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Southern Community Mental Health Services (SCMHS),Site,102132,Mistral Place,Building,101943,BLD163222,SCMHS Mistral Place (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Karingal Workshop,Building,101826,BLD163138,SJP Karingal Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Store / Workshop,Building,101783,BLD163088,SJP Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,"Transport Compound, Workshop, Wash Bay, Store",Building,102010,BLD163409,"(SJP) Transport Compound, Workshop, Wash Bay, Store (BUILDING)",Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Sub Station Karingal,Building,102001,BLD163316,SJP Sub Station Karingal (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,Sub Station,Building,102032,BLD163105,SDHP Sub Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Mary's Community Health Centre (SMCHC),Site,102192,Store / Workshop,Building,101715,BLD163173,SMCHC Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Millbrook Rise (MBR),Site,102157,Tyenna Units,Building,101825,BLD163217,MBR Tyenna Units (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Glenora (GLA),Site,102131,Store / Workshop,Building,101942,BLD163359,GLA Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Rosebery Community Health Centre (RBCHC),Site,102179,Nurses Home,Building,101800,BLD163142,RBCHC Nurses Home (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Health Physics Calibration Office & Incinerator Shed,Building,101768,BLD163208,RPTC Health Physics Calibration Office & Incinerator Shed (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Helipad,Building,101872,BLD163336,MCHP Helipad (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Walker House Parenting Centre (WHPC),Site,102154,Parenting Centre,Building,102081,BLD163156,WHPC Parenting Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Tolosa Street MHS (TOMHS),Site,102119,Unit 110A,Building,101961,BLD163227,TOMHS Unit 110A (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Unit 2,Building,101998,BLD163283,MCHP Unit 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Karingal Building,Building,101695,BLD163376,SJP Karingal Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Acton Hub (ACNH),Site,102099,Oral Health Services,Building,101950,BLD163343,ACNH Oral Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Millbrook Rise (MBR),Site,102157,Residence,Building,101795,BLD163380,MBR Millbrook Rise - Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Unit 1,Building,101940,BLD163230,MCHP Unit 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Parenting Centre (NWRHPC),Site,102098,Parenting Centre (0230),Building,101980,BLD163159,NWRHPC Parenting Centre (0230) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Unit 3,Building,101964,BLD163284,MCHP Unit 3 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Lindsay Miller Building,Building,101978,BLD163345,LGHP Lindsay Miller Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Terry Street MHS (TEMHS),Site,102118,Mental Health Services,Building,101959,BLD163184,TEMHS Mental Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Nurse's Home 1,Building,102088,BLD163108,LGHP Nurse's Home 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,Unit 3,Building,101784,BLD163293,CHCHC Unit 3 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,John L Grove Building,Building,102000,BLD163110,LGHP John L Grove Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Multipurpose Service Centre (CTMPSC),Site,102105,Store / Workshop,Building,101748,BLD163089,CTMPSC Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,West Coast District Hospital (WCDH),Site,102176,Maintenance Shed,Building,101782,BLD163249,WCDH Maintenance Shed (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Unit 4,Building,101917,BLD163309,FIMPSC Unit 4 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Launceston - Birthing Centre Inc,Building,101963,BLD163259,LGHP Launceston - Birthing Centre Inc (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton Oral Health Services (SOHS),Site,102184,Oral Health Services,Building,102064,BLD163355,SOHS Oral Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island - Residence complex (KIDHR),Site,102218,Unit 6,Building,101840,BLD163369,KIDHR Unit 6 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Unit 5,Building,101952,BLD163287,MCHP Unit 5 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Holman Clinic Patient & Student Accom & Spurr Wing,Building,102046,BLD163299,LGHP Holman Clinic Patient & Student Accom & Spurr Wing (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Multipurpose Service Centre (CTMPSC),Site,102105,Multipurpose Service Centre,Building,101730,BLD163206,CTMPSC Multipurpose Service Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,Laundry / Store rooms,Building,101823,BLD163177,CHCHC Laundry / Store rooms (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Unit 2,Building,101864,BLD163311,FIMPSC Unit 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Sub Station (0926),Building,101702,BLD163392, SJP Sub Station  (0926) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Tolosa Street MHS (TOMHS),Site,102119,Unit 110C,Building,101976,BLD163233,TOMHS Unit 110C (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island - Residence complex (KIDHR),Site,102218,Unit 5,Building,101836,BLD163387,KIDHR Unit 5 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Staff Residence (UTAS),Building,101770,BLD163297,KIDHCHC Staff Residence  (UTAS) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island - Residence complex (KIDHR),Site,102218,Main Building,Building,101841,BLD163385,KIDHR Main Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Bridgewater - Oral Health Clinic (BOHC),Site,102095,Oral Health Services,Building,101987,BLD163134,BOHC Oral Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Oldaker St Clinic MHS (OSCMHS),Site,102114,Mental Health Services,Building,101984,BLD163223,OSCMHS Mental Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Transport Admin Office,Building,101818,BLD163199,SJP Transport Admin Office (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Kings Meadows Community Health Centre (KMCHC),Site,102137,Joan Marshall Building,Building,101697,BLD163150,KMCHC Joan Marshall Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,THS - Administration Centre,Building,101934,BLD163356,LGHP THS - Administration Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Parenting Centre (NWRHPC),Site,102098,Parenting Centre (0231),Building,101993,BLD163388,NWRHPC Parenting Centre (0231) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Helipad,Building,101983,BLD163327,NWRHP Helipad (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Nelumie Flats Units 13 - 18,Building,102072,BLD163235,LGHP Nelumie Flats Units 13 - 18 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,Unit 1,Building,101796,BLD163290,CHCHC Unit 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Multipurpose Service Centre,Building,101858,BLD163163,FIMPSC Multipurpose Service Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Southern Dental Centre (SDC),Site,102160,Training rooms,Building,102009,BLD163214,SDC Training rooms (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Multipurpose Service Centre (CTMPSC),Site,102105,MPSC - (old Ambulance station),Building,101920,BLD163164,CTMPSC MPSC -  (old Ambulance station) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Nelumie Flats Units 7- 12,Building,102041,BLD163234,LGHP Nelumie Flats Units 7- 12 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Unit 3,Building,101865,BLD163310,FIMPSC Unit 3 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Queenstown UTAS Student Accommodation (QTUA),Site,102175,Student Accommodation,Building,102017,BLD163143,QTUA Student Accommodation (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,North East Soldiers Memorial Hospital (NESMH),Site,102096,Store / Workshop,Building,102087,BLD163296,NESMH Store / Workshop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Helens District Hospital (SHDH),Site,102190,Unit 2/3,Building,101898,BLD163305,SHDH Unit 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Sub Station (0925),Building,101787,BLD163195,SJP Sub Station (0925) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Northern Community Health Centre (Integrated Care Service),Building,101919,BLD163303,LGHP Northern Community Health Centre  (Integrated Care Service) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,Unit 4,Building,101817,BLD163294,CHCHC Unit 4 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Transport Galvanised Shed,Building,102018,BLD163322,SJP Transport Galvanised Shed (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,Wellington Centre,Building,101887,BLD163360,RHHP Wellington Centre (2085)(BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,McDougall Building,Building,101675,BLD163207,RPTC McDougall Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Kitchen Store Shed,Building,101799,BLD163250,SJP Kitchen Store Shed (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Sub Station (0342),Building,102037,BLD163393, SJP Sub Station (0342) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Multipurpose Service Centre (CTMPSC),Site,102105,MPSC - (old Ambulance residence),Building,101763,BLD163165,CTMPSC MPSC -  (old Ambulance residence) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Deloraine District Hospital (DDH),Site,102112,Ambulance Residence,Building,101740,BLD163021,DDH Ambulance Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Beaconsfield District Health Centre (BDHC),Site,102092,Ambulance Garage,Building,101760,BLD163023,BDHC Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Zeehan Ambulance Station (ZAS),Site,102214,Ambulance Station,Building,101892,BLD163026,ZAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Ambulance Station (CTMPSCAS),Site,102103,Ambulance Station,Building,101773,BLD163073,CTMPSCAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Bothwell Medical Centre (BMC),Site,102093,Ambulance Garage,Building,101975,BLD163049,BMC Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Ambulance Residence (CTMPSCAR),Site,102104,Residence,Building,101955,BLD163027,CTMPSCAR Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,George Town Hospital Precinct (GTHP),Site,102117,Ambulance Station,Building,101736,BLD163029,GTHP Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Roy Fagan Centre (RFC),Site,102146,Zone 5 Entrance,Building,102085,BLD163041,RFC Zone 5 Entrance (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Mowbray Ambulance Station (MBAS),Site,102155,Ambulance Garage,Building,102063,BLD163059,MBAS Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Triabunna Ambulance Residence (TBAR),Site,102198,Ambulance Residence,Building,101866,BLD163052,TBAR Ambulance Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,Vodafone building,Building,101855,BLD163077,RHHP Vodafone building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Northern Region Ambulance Station (RASN),Site,102144,Ambulance Station,Building,101979,BLD163028,RASN Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Southern Tas Ambulance Station (SRAS),Site,102123,Ambulance Station,Building,101969,BLD163064,SRAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,New Norfolk Ambulance Station (NNAS),Site,102159,Ambulance Station,Building,101816,BLD163065,NNAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Dodges Ferry Ambulance Station (DFAS),Site,102115,Ambulance Station,Building,101970,BLD163056,DFAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Zeehan Ambulance Residence (ZAR),Site,102212,Residence,Building,101905,BLD163037,ZAR Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Zeehan Ambulance Station (ZAS),Site,102214,Ambulance Garage,Building,101918,BLD163024,ZAS Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Swansea Ambulance Garage (SAG),Site,102196,Ambulance Garage,Building,101902,BLD163069,SAG Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Bruny Island Community Health Centre Precinct (BICHCP),Site,102090,Ambulance Station,Building,101758,BLD163032,BICHCP Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Hobart Private Hospital (HPH),Site,102124,Private Hospital (G Block),Building,101929,BLD163048,HPH Private Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Sheffield Ambulance Station (SHFAS),Site,102183,Residence,Building,102005,BLD163043,SHFAS Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Sheffield Ambulance Station (SHFAS),Site,102183,Ambulance Station,Building,102056,BLD163042,SHFAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Zeehan Ambulance Station (ZAS),Site,102214,Residence,Building,101873,BLD163025,ZAS Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Huonville Ambulance Station (HAS),Site,102134,Ambulance Station,Building,101966,BLD163016,HAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Queenstown Ambulance Station (QTAS),Site,102172,Ambulance Station,Building,102083,BLD163076,QTAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Queenstown Ambulance Station (QTAS),Site,102172,Ambulance Station(Garage),Building,102057,BLD163411,(QTAS) Ambulance Station(Garage) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Scottsdale Ambulance Station (SDAS),Site,102181,Ambulance Station,Building,102007,BLD163060,SDAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Ambulance Administration Offices (RASNWA),Site,102102,Car wash,Building,101990,BLD163019,RASNWA Car wash (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Helens Ambulance Station (SHAS),Site,102189,Ambulance Station,Building,102006,BLD163030,SHAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Triabunna Station (TBAS),Site,102200,Ambulance - building vacant for disposal,Building,101914,BLD163047,TBAS Ambulance - building vacant for disposal (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Strahan Medical Centre (SMC),Site,102193,Ambulance Garage,Building,101721,BLD163034,SMC Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Sorell Ambulance Station (SAS),Site,102186,Ambulance Garage,Building,102016,BLD163045,SAS Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,Ambulance Station,Building,102039,BLD163015,SDHP Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Triabunna Station (TBAS),Site,102200,Ambulance Garage,Building,101889,BLD163035,TBAS Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Queenstown Ambulance Station (QTAS),Site,102172,Ambulance Station (Garage),Building,102061,BLD163415,(QTAS) Ambulance Station (Garage) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Ambulance Station (RASNW),Site,102101,Regional Office,Building,101937,BLD163017,RASNW Regional Office (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Ambulance Station,Building,101930,BLD163050,MCHP Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Dover Ambulance Garage (DAG),Site,102116,Ambulance Garage,Building,101924,BLD163067,DAG Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,New Norfolk Ambulance Station (NNAS),Site,102159,Ambulance Residence,Building,101777,BLD163070,NNAS Ambulance Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Roy Fagan Centre (RFC),Site,102146,Zone 4 (Day Centre),Building,102067,BLD163040,RFC Zone 4  (Day Centre) (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Kingston Ambulance Station (KAS),Site,102139,Ambulance Station,Building,101756,BLD163014,KAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,George Town Hospital Precinct (GTHP),Site,102117,Ambulance Residence,Building,101733,BLD163054,GTHP Ambulance Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Ambulance Residence (CTMPSCAR),Site,102104,Carport,Building,101947,BLD163058,CTMPSCAR Carport (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Campbell Town Ambulance Station (CTMPSCAS),Site,102103,Ambulance Residence,Building,101742,BLD163068,CTMPSCAS Ambulance Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Coles Bay Ambulance Garage (CBAG),Site,102106,Ambulance Garage,Building,101982,BLD163053,CBAG Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Roy Fagan Centre (RFC),Site,102146,Zone 2,Building,102070,BLD163038,RFC Zone 2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Ambulance Tas Regional Office (ATRO),Site,102122,Communications Centre,Building,101939,BLD163044,RASS Communications Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Scottsdale Ambulance Station (SDAS),Site,102181,Carport,Building,102062,BLD163062,SDAS Carport (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Nubeena Ambulance Station (NAS),Site,102165,Residence,Building,102069,BLD163051,NAS Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Spring Bay Community Health Centre (SBCHC),Site,102197,Ambulance Station,Building,101708,BLD163072,SBCHC Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Miena Ambulance Station (MAS),Site,102151,Ambulance Station,Building,102080,BLD163066,MAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Nubeena Ambulance Station (NAS),Site,102165,Ambulance Station,Building,102038,BLD163063,NAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Deloraine District Hospital (DDH),Site,102112,Ambulance Station,Building,101755,BLD163020,DDH Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Roy Fagan Centre (RFC),Site,102146,Zone 1,Building,102027,BLD163033,RFC Zone 1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,BUPA building  25 Argyle Street Hobart,Building,101897,BLD163079,RHHP BUPA building  25 Argyle Street Hobart (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Scottsdale Ambulance Station (SDAS),Site,102181,Garage,Building,102020,BLD163061,SDAS Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Helens Ambulance Station (SHAS),Site,102189,Residence,Building,102074,BLD163082,SHAS Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Mowbray Ambulance Station (MBAS),Site,102155,Ambulance Station,Building,102068,BLD163055,MBAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Longford Ambulance Station (LAS),Site,102150,Ambulance Station,Building,102082,BLD163057,LAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Huonville Ambulance Station (HAS),Site,102134,Ambulance Residence,Building,101956,BLD163018,HAS Ambulance Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Sorell Ambulance Station (SAS),Site,102186,Ambulance Station,Building,102011,BLD163031,SAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Midlands Ambulance Garage (MAG),Site,102167,Ambulance Garage,Building,102050,BLD163046,MAG Ambulance Garage (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Roy Fagan Centre (RFC),Site,102146,Zone 3,Building,102030,BLD163039,RFC Zone 3 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,Residence,Building,102004,BLD163074,SDHP Residence (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Ulverstone Ambulance Station (UAS),Site,102203,Ambulance Station,Building,101908,BLD163022,UAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Tullah Ambulance Station (TAS),Site,102201,Ambulance Station,Building,101883,BLD163036,TAS Ambulance Station (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Child Care Centre,Building,101962,BLD163348,LGHP Child Care Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Lindisfarne Child Health Centre (LINDCHC),Site,102148,Child Health Centre,Building,102029,BLD163182,LINDCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Wilfred Lopes Secure Mental Health Facility (WLSMHF),Site,102215,ADEH Administration Building,Building,101710,BLD163226,WLSMHF ADEH Administration Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Community Equipment Scheme,Building,101985,BLD163269,MCHP Community Equipment Scheme (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Holyoake (HYK),Site,102129,Alcohol & Drugs Service,Building,101922,BLD163246,HYK Alcohol & Drugs Service (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Howrah Child Health Centre (HCHC),Site,102133,Child Health Centre,Building,101986,BLD163118,HCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Lenah Valley Child Health Clinic (LVCHC),Site,102147,Child Health Centre,Building,101833,BLD163115,LVCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Huonville Community Health Centre (HUCHC),Site,102135,Community Health Centre,Building,101772,BLD163213,HUCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Alcohol and Drug Service (NWADS),Site,102205,Alcohol & Drugs Service,Building,101880,BLD163148,NWADS Alcohol & Drugs Service (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Ravenswood Community Health Centre (RCHC),Site,102153,Community Health Centre,Building,101705,BLD163145,RCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Summerhill Child Health Centre (SHCHC),Site,102195,Child Health Centre,Building,101907,BLD163349,SHCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Brighton Community Health Centre (BCHC),Site,102094,Community Health Centre,Building,101745,BLD163180,BCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Bowls Club,Building,101834,BLD163091,SJP Bowls Club (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Boiler House,Building,101808,BLD163090,SJP Boiler House (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,1831 South Building,Building,101801,BLD163374,SJP 1831 South Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,May Shaw Health Centre (MSHC),Site,102216,Aged Care Units,Building,101915,BLD163181,MSHC Aged Care Units (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Amenities Building,Building,101703,BLD163099,SJP Amenities Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Central Coast Community Health Centre (CCCHC),Site,102206,Community Health Centre,Building,101713,BLD163152,CCCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Chalet 1 Alan Rodgers,Building,101819,BLD163314,SJP Chalet 1 Alan Rodgers (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Ulverstone Child Health Centre (UCHC),Site,102204,Child Health Centre,Building,101912,BLD163151,UCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,19 St Johns Avenue,Building,101843,BLD163136,SJP 19 St Johns Avenue (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Rosebery Community Health Centre (RBCHC),Site,102179,Community Health Centre,Building,101780,BLD163140,RBCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Mary's Community Health Centre (SMCHC),Site,102192,Child Care Centre,Building,101692,BLD163172,SMCHC Child Care Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Perth Child Health Centre (PCHC),Site,102171,Child Health Centre,Building,102054,BLD163162,PCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Kings Meadows Community Health Centre (KMCHC),Site,102137,Community Health Centre,Building,101681,BLD163149,KMCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cygnet Community Health Centre (CYCHC),Site,102109,Community Health Centre,Building,101846,BLD163187,CYCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Carruthers Building,Building,101848,BLD163371,SJP Carruthers Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Smithton District Hospital Precinct (SDHP),Site,102185,Carport,Building,102014,BLD163306,SDHP Carport (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Lauderdale Child Health Clinic (LCHC),Site,102141,Child Health Centre,Building,101968,BLD163209,LCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Risdon Vale Community Health Centre (RVCHC),Site,102177,Community Health Centre,Building,101706,BLD163133,RVCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,15 St Johns Avenue,Building,101844,BLD163093,SJP 15 St Johns Avenue (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,Aged Care Units,Building,101764,BLD163340,KIDHCHC Aged Care Units (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Chimney Villa,Building,102076,BLD163106,LGHP Chimney Villa (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Auxiliary Storage Building,Building,101738,BLD163342,RPTC Auxiliary Storage Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cygnet Child Care Centre (CCCC),Site,102110,Child Care Centre,Building,101845,BLD163221,CCCC Child Care Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Chalet 2 Rechabite Chalet,Building,101791,BLD163317,SJP Chalet 2 Rechabite Chalet (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Serenity House Drug and Alcohol Centre (STYH),Site,102194,Alcohol & Drugs Service,Building,101878,BLD163153,STYH Alcohol & Drugs Service (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Clare House MHS (CHMHS),Site,102162,Administration offices (0005),Building,102031,BLD163324,CHMHS Administration offices (0005) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,James Muir Community Health Centre (JMCHC),Site,102211,Community Health Centre,Building,101711,BLD163166,JMCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Administration Building,Building,101707,BLD163228,SJP Administration Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,North Hobart Child Health Centre (NHCHC),Site,102164,Child Health Centre,Building,101847,BLD163179,NHCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Glenora (GLA),Site,102131,Child Care Centre,Building,101974,BLD163354,GLA Child Care Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Devonport Community Health Centre (DCHC),Site,102113,Community Health Centre,Building,101746,BLD163128,DCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,1831 North Building,Building,101676,BLD163377,SJP 1831 North Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Longford Community Health Centre (LFCHC),Site,102149,Community Health Centre,Building,101842,BLD163295,LFCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Bruny Island Community Health Centre Precinct (BICHCP),Site,102090,Community Health Centre,Building,101771,BLD163231,BICHCP Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,South Hobart Child Health Centre (STHHCHC),Site,102188,Child Health Centre,Building,101701,BLD163130,STHHCHC Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Clive Hamilton Building,Building,101828,BLD163096,SJP Clive Hamilton Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Admin & Allied Health,Building,101936,BLD163268,MCHP Admin & Allied Health (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Millbrook Rise (MBR),Site,102157,Clyde Unit,Building,101785,BLD163219,MBR Clyde Unit (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Wilfred Lopes Secure Mental Health Facility (WLSMHF),Site,102215,ADEH Gatehouse,Building,101724,BLD163256,WLSMHF ADEH Gatehouse (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Sorell Community Health Centre (SCHC),Site,102187,Community Health Centre,Building,101803,BLD163211,SCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,21 St Johns Avenue,Building,101694,BLD163135,SJP 21 St Johns Avenue (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Westbury Community Health Centre (WCHC),Site,102207,Community Health Centre,Building,101717,BLD163185,WCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,St Mary's Community Health Centre (SMCHC),Site,102192,Community Health Centre,Building,101678,BLD163168,SMCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Beaconsfield District Health Centre (BDHC),Site,102092,Admin & Allied Health,Building,101750,BLD163129,BDHC Admin & Allied Health (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Allambie Building,Building,102025,BLD163112,LGHP Allambie Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,St Johns Park (SJP),Site,102161,Church,Building,101688,BLD163384,SJP Church (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Clare House MHS (CHMHS),Site,102162,Administration offices (0937),Building,102048,BLD163400,CHMHS Administration offices (0937) (BUILDING) ,Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Central Highlands Community Health Centre (CHCHC),Site,102170,Community Health Centre,Building,101790,BLD163174,CHCHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Community Outreach Building,Building,101674,BLD163201,RPTC Community Outreach Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Statton Building,Building,101737,BLD163239,RPTC Statton Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - J Block,Building,101900,BLD163254,RHHP RHH - J Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Repat Centre (RPTC),Site,102127,Peacock Building,Building,101679,BLD163203,RPTC Peacock Building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH Forecourt Coffee shop,Building,101874,BLD163331,RHHP RHH Forecourt Coffee shop (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Cape Barren Island - Lady Barron Health Centre,Building,104880,BLD163438,(FIMPSC) Cape Barren Island - Lady Barron Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Moonah Child Health Centre (MCHC),Site,104775,Moonah Child Health Centre,Building,104776,BLD163426,(MCHC) Moonah Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Office Pod (Vacant) ,Building,104780,BLD163418,(NWRHP) Office Pod (Vacant)  (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Flinders Island Multi Purpose Service Centre (FIMPSC),Site,102209,Cape Barren Island Health Centre,Building,104877,BLD163433,(FIMPSC) Cape Barren Island Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Gardener Shed,Building,104779,BLD163419,(NWRHP) Gardener Shed (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Midlands Multi Purpose Health Centre (MMPHC),Site,102169,Southern Midlands Rural Health Training Site,Building,104875,BLD163434,(MMPHC) Southern Midlands Rural Health Training Site (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Wellington Street Child Health Centre,Building,104874,BLD163435,(LGHP) Wellington Street Child Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Respiratory Clinic,Building,104778,BLD163416,(NWRHP) Respiratory Clinic (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - A Block,Building,101861,BLD163114,RHHP RHH - A Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Peacock Centre MHS (PCMHS),Site,102217,Peacock Centre  - Greenhouse,Building,101714,BLD163383,PCMHS Peacock Centre  - Greenhouse (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation  3 x studios (conjoined),Building,104939,BLD163365,NWRHP Patient Accommodation  3 x studios  (conjoined) (2100)(BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cambridge Kitchen Facility (CKF),Site,104777,Storage Container No.4,Building,104786,BLD163425,(CKF) Storage Container No.4 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation 1 x 2 bedroom unit,Building,104938,BLD163417,(NWRHP) Patient Accommodation 1 x 2 bedroom unit (2099)(BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,King Island District Hospital and Community Health Centre (KIDHCHC),Site,102108,District Hospital Loading Bay Roof,Building,104782,BLD163431,(KIDHCHC) District Hospital Loading Bay Roof (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cambridge Kitchen Facility (CKF),Site,104777,Storage Container No.2,Building,104784,BLD163424,(CKF) Storage Container No.2 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cambridge Kitchen Facility (CKF),Site,104777,Storage Container No.6,Building,104788,BLD163429,(CKF) Storage Container No.6 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cambridge Kitchen Facility (CKF),Site,104777,Storage Container No.3,Building,104785,BLD163423,(CKF) Storage Container No.3 (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation 1 x 2 bedroom unit,Building,104934,BLD163372,NWRHP Patient Accommodation 1 x 2 bedroom unit (2095) (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation 1 x 2 bedroom unit,Building,104936,BLD163413,(NWRHP) Patient Accommodation 1 x 2 bedroom unit (2097)(BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation 1 x 2 bedroom unit,Building,104935,BLD163414,(NWRHP) Patient Accommodation 1 x 2 bedroom unit (2096)(BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Patient Accommodation 1 x 2 bedroom unit,Building,104937,BLD163412,(NWRHP) Patient Accommodation 1 x 2 bedroom unit (2098)(BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cambridge Kitchen Facility (CKF),Site,104777,Storage Container No.5,Building,104787,BLD163427,(CKF) Storage Container No.5 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Cambridge Kitchen Facility (CKF),Site,104777,Storage Container No.1,Building,104783,BLD163422,(CKF) Storage Container No.1 (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Midlands Multi Purpose Health Centre (MMPHC),Site,102169,East Wing,Building,101811,BLD163216,MMPHC East Wing (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Clarence Community Health Centre (Integrated Care Centre) (CCHC),Site,102180,Community Health Centre,Building,101673,BLD163312,Integrated Care Centre  Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Glenorchy Health Centre (GHC),Site,102121,Community Health Centre,Building,101774,BLD163320,GHC Community Health Centre (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,Mersey Community Hospital Precinct (MCHP),Site,102140,Community Hospital,Building,101944,BLD163121,MCHP Community Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,D Block - Infill building,Building,101895,BLD163120,RHHP D Block - Infill building (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - F Block,Building,101859,BLD163258,RHHP RHH - F Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - K Block,Building,101860,BLD163332,RHHP RHH - K Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,North,Region,100092,Launceston General Hospital Precinct (LGHP),Site,102143,Launceston General Hospital,Building,101923,BLD163107,LGHP Launceston General Hospital (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Tasman Multi Purpose Service Centre Precinct (TMPSCP),Site,102166,A Block,Building,102044,BLD163210,TMPSCP A Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - C Block,Building,101869,BLD163111,RHHP RHH - C Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - D Block,Building,101871,BLD163117,RHHP RHH - D Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - E Block,Building,101879,BLD163119,RHHP RHH - E Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Royal Hobart Hospital Precinct (RHHP),Site,102125,RHH - H Block,Building,101870,BLD163113,RHHP RHH - H Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,New Norfolk District Hospital and Community Health Centre (NNDHCHC),Site,102158,A Block,Building,101680,BLD163375,NNDHCHC A Block (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,Telstra Building,Site,105005,Telstra,Building,101875,BLD163078,RHHP Telstra (BUILDING),Active
+DoH Tasmania,Organisation,100095,South,Region,100094,56 Collins St,Site,105004,Sexual Health Services,Building,104873,BLD163428,Sexual Health Services (BUILDING),Active
+DoH Tasmania,Organisation,100095,North West,Region,100093,North West Regional Hospital Precinct (NWRHP),Site,102107,Major Hospital,Building,101989,BLD163379,NWRHP Major Hospital (BUILDING),Active

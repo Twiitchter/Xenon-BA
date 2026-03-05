@@ -1,215 +1,80 @@
 # Docker Development Guide
 
-This project supports running in Docker containers for development, with separate containers for the application (API + React client) and the database.
+Development runs as three separate containers:
+
+- `frontend` (Vite on port `3001`)
+- `backend` (Express API on port `3000`)
+- `mssql` (SQL Server on port `1433`)
 
 ## Quick Start
 
-The easiest way to use Docker is with the **smart launcher script** that automatically detects your environment:
-
 ```bash
-# Start containers (auto-detects Codespaces or local dev)
+# Start all 3 containers
 ./docker-dev.sh up --build
-
-# Stop containers
-./docker-dev.sh down
 
 # View logs
 ./docker-dev.sh logs -f
 
-# Run migrations
-./docker-dev.sh exec app npm run migrate
+# Stop containers
+./docker-dev.sh down
 ```
 
-The script will:
-- ✅ Detect if you're in GitHub Codespaces and use Docker-in-Docker
-- ✅ Detect your local environment and use the appropriate database profile
-- ✅ Automatically select the right docker-compose file
+## Environment
 
-For Codespaces-specific information, see [CODESPACES.md](CODESPACES.md).
-
-## Prerequisites
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
-- Docker Compose v2+ (included with Docker Desktop)
-
----
-
-## Manual Docker Compose Commands
-
-If you prefer to use docker compose directly instead of the `./docker-dev.sh` script:
-
-## Supported Databases
-
-| Database | Dialect Value | Default Port | Docker Image |
-|---|---|---|---|
-| PostgreSQL | `pg` | 5432 | `postgres:16-alpine` |
-| SQL Server | `mssql` | 1433 | `mcr.microsoft.com/mssql/server:2022-latest` |
-| MySQL | `mysql` | 3306 | `mysql:8.0` |
-
----
-
-## Quick Start with Docker (Development)
-
-**Recommended:** Use the smart launcher script:
-```bash
-./docker-dev.sh up --build
-```
-
-**Or use docker compose directly:**
-
-### 1. Configure Environment
+Create your env file if needed:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set `DB_DIALECT` to your chosen database (`pg`, `mssql`, or `mysql`).
-
-### 2. Start with Docker Compose Profiles
-
-Each database runs under a Docker Compose **profile**. Use the profile matching your `DB_DIALECT`:
-
-#### PostgreSQL (default)
+Ensure these values are set:
 
 ```bash
-# Set in .env:
-# DB_DIALECT=pg
-# DB_HOST=db-postgres
-# DB_PORT=5432
-# DB_USER=postgres
-# DB_PASSWORD=postgres
-
-docker compose -f docker-compose.dev.yml --profile postgres up --build
+DB_DIALECT=mssql
+DB_PASSWORD=YourStrong!Passw0rd
 ```
 
-#### SQL Server (MSSQL)
+Optional if host port `1433` is already in use:
 
 ```bash
-# Set in .env:
-# DB_DIALECT=mssql
-# DB_HOST=db-mssql
-# DB_PORT=1433
-# DB_USER=sa
-# DB_PASSWORD=YourStrong!Passw0rd
-
-docker compose -f docker-compose.dev.yml --profile mssql up --build
+MSSQL_HOST_PORT=11433
 ```
 
-> **Note:** SQL Server requires at least 2GB RAM allocated to Docker.
+Notes:
 
-#### MySQL
+- `DB_HOST` in `.env` can stay as `localhost` for bare-metal development.
+- In Docker, `docker-compose.dev.yml` overrides DB host to `mssql` for the backend container.
+- SQL Server requires a strong SA password and enough Docker memory (2GB+ recommended).
+
+## Direct Compose Commands
 
 ```bash
-# Set in .env:
-# DB_DIALECT=mysql
-# DB_HOST=db-mysql
-# DB_PORT=3306
-# DB_USER=xeonb
-# DB_PASSWORD=mysql
+# Start stack
+docker compose -f docker-compose.dev.yml up --build
 
-docker compose -f docker-compose.dev.yml --profile mysql up --build
+# Run migrations manually (usually handled on backend startup)
+docker compose -f docker-compose.dev.yml exec backend npm run migrate
+
+# Stop stack
+docker compose -f docker-compose.dev.yml down
+
+# Stop and reset DB volume
+docker compose -f docker-compose.dev.yml down -v
 ```
 
-### 3. Run Migrations
+## Endpoints
 
-After the containers are running, run the database migration:
+- Frontend: `http://localhost:3001`
+- Backend API: `http://localhost:3000`
+- DB health: `http://localhost:3000/api/health/db`
+- SQL Server: `localhost:${MSSQL_HOST_PORT:-1433}`
 
-```bash
-docker compose -f docker-compose.dev.yml exec app npm run migrate
-```
+## Codespaces
 
-### 4. Access the Application
-
-| Service | URL |
-|---|---|
-| API Server | http://localhost:3000 |
-| Vite Dev Server (Client) | http://localhost:3001 |
-| Health Check | http://localhost:3000/health |
-
----
-
-## Stopping
-
-```bash
-# Stop containers (preserves data)
-docker compose -f docker-compose.dev.yml --profile postgres down
-
-# Stop and delete volumes (reset database)
-docker compose -f docker-compose.dev.yml --profile postgres down -v
-```
-
----
-
-## Running Without Docker (Bare Metal)
-
-If you prefer running the database directly on your machine:
-
-### PostgreSQL
-
-```bash
-# Install PostgreSQL, then:
-createdb xeonb_crm
-npm run migrate
-npm run dev
-```
-
-### SQL Server
-
-```bash
-# Install SQL Server or use SQL Server Express
-# Create database: CREATE DATABASE xeonb_crm
-# Update .env with DB_DIALECT=mssql
-npm run migrate
-npm run dev
-```
-
-### MySQL
-
-```bash
-# Install MySQL, then:
-mysql -u root -p -e "CREATE DATABASE xeonb_crm"
-# Update .env with DB_DIALECT=mysql
-npm run migrate
-npm run dev
-```
-
----
-
-## Migration Commands
-
-```bash
-# Run pending migrations
-npm run migrate
-
-# Rollback last migration batch
-npm run migrate:rollback
-```
-
----
-
-## Production Docker
-
-For production deployment:
-
-```bash
-docker compose up --build -d
-```
-
-The production `docker-compose.yml` uses a multi-stage build that compiles TypeScript and bundles the React client. Edit it to uncomment your preferred database service.
-
----
+Codespaces uses `docker-compose.codespaces.yml` and starts the database container separately while the app runs in the devcontainer shell. See `CODESPACES.md`.
 
 ## Architecture
 
-```
-┌─────────────────────────────────┐     ┌──────────────────────────┐
-│  App Container                  │     │  DB Container            │
-│                                 │     │                          │
-│  ┌───────────┐  ┌────────────┐  │     │  PostgreSQL              │
-│  │ Express   │  │ Vite Dev   │  │────▶│  — or —                  │
-│  │ API :3000 │  │ Server     │  │     │  SQL Server              │
-│  │           │  │ :3001      │  │     │  — or —                  │
-│  └───────────┘  └────────────┘  │     │  MySQL                   │
-│                                 │     │                          │
-└─────────────────────────────────┘     └──────────────────────────┘
+```text
+Frontend (3001) --/api proxy--> Backend (3000) --> MSSQL (1433)
 ```

@@ -1,7 +1,51 @@
-import axios from 'axios';
-import { authService } from './authService';
+import axios from "axios";
+import { authService } from "./authService";
 
-const API_URL = '/api/admin';
+const API_URL = "/api/admin";
+
+export interface AdminHierarchyBuilding {
+  id: string;
+  name: string;
+  siteId: string;
+  regionId: string;
+  floors: AdminHierarchyFloor[];
+}
+
+export interface AdminHierarchyFloor {
+  id: string;
+  name: string;
+  buildingId: string;
+  siteId: string;
+  regionId: string;
+}
+
+export interface AdminHierarchySite {
+  id: string;
+  name: string;
+  regionId: string;
+  buildings: AdminHierarchyBuilding[];
+}
+
+export interface AdminHierarchyRegion {
+  id: string;
+  name: string;
+  sites: AdminHierarchySite[];
+}
+
+export interface AdminHierarchyResponse {
+  source: "functionallocations" | "assets";
+  generatedAt: string;
+  fetchedRecordCount: number;
+  pageSize: number;
+  pagesFetched: number;
+  pageLimit: number;
+  isTruncated: boolean;
+  reportedTotalCount?: number;
+  rawNodeCount: number;
+  rawRecordsSampleCount: number;
+  rawRecordsSample: any[];
+  regions: AdminHierarchyRegion[];
+}
 
 class AdminService {
   // ─── Settings ─────────────────────────────────────────────────────
@@ -15,16 +59,24 @@ class AdminService {
   }
 
   async updateSettings(settings: Record<string, string>) {
-    const response = await axios.put(`${API_URL}/settings`, { settings }, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.put(
+      `${API_URL}/settings`,
+      { settings },
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data;
   }
 
   async testAsseticConnection() {
-    const response = await axios.post(`${API_URL}/settings/test-assetic`, {}, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.post(
+      `${API_URL}/settings/test-assetic`,
+      {},
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data;
   }
 
@@ -32,6 +84,19 @@ class AdminService {
     const response = await axios.get(`${API_URL}/settings/assetic-rate-limit`, {
       headers: authService.getAuthHeader(),
     });
+    return response.data;
+  }
+
+  async getAsseticLocationHierarchy(
+    refresh = false,
+  ): Promise<AdminHierarchyResponse> {
+    const response = await axios.get(
+      `${API_URL}/settings/assetic-location-hierarchy`,
+      {
+        headers: authService.getAuthHeader(),
+        params: refresh ? { refresh: true } : undefined,
+      },
+    );
     return response.data;
   }
 

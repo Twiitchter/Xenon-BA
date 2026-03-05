@@ -107,11 +107,11 @@ EMAIL_FROM=noreply@xeonb.com
 
 **Database-specific settings:**
 
-| Dialect | DB_PORT | DB_USER | Notes |
-|---|---|---|---|
-| `pg` | 5432 | postgres | Default |
-| `mssql` | 1433 | sa | Set `DB_ENCRYPT=false`, `DB_TRUST_CERT=true` for local dev |
-| `mysql` | 3306 | root or custom | — |
+| Dialect | DB_PORT | DB_USER        | Notes                                                      |
+| ------- | ------- | -------------- | ---------------------------------------------------------- |
+| `pg`    | 5432    | postgres       | Default                                                    |
+| `mssql` | 1433    | sa             | Set `DB_ENCRYPT=false`, `DB_TRUST_CERT=true` for local dev |
+| `mysql` | 3306    | root or custom | —                                                          |
 
 ### 5. Run Database Migrations
 
@@ -140,36 +140,26 @@ npm run dev:client
 ```
 
 The application will be available at:
+
 - Frontend: http://localhost:3001
 - Backend API: http://localhost:3000
 
 ## Docker Development (Recommended)
 
-The easiest way to get started is with Docker, which runs the app and database in containers with zero local setup (apart from Docker Desktop).
+The easiest way to get started is with Docker, which runs frontend, backend, and SQL Server in separate containers with zero local setup (apart from Docker Desktop).
 
 ```bash
-# 1. Copy and edit your .env (set DB_HOST to the container name)
+# 1. Copy and edit your .env
 cp .env.example .env
 
-# 2. Start with your chosen database profile:
-
-# PostgreSQL
-docker compose -f docker-compose.dev.yml --profile postgres up --build
-
-# SQL Server
-docker compose -f docker-compose.dev.yml --profile mssql up --build
-
-# MySQL
-docker compose -f docker-compose.dev.yml --profile mysql up --build
+# 2. Start the 3-container stack
+docker compose -f docker-compose.dev.yml up --build
 
 # 3. Run migrations (in another terminal)
-docker compose -f docker-compose.dev.yml exec app npm run migrate
+docker compose -f docker-compose.dev.yml exec backend npm run migrate
 ```
 
-> **Important:** When running in Docker, set `DB_HOST` in `.env` to the container service name:
-> - PostgreSQL: `DB_HOST=db-postgres`
-> - SQL Server: `DB_HOST=db-mssql`
-> - MySQL: `DB_HOST=db-mysql`
+> **Important:** In Docker, backend DB host is set to `mssql` by compose overrides. Keep `DB_PASSWORD` in `.env` aligned with SQL Server SA password requirements.
 
 See [DOCKER.md](DOCKER.md) for full details.
 
@@ -368,6 +358,7 @@ EMAIL_PASSWORD=your-password
 ### Build Issues
 
 1. Clear node_modules and reinstall:
+
    ```bash
    rm -rf node_modules client/node_modules
    npm install
@@ -393,6 +384,7 @@ EMAIL_PASSWORD=your-password
 ## Support
 
 For issues and questions:
+
 - GitHub Issues: https://github.com/Twiitchter/XeonB/issues
 - Brightly Assetic API: https://help.brightlysoftware.com/
 

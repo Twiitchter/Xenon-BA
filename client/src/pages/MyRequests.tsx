@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { maintenanceService } from '../services/maintenanceService';
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { maintenanceService } from "../services/maintenanceService";
 
 interface MyItem {
   id: number;
@@ -11,11 +12,11 @@ interface MyItem {
   location?: string;
   created_at: string;
   updated_at: string;
-  item_type: 'request' | 'work_order';
+  item_type: "request" | "work_order";
   work_order_id?: number;
   work_order_status?: string;
   work_order_craft?: string;
-  display_type: 'request' | 'work_order';
+  display_type: "request" | "work_order";
   display_status: string;
   assigned_to_username?: string;
   scheduled_date?: string;
@@ -29,29 +30,47 @@ interface Message {
 }
 
 const MyRequests: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState<MyItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [filters, setFilters] = useState({ status: '', priority: '' });
-  
+  const [error, setError] = useState("");
+  const [filters, setFilters] = useState({ status: "", priority: "" });
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    priority: "medium",
+    category: "",
+    location: "",
+  });
+
   // Detail view state
   const [selectedItem, setSelectedItem] = useState<MyItem | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
 
   useEffect(() => {
     fetchMyItems();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("new") === "1") {
+      setShowCreateForm(true);
+    }
+  }, [location.search]);
+
   const fetchMyItems = async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const data = await maintenanceService.getMyItems(filters);
       setItems(data.items || []);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch your requests');
+      setError(err.response?.data?.error || "Failed to fetch your requests");
     } finally {
       setLoading(false);
     }
@@ -61,18 +80,59 @@ const MyRequests: React.FC = () => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setCreating(true);
+
+    try {
+      await maintenanceService.createRequest(formData);
+      setFormData({
+        title: "",
+        description: "",
+        priority: "medium",
+        category: "",
+        location: "",
+      });
+      setShowCreateForm(false);
+
+      // Remove deep-link flag after successful create.
+      if (location.search) {
+        navigate("/my-requests", { replace: true });
+      }
+
+      await fetchMyItems();
+    } catch (err: any) {
+      setError(
+        err.response?.data?.error || "Failed to create maintenance request",
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleToggleCreate = () => {
+    const next = !showCreateForm;
+    setShowCreateForm(next);
+
+    if (!next && location.search) {
+      navigate("/my-requests", { replace: true });
+    }
+  };
+
   const openDetail = async (item: MyItem) => {
     setSelectedItem(item);
-    
+
     // Fetch messages if there's a work order
-    const workOrderId = item.work_order_id || (item.item_type === 'work_order' ? item.id : null);
+    const workOrderId =
+      item.work_order_id || (item.item_type === "work_order" ? item.id : null);
     if (workOrderId) {
       setMessagesLoading(true);
       try {
         const data = await maintenanceService.getMessages(workOrderId);
         setMessages(data.messages || []);
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to fetch messages');
+        setError(err.response?.data?.error || "Failed to fetch messages");
       } finally {
         setMessagesLoading(false);
       }
@@ -84,51 +144,55 @@ const MyRequests: React.FC = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem || !newMessage.trim()) return;
-    
-    const workOrderId = selectedItem.work_order_id || (selectedItem.item_type === 'work_order' ? selectedItem.id : null);
+
+    const workOrderId =
+      selectedItem.work_order_id ||
+      (selectedItem.item_type === "work_order" ? selectedItem.id : null);
     if (!workOrderId) {
-      setError('Cannot send message - no work order associated with this request yet');
+      setError(
+        "Cannot send message - no work order associated with this request yet",
+      );
       return;
     }
 
     try {
       await maintenanceService.sendMessage(workOrderId, newMessage);
-      setNewMessage('');
+      setNewMessage("");
       const data = await maintenanceService.getMessages(workOrderId);
       setMessages(data.messages || []);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send message');
+      setError(err.response?.data?.error || "Failed to send message");
     }
   };
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case 'open':
-      case 'pending':
-        return 'badge-warning';
-      case 'in_progress':
-        return 'badge-info';
-      case 'completed':
-        return 'badge-success';
-      case 'cancelled':
-        return 'badge-danger';
+      case "open":
+      case "pending":
+        return "badge-warning";
+      case "in_progress":
+        return "badge-info";
+      case "completed":
+        return "badge-success";
+      case "cancelled":
+        return "badge-danger";
       default:
-        return 'badge-secondary';
+        return "badge-secondary";
     }
   };
 
   const getPriorityBadgeClass = (priority: string) => {
     switch (priority) {
-      case 'critical':
-        return 'badge-danger';
-      case 'high':
-        return 'badge-warning';
-      case 'medium':
-        return 'badge-info';
-      case 'low':
-        return 'badge-secondary';
+      case "critical":
+        return "badge-danger";
+      case "high":
+        return "badge-warning";
+      case "medium":
+        return "badge-info";
+      case "low":
+        return "badge-secondary";
       default:
-        return 'badge-secondary';
+        return "badge-secondary";
     }
   };
 
@@ -136,14 +200,98 @@ const MyRequests: React.FC = () => {
     <div className="container">
       <div className="page-header">
         <h2>My Requests & Work Orders</h2>
+        <button onClick={handleToggleCreate}>
+          {showCreateForm ? "Cancel" : "+ New Request"}
+        </button>
       </div>
+
+      {showCreateForm && (
+        <div className="card">
+          <h3>Log a Maintenance Request</h3>
+          <form onSubmit={handleCreate}>
+            <div className="form-group">
+              <label>Title *</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
+                required
+                aria-required="true"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                rows={3}
+                placeholder="Describe the issue"
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Priority</label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) =>
+                    setFormData({ ...formData, priority: e.target.value })
+                  }
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ flex: 1 }}>
+                <label>Category</label>
+                <input
+                  type="text"
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  placeholder="e.g. Electrical"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Location</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
+                placeholder="e.g. Building A, Room 204"
+              />
+            </div>
+
+            <button type="submit" disabled={creating}>
+              {creating ? "Submitting..." : "Submit Request"}
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="card">
         <h3>Filters</h3>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
           <div className="form-group" style={{ flex: 1 }}>
             <label>Status</label>
-            <select name="status" value={filters.status} onChange={handleFilterChange}>
+            <select
+              name="status"
+              value={filters.status}
+              onChange={handleFilterChange}
+            >
               <option value="">All</option>
               <option value="open">Open</option>
               <option value="pending">Pending</option>
@@ -154,7 +302,11 @@ const MyRequests: React.FC = () => {
           </div>
           <div className="form-group" style={{ flex: 1 }}>
             <label>Priority</label>
-            <select name="priority" value={filters.priority} onChange={handleFilterChange}>
+            <select
+              name="priority"
+              value={filters.priority}
+              onChange={handleFilterChange}
+            >
               <option value="">All</option>
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -172,7 +324,13 @@ const MyRequests: React.FC = () => {
         {loading ? (
           <div className="loading">Loading your requests...</div>
         ) : items.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px",
+              color: "var(--text-muted)",
+            }}
+          >
             You haven't submitted any requests yet.
           </div>
         ) : (
@@ -194,12 +352,17 @@ const MyRequests: React.FC = () => {
               {items.map((item) => (
                 <tr key={`${item.item_type}-${item.id}`}>
                   <td>
-                    <span className={`badge ${item.display_type === 'work_order' ? 'badge-info' : 'badge-secondary'}`}>
-                      {item.display_type === 'work_order' ? 'Work Order' : 'Request'}
+                    <span
+                      className={`badge ${item.display_type === "work_order" ? "badge-info" : "badge-secondary"}`}
+                    >
+                      {item.display_type === "work_order"
+                        ? "Work Order"
+                        : "Request"}
                     </span>
                   </td>
                   <td>
-                    {item.display_type === 'work_order' && item.work_order_id ? (
+                    {item.display_type === "work_order" &&
+                    item.work_order_id ? (
                       <>WO-{item.work_order_id}</>
                     ) : (
                       <>WR-{item.id}</>
@@ -207,22 +370,27 @@ const MyRequests: React.FC = () => {
                   </td>
                   <td>{item.title}</td>
                   <td>
-                    <span className={`badge ${getPriorityBadgeClass(item.priority)}`}>
+                    <span
+                      className={`badge ${getPriorityBadgeClass(item.priority)}`}
+                    >
                       {item.priority}
                     </span>
                   </td>
                   <td>
-                    <span className={`badge ${getStatusBadgeClass(item.display_status)}`}>
+                    <span
+                      className={`badge ${getStatusBadgeClass(item.display_status)}`}
+                    >
                       {item.display_status}
                     </span>
                   </td>
-                  <td>
-                    {item.work_order_craft || item.category || 'N/A'}
-                  </td>
-                  <td>{item.location || 'N/A'}</td>
+                  <td>{item.work_order_craft || item.category || "N/A"}</td>
+                  <td>{item.location || "N/A"}</td>
                   <td>{new Date(item.created_at).toLocaleDateString()}</td>
                   <td>
-                    <button className="btn-ghost" onClick={() => openDetail(item)}>
+                    <button
+                      className="btn-ghost"
+                      onClick={() => openDetail(item)}
+                    >
                       View Details
                     </button>
                   </td>
@@ -236,91 +404,133 @@ const MyRequests: React.FC = () => {
       {/* Detail panel */}
       {selectedItem && (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "16px",
+            }}
+          >
             <h3>
-              {selectedItem.display_type === 'work_order' && selectedItem.work_order_id
+              {selectedItem.display_type === "work_order" &&
+              selectedItem.work_order_id
                 ? `Work Order #${selectedItem.work_order_id}`
-                : `Work Request #${selectedItem.id}`}: {selectedItem.title}
+                : `Work Request #${selectedItem.id}`}
+              : {selectedItem.title}
             </h3>
             <button onClick={() => setSelectedItem(null)}>Close</button>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ marginBottom: "20px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "16px",
+              }}
+            >
               <div>
                 <strong>Description:</strong>
-                <p style={{ marginTop: '4px' }}>{selectedItem.description || 'No description provided'}</p>
+                <p style={{ marginTop: "4px" }}>
+                  {selectedItem.description || "No description provided"}
+                </p>
               </div>
               <div>
                 <strong>Priority:</strong>
-                <p style={{ marginTop: '4px' }}>
-                  <span className={`badge ${getPriorityBadgeClass(selectedItem.priority)}`}>
+                <p style={{ marginTop: "4px" }}>
+                  <span
+                    className={`badge ${getPriorityBadgeClass(selectedItem.priority)}`}
+                  >
                     {selectedItem.priority}
                   </span>
                 </p>
               </div>
               <div>
                 <strong>Status:</strong>
-                <p style={{ marginTop: '4px' }}>
-                  <span className={`badge ${getStatusBadgeClass(selectedItem.display_status)}`}>
+                <p style={{ marginTop: "4px" }}>
+                  <span
+                    className={`badge ${getStatusBadgeClass(selectedItem.display_status)}`}
+                  >
                     {selectedItem.display_status}
                   </span>
                 </p>
               </div>
               <div>
                 <strong>Category/Craft:</strong>
-                <p style={{ marginTop: '4px' }}>{selectedItem.work_order_craft || selectedItem.category || 'N/A'}</p>
+                <p style={{ marginTop: "4px" }}>
+                  {selectedItem.work_order_craft ||
+                    selectedItem.category ||
+                    "N/A"}
+                </p>
               </div>
               {selectedItem.location && (
                 <div>
                   <strong>Location:</strong>
-                  <p style={{ marginTop: '4px' }}>{selectedItem.location}</p>
+                  <p style={{ marginTop: "4px" }}>{selectedItem.location}</p>
                 </div>
               )}
               {selectedItem.assigned_to_username && (
                 <div>
                   <strong>Assigned To:</strong>
-                  <p style={{ marginTop: '4px' }}>{selectedItem.assigned_to_username}</p>
+                  <p style={{ marginTop: "4px" }}>
+                    {selectedItem.assigned_to_username}
+                  </p>
                 </div>
               )}
               {selectedItem.scheduled_date && (
                 <div>
                   <strong>Scheduled Date:</strong>
-                  <p style={{ marginTop: '4px' }}>{new Date(selectedItem.scheduled_date).toLocaleDateString()}</p>
+                  <p style={{ marginTop: "4px" }}>
+                    {new Date(selectedItem.scheduled_date).toLocaleDateString()}
+                  </p>
                 </div>
               )}
               <div>
                 <strong>Created:</strong>
-                <p style={{ marginTop: '4px' }}>{new Date(selectedItem.created_at).toLocaleString()}</p>
+                <p style={{ marginTop: "4px" }}>
+                  {new Date(selectedItem.created_at).toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
 
           {/* Messages section */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+          <div
+            style={{ borderTop: "1px solid var(--border)", paddingTop: "20px" }}
+          >
             <h4>Updates & Comments</h4>
-            {selectedItem.work_order_id || selectedItem.item_type === 'work_order' ? (
+            {selectedItem.work_order_id ||
+            selectedItem.item_type === "work_order" ? (
               <>
                 {messagesLoading ? (
                   <div className="loading">Loading messages...</div>
                 ) : (
                   <>
-                    <div className="messages-box" style={{ marginBottom: '16px' }}>
+                    <div
+                      className="messages-box"
+                      style={{ marginBottom: "16px" }}
+                    >
                       {messages.length === 0 ? (
-                        <p style={{ color: 'var(--text-muted)' }}>No updates yet.</p>
+                        <p style={{ color: "var(--text-muted)" }}>
+                          No updates yet.
+                        </p>
                       ) : (
                         messages.map((msg) => (
                           <div key={msg.id} className="message-bubble">
-                            <strong>{msg.sender_username || 'System'}</strong>
+                            <strong>{msg.sender_username || "System"}</strong>
                             <span className="message-meta">
                               {new Date(msg.created_at).toLocaleString()}
                             </span>
-                            <p style={{ margin: '4px 0 0 0' }}>{msg.message}</p>
+                            <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
                           </div>
                         ))
                       )}
                     </div>
-                    <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px' }}>
+                    <form
+                      onSubmit={handleSendMessage}
+                      style={{ display: "flex", gap: "10px" }}
+                    >
                       <input
                         type="text"
                         value={newMessage}
@@ -335,8 +545,9 @@ const MyRequests: React.FC = () => {
                 )}
               </>
             ) : (
-              <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                Comments will be available once a work order is created for this request.
+              <p style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+                Comments will be available once a work order is created for this
+                request.
               </p>
             )}
           </div>

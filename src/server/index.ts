@@ -1,17 +1,18 @@
-import express, { Application } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import passport from 'passport';
-import authRoutes from './routes/auth';
-import assetRoutes from './routes/assets';
-import reportRoutes from './routes/reports';
-import maintenanceRoutes from './routes/maintenance';
-import adminRoutes from './routes/admin';
-import { initializePassport } from './config/passport';
-import { initializeDatabase } from './database';
-import settingsService from './services/settingsService';
+import express, { Application } from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import dotenv from "dotenv";
+import passport from "passport";
+import authRoutes from "./routes/auth";
+import assetRoutes from "./routes/assets";
+import reportRoutes from "./routes/reports";
+import maintenanceRoutes from "./routes/maintenance";
+import adminRoutes from "./routes/admin";
+import { initializePassport } from "./config/passport";
+import { initializeDatabase } from "./database";
+import settingsService from "./services/settingsService";
+import asseticLocationHierarchyService from "./services/asseticLocationHierarchyService";
 
 dotenv.config();
 
@@ -21,7 +22,7 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(helmet());
 app.use(cors());
-app.use(morgan('dev'));
+app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -30,60 +31,87 @@ initializePassport(passport);
 app.use(passport.initialize());
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/assets', assetRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/maintenance', maintenanceRoutes);
-app.use('/api/admin', adminRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/assets", assetRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/maintenance", maintenanceRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Health check (basic)
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // Health check with database status
-app.get('/api/health/db', async (req, res) => {
+app.get("/api/health/db", async (req, res) => {
   try {
-    const { db } = await import('./database');
-    await db.raw('SELECT 1');
-    res.json({ status: 'ok', database: 'connected', timestamp: new Date().toISOString() });
+    const { db } = await import("./database");
+    await db.raw("SELECT 1");
+    res.json({
+      status: "ok",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    });
   } catch (error: any) {
     res.status(503).json({
-      status: 'unavailable',
-      database: 'disconnected',
-      message: 'Database is not ready',
+      status: "unavailable",
+      database: "disconnected",
+      message: "Database is not ready",
       timestamp: new Date().toISOString(),
     });
   }
 });
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
-    error: {
-      message: err.message || 'Internal server error',
-      status: err.status || 500
-    }
-  });
-});
+app.use(
+  (
+    err: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    console.error("Error:", err);
+    res.status(err.status || 500).json({
+      error: {
+        message: err.message || "Internal server error",
+        status: err.status || 500,
+      },
+    });
+  },
+);
 
 // Initialize database and start server
 async function startServer() {
   try {
     await initializeDatabase();
-    console.log('Database initialized successfully');
+    console.log("Database initialized successfully");
 
     // Load settings cache
     await settingsService.loadCache();
-    console.log('Settings cache loaded');
+    console.log("Settings cache loaded");
+
+    // Preload location hierarchy so region/site/building selectors are ready on first use.
+    try {
+      const asseticEnabled = await settingsService.getBool(
+        "assetic_sync_enabled",
+      );
+      if (asseticEnabled) {
+        const hierarchy =
+          await asseticLocationHierarchyService.refreshFromAssetic();
+        console.log(
+          `[AsseticHierarchy] Preloaded ${hierarchy.regions.length} region(s) from ${hierarchy.source}`,
+        );
+      }
+    } catch (error) {
+      console.warn("[AsseticHierarchy] Startup preload failed:", error);
+    }
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 }

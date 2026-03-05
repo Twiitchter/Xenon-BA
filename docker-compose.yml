@@ -17,30 +17,30 @@ services:
 
   # Choose one database service below (comment/uncomment as needed)
 
-  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  # ── SQL Server (MSSQL) ─────────────────────────────────────────────────────
   db:
-    image: postgres:16-alpine
+    image: mcr.microsoft.com/mssql/server:2022-latest
     ports:
-      - "5432:5432"
+      - "1433:1433"
     environment:
-      POSTGRES_DB: ${DB_NAME:-xeonb_crm}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD:-YourStrong!Passw0rd}
+      MSSQL_PID: Developer
     volumes:
-      - dbdata:/var/lib/postgresql/data
+      - dbdata:/var/opt/mssql
     restart: unless-stopped
 
-  # ── SQL Server (uncomment to use instead of PostgreSQL) ────────────────────
+  # ── PostgreSQL (alternative option) ────────────────────────────────────────
   # db:
-  #   image: mcr.microsoft.com/mssql/server:2022-latest
+  #   image: postgres:16-alpine
   #   ports:
-  #     - "1433:1433"
+  #     - "5432:5432"
   #   environment:
-  #     ACCEPT_EULA: "Y"
-  #     MSSQL_SA_PASSWORD: ${DB_PASSWORD}
-  #     MSSQL_PID: Developer
+  #     POSTGRES_DB: ${DB_NAME:-xeonb_crm}
+  #     POSTGRES_USER: ${DB_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
   #   volumes:
-  #     - dbdata:/var/opt/mssql
+  #     - dbdata:/var/lib/postgresql/data
   #   restart: unless-stopped
 
   # ── MySQL (uncomment to use instead of PostgreSQL) ─────────────────────────

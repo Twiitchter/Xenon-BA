@@ -1,8 +1,9 @@
-import { Router, Response } from 'express';
-import { body, validationResult } from 'express-validator';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
-import db from '../database';
-import asseticClient from '../services/asseticClient';
+import { Router, Response } from "express";
+import { body, validationResult } from "express-validator";
+import { authenticateToken, AuthRequest } from "../middleware/auth";
+import db from "../database";
+import asseticClient from "../services/asseticClient";
+import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 
 const router = Router();
 
@@ -16,66 +17,76 @@ router.use(authenticateToken);
  * Get combined work requests and work orders for the current user
  * When a work order exists for a work request, the work order takes precedence
  */
-router.get('/my-items', async (req: AuthRequest, res: Response) => {
+router.get("/my-items", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user.id;
     const { status, priority, limit = 100, offset = 0 } = req.query;
 
     // Get work requests created by this user
-    let wrQuery = db('maintenance_requests as mr')
-      .leftJoin('users as u', 'mr.requested_by', 'u.id')
-      .leftJoin('work_orders as wo', 'mr.id', 'wo.request_id')
+    let wrQuery = db("maintenance_requests as mr")
+      .leftJoin("users as u", "mr.requested_by", "u.id")
+      .leftJoin("work_orders as wo", "mr.id", "wo.request_id")
       .select(
-        'mr.id',
-        'mr.title',
-        'mr.description',
-        'mr.priority',
-        'mr.status',
-        'mr.category',
-        'mr.location',
-        'mr.created_at',
-        'mr.updated_at',
-        db.raw('? as item_type', ['request']),
-        'wo.id as work_order_id',
-        'wo.status as work_order_status',
-        'wo.craft as work_order_craft',
-        db.raw('NULL as assigned_to_username'),
-        db.raw('NULL as scheduled_date')
+        "mr.id",
+        "mr.title",
+        "mr.description",
+        "mr.priority",
+        "mr.status",
+        "mr.category",
+        "mr.location",
+        "mr.created_at",
+        "mr.updated_at",
+        db.raw("? as item_type", ["request"]),
+        "wo.id as work_order_id",
+        "wo.status as work_order_status",
+        "wo.craft as work_order_craft",
+        db.raw("NULL as assigned_to_username"),
+        db.raw("NULL as scheduled_date"),
       )
-      .where('mr.requested_by', userId);
+      .where("mr.requested_by", userId);
 
     if (status) {
-      wrQuery = wrQuery.where('mr.status', status as string);
+      wrQuery = wrQuery.where("mr.status", status as string);
     }
     if (priority) {
-      wrQuery = wrQuery.where('mr.priority', priority as string);
+      wrQuery = wrQuery.where("mr.priority", priority as string);
     }
 
-    const requests = await wrQuery.orderBy('mr.created_at', 'desc');
+    const requests = await wrQuery.orderBy("mr.created_at", "desc");
 
     // Transform and combine results, applying display logic
-    const allItems = requests.map(r => ({
-      ...r,
-      // If work order exists, show work order status
-      display_type: r.work_order_id ? 'work_order' : 'request',
-      display_status: r.work_order_id ? r.work_order_status : r.status,
-    })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const allItems = requests
+      .map((r) => ({
+        ...r,
+        // If work order exists, show work order status
+        display_type: r.work_order_id ? "work_order" : "request",
+        display_status: r.work_order_id ? r.work_order_status : r.status,
+      }))
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
 
     const total = allItems.length;
-    const items = allItems.slice(Number(offset), Number(offset) + Number(limit));
+    const items = allItems.slice(
+      Number(offset),
+      Number(offset) + Number(limit),
+    );
 
     res.json({
       items,
       total,
     });
   } catch (error) {
-    console.error('Error fetching user items:', error);
-    res.status(500).json({ error: 'Failed to fetch items' });
+    console.error("Error fetching user items:", error);
+    res.status(500).json({ error: "Failed to fetch items" });
   }
+});
+
 // Set Assetic logging context for Assetic API calls
 router.use((req: AuthRequest, _res: Response, next: Function) => {
-  asseticClient.setContext(req.user?.id, 'maintenance');
-  _res.on('finish', () => asseticClient.clearContext());
+  asseticClient.setContext(req.user?.id, "maintenance");
+  _res.on("finish", () => asseticClient.clearContext());
   next();
 });
 
@@ -85,24 +96,24 @@ router.use((req: AuthRequest, _res: Response, next: Function) => {
  * GET /api/maintenance/requests
  * List maintenance requests
  */
-router.get('/requests', async (req: AuthRequest, res: Response) => {
+router.get("/requests", async (req: AuthRequest, res: Response) => {
   try {
     const { status, priority, limit = 100, offset = 0 } = req.query;
 
-    let qb = db('maintenance_requests as mr')
-      .leftJoin('users as u', 'mr.requested_by', 'u.id')
-      .select('mr.*', 'u.username as requested_by_username');
+    let qb = db("maintenance_requests as mr")
+      .leftJoin("users as u", "mr.requested_by", "u.id")
+      .select("mr.*", "u.username as requested_by_username");
 
     if (status) {
-      qb = qb.where('mr.status', status as string);
+      qb = qb.where("mr.status", status as string);
     }
 
     if (priority) {
-      qb = qb.where('mr.priority', priority as string);
+      qb = qb.where("mr.priority", priority as string);
     }
 
     const requests = await qb
-      .orderBy('mr.created_at', 'desc')
+      .orderBy("mr.created_at", "desc")
       .limit(Number(limit))
       .offset(Number(offset));
 
@@ -111,8 +122,8 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
       total: requests.length,
     });
   } catch (error) {
-    console.error('Error fetching maintenance requests:', error);
-    res.status(500).json({ error: 'Failed to fetch maintenance requests' });
+    console.error("Error fetching maintenance requests:", error);
+    res.status(500).json({ error: "Failed to fetch maintenance requests" });
   }
 });
 
@@ -120,24 +131,24 @@ router.get('/requests', async (req: AuthRequest, res: Response) => {
  * GET /api/maintenance/requests/:id
  * Get a specific maintenance request
  */
-router.get('/requests/:id', async (req: AuthRequest, res: Response) => {
+router.get("/requests/:id", async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const request = await db('maintenance_requests as mr')
-      .leftJoin('users as u', 'mr.requested_by', 'u.id')
-      .select('mr.*', 'u.username as requested_by_username')
-      .where('mr.id', id)
+    const request = await db("maintenance_requests as mr")
+      .leftJoin("users as u", "mr.requested_by", "u.id")
+      .select("mr.*", "u.username as requested_by_username")
+      .where("mr.id", id)
       .first();
 
     if (!request) {
-      return res.status(404).json({ error: 'Maintenance request not found' });
+      return res.status(404).json({ error: "Maintenance request not found" });
     }
 
     res.json(request);
   } catch (error) {
-    console.error('Error fetching maintenance request:', error);
-    res.status(500).json({ error: 'Failed to fetch maintenance request' });
+    console.error("Error fetching maintenance request:", error);
+    res.status(500).json({ error: "Failed to fetch maintenance request" });
   }
 });
 
@@ -146,43 +157,43 @@ router.get('/requests/:id', async (req: AuthRequest, res: Response) => {
  * Create a new maintenance request
  */
 router.post(
-  '/requests',
+  "/requests",
   [
-    body('title').isLength({ min: 1 }).trim(),
-    body('description').optional().trim(),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
-    body('category').optional().trim(),
-    body('location').optional().trim(),
-    body('assetId').optional().isInt(),
+    body("title").isLength({ min: 1 }).trim(),
+    body("description").optional().trim(),
+    body("priority").optional().isIn(["low", "medium", "high", "critical"]),
+    body("category").optional().trim(),
+    body("location").optional().trim(),
+    body("assetId").optional().isInt(),
     // Assetic required fields
-    body('workRequestSourceId').optional().trim(),
+    body("workRequestSourceId").optional().trim(),
     // Requestor fields
-    body('requestorDisplayName').optional().trim(),
-    body('requestorFirstName').optional().trim(),
-    body('requestorSurname').optional().trim(),
-    body('requestorEmail').optional().isEmail().normalizeEmail(),
-    body('requestorPhone').optional().trim(),
-    body('requestorMobile').optional().trim(),
-    body('requestorTypeId').optional().trim(),
+    body("requestorDisplayName").optional().trim(),
+    body("requestorFirstName").optional().trim(),
+    body("requestorSurname").optional().trim(),
+    body("requestorEmail").optional().isEmail().normalizeEmail(),
+    body("requestorPhone").optional().trim(),
+    body("requestorMobile").optional().trim(),
+    body("requestorTypeId").optional().trim(),
     // Optional Assetic fields
-    body('workRequestSubtypeId').optional().trim(),
-    body('workRequestPriorityId').optional().trim(),
-    body('externalIdentifier').optional().trim(),
-    body('supportingInformation').optional().trim(),
+    body("workRequestSubtypeId").optional().trim(),
+    body("workRequestPriorityId").optional().trim(),
+    body("externalIdentifier").optional().trim(),
+    body("supportingInformation").optional().trim(),
     // Physical location fields
-    body('streetNumber').optional().trim(),
-    body('streetAddress').optional().trim(),
-    body('citySuburb').optional().trim(),
-    body('state').optional().trim(),
-    body('zipPostcode').optional().trim(),
-    body('country').optional().trim(),
-    body('otherLocation').optional().trim(),
-    body('whereLocation').optional().trim(),
+    body("streetNumber").optional().trim(),
+    body("streetAddress").optional().trim(),
+    body("citySuburb").optional().trim(),
+    body("state").optional().trim(),
+    body("zipPostcode").optional().trim(),
+    body("country").optional().trim(),
+    body("otherLocation").optional().trim(),
+    body("whereLocation").optional().trim(),
     // Spatial location
-    body('spatialLocation').optional().trim(),
+    body("spatialLocation").optional().trim(),
     // Reactive inspection
-    body('reactiveInspectorName').optional().trim(),
-    body('reactiveInspectionDate').optional().isISO8601(),
+    body("reactiveInspectorName").optional().trim(),
+    body("reactiveInspectionDate").optional().isISO8601(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -191,23 +202,45 @@ router.post(
     }
 
     try {
-      const { 
-        title, description, priority, category, location, assetId,
-        workRequestSourceId, requestorDisplayName, requestorFirstName, requestorSurname,
-        requestorEmail, requestorPhone, requestorMobile, requestorTypeId,
-        workRequestSubtypeId, workRequestPriorityId, externalIdentifier, supportingInformation,
-        streetNumber, streetAddress, citySuburb, state, zipPostcode, country,
-        otherLocation, whereLocation, spatialLocation,
-        reactiveInspectorName, reactiveInspectionDate
+      const {
+        title,
+        description,
+        priority,
+        category,
+        location,
+        assetId,
+        workRequestSourceId,
+        requestorDisplayName,
+        requestorFirstName,
+        requestorSurname,
+        requestorEmail,
+        requestorPhone,
+        requestorMobile,
+        requestorTypeId,
+        workRequestSubtypeId,
+        workRequestPriorityId,
+        externalIdentifier,
+        supportingInformation,
+        streetNumber,
+        streetAddress,
+        citySuburb,
+        state,
+        zipPostcode,
+        country,
+        otherLocation,
+        whereLocation,
+        spatialLocation,
+        reactiveInspectorName,
+        reactiveInspectionDate,
       } = req.body;
 
-      const [inserted] = await db('maintenance_requests')
+      const [inserted] = await db("maintenance_requests")
         .insert({
           asset_id: assetId || null,
           requested_by: req.user.id,
           title,
           description: description || null,
-          priority: priority || 'medium',
+          priority: priority || "medium",
           category: category || null,
           location: location || null,
           // Assetic fields
@@ -235,21 +268,21 @@ router.post(
           reactive_inspector_name: reactiveInspectorName || null,
           reactive_inspection_date: reactiveInspectionDate || null,
         })
-        .returning('*');
+        .returning("*");
 
       // For MySQL/MSSQL that don't support RETURNING, fetch the inserted row
-      if (!inserted || typeof inserted === 'number') {
-        const id = typeof inserted === 'number' ? inserted : (inserted as any);
-        const row = await db('maintenance_requests').where('id', id).first();
+      if (!inserted || typeof inserted === "number") {
+        const id = typeof inserted === "number" ? inserted : (inserted as any);
+        const row = await db("maintenance_requests").where("id", id).first();
         return res.status(201).json(row);
       }
 
       res.status(201).json(inserted);
     } catch (error) {
-      console.error('Error creating maintenance request:', error);
-      res.status(500).json({ error: 'Failed to create maintenance request' });
+      console.error("Error creating maintenance request:", error);
+      res.status(500).json({ error: "Failed to create maintenance request" });
     }
-  }
+  },
 );
 
 /**
@@ -257,14 +290,16 @@ router.post(
  * Update a maintenance request
  */
 router.put(
-  '/requests/:id',
+  "/requests/:id",
   [
-    body('title').optional().isLength({ min: 1 }).trim(),
-    body('description').optional().trim(),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
-    body('status').optional().isIn(['open', 'in_progress', 'completed', 'cancelled']),
-    body('category').optional().trim(),
-    body('location').optional().trim(),
+    body("title").optional().isLength({ min: 1 }).trim(),
+    body("description").optional().trim(),
+    body("priority").optional().isIn(["low", "medium", "high", "critical"]),
+    body("status")
+      .optional()
+      .isIn(["open", "in_progress", "completed", "cancelled"]),
+    body("category").optional().trim(),
+    body("location").optional().trim(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -274,11 +309,12 @@ router.put(
 
     try {
       const { id } = req.params;
-      const { title, description, priority, status, category, location } = req.body;
+      const { title, description, priority, status, category, location } =
+        req.body;
 
-      const existing = await db('maintenance_requests').where('id', id).first();
+      const existing = await db("maintenance_requests").where("id", id).first();
       if (!existing) {
-        return res.status(404).json({ error: 'Maintenance request not found' });
+        return res.status(404).json({ error: "Maintenance request not found" });
       }
 
       const updateData: any = { updated_at: db.fn.now() };
@@ -289,15 +325,15 @@ router.put(
       if (category) updateData.category = category;
       if (location) updateData.location = location;
 
-      await db('maintenance_requests').where('id', id).update(updateData);
-      const updated = await db('maintenance_requests').where('id', id).first();
+      await db("maintenance_requests").where("id", id).update(updateData);
+      const updated = await db("maintenance_requests").where("id", id).first();
 
       res.json(updated);
     } catch (error) {
-      console.error('Error updating maintenance request:', error);
-      res.status(500).json({ error: 'Failed to update maintenance request' });
+      console.error("Error updating maintenance request:", error);
+      res.status(500).json({ error: "Failed to update maintenance request" });
     }
-  }
+  },
 );
 
 // ─── Work Orders ────────────────────────────────────────────────────────────
@@ -306,25 +342,29 @@ router.put(
  * GET /api/maintenance/work-orders
  * List work orders
  */
-router.get('/work-orders', async (req: AuthRequest, res: Response) => {
+router.get("/work-orders", async (req: AuthRequest, res: Response) => {
   try {
     const { status, craft, limit = 100, offset = 0 } = req.query;
 
-    let qb = db('work_orders as wo')
-      .leftJoin('users as u', 'wo.assigned_to', 'u.id')
-      .leftJoin('maintenance_requests as mr', 'wo.request_id', 'mr.id')
-      .select('wo.*', 'u.username as assigned_to_username', 'mr.title as request_title');
+    let qb = db("work_orders as wo")
+      .leftJoin("users as u", "wo.assigned_to", "u.id")
+      .leftJoin("maintenance_requests as mr", "wo.request_id", "mr.id")
+      .select(
+        "wo.*",
+        "u.username as assigned_to_username",
+        "mr.title as request_title",
+      );
 
     if (status) {
-      qb = qb.where('wo.status', status as string);
+      qb = qb.where("wo.status", status as string);
     }
 
     if (craft) {
-      qb = qb.where('wo.craft', craft as string);
+      qb = qb.where("wo.craft", craft as string);
     }
 
     const workOrders = await qb
-      .orderBy('wo.created_at', 'desc')
+      .orderBy("wo.created_at", "desc")
       .limit(Number(limit))
       .offset(Number(offset));
 
@@ -333,8 +373,8 @@ router.get('/work-orders', async (req: AuthRequest, res: Response) => {
       total: workOrders.length,
     });
   } catch (error) {
-    console.error('Error fetching work orders:', error);
-    res.status(500).json({ error: 'Failed to fetch work orders' });
+    console.error("Error fetching work orders:", error);
+    res.status(500).json({ error: "Failed to fetch work orders" });
   }
 });
 
@@ -342,25 +382,29 @@ router.get('/work-orders', async (req: AuthRequest, res: Response) => {
  * GET /api/maintenance/work-orders/:id
  * Get a specific work order
  */
-router.get('/work-orders/:id', async (req: AuthRequest, res: Response) => {
+router.get("/work-orders/:id", async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const workOrder = await db('work_orders as wo')
-      .leftJoin('users as u', 'wo.assigned_to', 'u.id')
-      .leftJoin('maintenance_requests as mr', 'wo.request_id', 'mr.id')
-      .select('wo.*', 'u.username as assigned_to_username', 'mr.title as request_title')
-      .where('wo.id', id)
+    const workOrder = await db("work_orders as wo")
+      .leftJoin("users as u", "wo.assigned_to", "u.id")
+      .leftJoin("maintenance_requests as mr", "wo.request_id", "mr.id")
+      .select(
+        "wo.*",
+        "u.username as assigned_to_username",
+        "mr.title as request_title",
+      )
+      .where("wo.id", id)
       .first();
 
     if (!workOrder) {
-      return res.status(404).json({ error: 'Work order not found' });
+      return res.status(404).json({ error: "Work order not found" });
     }
 
     res.json(workOrder);
   } catch (error) {
-    console.error('Error fetching work order:', error);
-    res.status(500).json({ error: 'Failed to fetch work order' });
+    console.error("Error fetching work order:", error);
+    res.status(500).json({ error: "Failed to fetch work order" });
   }
 });
 
@@ -369,15 +413,15 @@ router.get('/work-orders/:id', async (req: AuthRequest, res: Response) => {
  * Create a work order from a maintenance request
  */
 router.post(
-  '/work-orders',
+  "/work-orders",
   [
-    body('requestId').isInt(),
-    body('title').isLength({ min: 1 }).trim(),
-    body('description').optional().trim(),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
-    body('craft').optional().trim(),
-    body('assignedTo').optional().isInt(),
-    body('scheduledDate').optional().isISO8601(),
+    body("requestId").isInt(),
+    body("title").isLength({ min: 1 }).trim(),
+    body("description").optional().trim(),
+    body("priority").optional().isIn(["low", "medium", "high", "critical"]),
+    body("craft").optional().trim(),
+    body("assignedTo").optional().isInt(),
+    body("scheduledDate").optional().isISO8601(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -386,44 +430,54 @@ router.post(
     }
 
     try {
-      const { requestId, title, description, priority, craft, assignedTo, scheduledDate } = req.body;
+      const {
+        requestId,
+        title,
+        description,
+        priority,
+        craft,
+        assignedTo,
+        scheduledDate,
+      } = req.body;
 
       // Verify the maintenance request exists
-      const reqCheck = await db('maintenance_requests').where('id', requestId).first();
+      const reqCheck = await db("maintenance_requests")
+        .where("id", requestId)
+        .first();
       if (!reqCheck) {
-        return res.status(404).json({ error: 'Maintenance request not found' });
+        return res.status(404).json({ error: "Maintenance request not found" });
       }
 
-      const [inserted] = await db('work_orders')
+      const [inserted] = await db("work_orders")
         .insert({
           request_id: requestId,
           assigned_to: assignedTo || null,
           craft: craft || null,
           title,
           description: description || null,
-          priority: priority || 'medium',
+          priority: priority || "medium",
           scheduled_date: scheduledDate || null,
         })
-        .returning('*');
+        .returning("*");
 
       // Update the maintenance request status to in_progress
-      await db('maintenance_requests')
-        .where('id', requestId)
-        .update({ status: 'in_progress', updated_at: db.fn.now() });
+      await db("maintenance_requests")
+        .where("id", requestId)
+        .update({ status: "in_progress", updated_at: db.fn.now() });
 
       // For MySQL/MSSQL that don't support RETURNING, fetch the inserted row
-      if (!inserted || typeof inserted === 'number') {
-        const id = typeof inserted === 'number' ? inserted : (inserted as any);
-        const row = await db('work_orders').where('id', id).first();
+      if (!inserted || typeof inserted === "number") {
+        const id = typeof inserted === "number" ? inserted : (inserted as any);
+        const row = await db("work_orders").where("id", id).first();
         return res.status(201).json(row);
       }
 
       res.status(201).json(inserted);
     } catch (error) {
-      console.error('Error creating work order:', error);
-      res.status(500).json({ error: 'Failed to create work order' });
+      console.error("Error creating work order:", error);
+      res.status(500).json({ error: "Failed to create work order" });
     }
-  }
+  },
 );
 
 /**
@@ -431,15 +485,17 @@ router.post(
  * Update a work order (status, assignment, craft, etc.)
  */
 router.put(
-  '/work-orders/:id',
+  "/work-orders/:id",
   [
-    body('title').optional().isLength({ min: 1 }).trim(),
-    body('description').optional().trim(),
-    body('priority').optional().isIn(['low', 'medium', 'high', 'critical']),
-    body('status').optional().isIn(['pending', 'in_progress', 'completed', 'cancelled']),
-    body('craft').optional().trim(),
-    body('assignedTo').optional().isInt(),
-    body('scheduledDate').optional().isISO8601(),
+    body("title").optional().isLength({ min: 1 }).trim(),
+    body("description").optional().trim(),
+    body("priority").optional().isIn(["low", "medium", "high", "critical"]),
+    body("status")
+      .optional()
+      .isIn(["pending", "in_progress", "completed", "cancelled"]),
+    body("craft").optional().trim(),
+    body("assignedTo").optional().isInt(),
+    body("scheduledDate").optional().isISO8601(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -449,11 +505,22 @@ router.put(
 
     try {
       const { id } = req.params;
-      const { title, description, priority, status, craft, assignedTo, scheduledDate } = req.body;
+      const {
+        title,
+        description,
+        priority,
+        status,
+        craft,
+        assignedTo,
+        scheduledDate,
+      } = req.body;
 
-      const existing = await db('work_orders').where('id', id).select('id', 'request_id').first();
+      const existing = await db("work_orders")
+        .where("id", id)
+        .select("id", "request_id")
+        .first();
       if (!existing) {
-        return res.status(404).json({ error: 'Work order not found' });
+        return res.status(404).json({ error: "Work order not found" });
       }
 
       const updateData: any = { updated_at: db.fn.now() };
@@ -464,24 +531,24 @@ router.put(
       if (craft) updateData.craft = craft;
       if (assignedTo) updateData.assigned_to = assignedTo;
       if (scheduledDate) updateData.scheduled_date = scheduledDate;
-      if (status === 'completed') updateData.completed_at = db.fn.now();
+      if (status === "completed") updateData.completed_at = db.fn.now();
 
-      await db('work_orders').where('id', id).update(updateData);
+      await db("work_orders").where("id", id).update(updateData);
 
       // If work order is completed, update maintenance request status
-      if (status === 'completed') {
-        await db('maintenance_requests')
-          .where('id', existing.request_id)
-          .update({ status: 'completed', updated_at: db.fn.now() });
+      if (status === "completed") {
+        await db("maintenance_requests")
+          .where("id", existing.request_id)
+          .update({ status: "completed", updated_at: db.fn.now() });
       }
 
-      const updated = await db('work_orders').where('id', id).first();
+      const updated = await db("work_orders").where("id", id).first();
       res.json(updated);
     } catch (error) {
-      console.error('Error updating work order:', error);
-      res.status(500).json({ error: 'Failed to update work order' });
+      console.error("Error updating work order:", error);
+      res.status(500).json({ error: "Failed to update work order" });
     }
-  }
+  },
 );
 
 // ─── Work Order Messages ────────────────────────────────────────────────────
@@ -490,36 +557,39 @@ router.put(
  * GET /api/maintenance/work-orders/:id/messages
  * Get messages for a work order
  */
-router.get('/work-orders/:id/messages', async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+router.get(
+  "/work-orders/:id/messages",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { limit = 50, offset = 0 } = req.query;
 
-    const messages = await db('work_order_messages as wom')
-      .leftJoin('users as u', 'wom.sender_id', 'u.id')
-      .select('wom.*', 'u.username as sender_username')
-      .where('wom.work_order_id', id)
-      .orderBy('wom.created_at', 'asc')
-      .limit(Number(limit))
-      .offset(Number(offset));
+      const messages = await db("work_order_messages as wom")
+        .leftJoin("users as u", "wom.sender_id", "u.id")
+        .select("wom.*", "u.username as sender_username")
+        .where("wom.work_order_id", id)
+        .orderBy("wom.created_at", "asc")
+        .limit(Number(limit))
+        .offset(Number(offset));
 
-    res.json({
-      messages,
-      total: messages.length,
-    });
-  } catch (error) {
-    console.error('Error fetching work order messages:', error);
-    res.status(500).json({ error: 'Failed to fetch messages' });
-  }
-});
+      res.json({
+        messages,
+        total: messages.length,
+      });
+    } catch (error) {
+      console.error("Error fetching work order messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  },
+);
 
 /**
  * POST /api/maintenance/work-orders/:id/messages
  * Add a message to a work order
  */
 router.post(
-  '/work-orders/:id/messages',
-  [body('message').isLength({ min: 1 }).trim()],
+  "/work-orders/:id/messages",
+  [body("message").isLength({ min: 1 }).trim()],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -531,31 +601,32 @@ router.post(
       const { message } = req.body;
 
       // Verify the work order exists
-      const woCheck = await db('work_orders').where('id', id).first();
+      const woCheck = await db("work_orders").where("id", id).first();
       if (!woCheck) {
-        return res.status(404).json({ error: 'Work order not found' });
+        return res.status(404).json({ error: "Work order not found" });
       }
 
-      const [inserted] = await db('work_order_messages')
+      const [inserted] = await db("work_order_messages")
         .insert({
           work_order_id: id,
           sender_id: req.user.id,
           message,
         })
-        .returning('*');
+        .returning("*");
 
-      if (!inserted || typeof inserted === 'number') {
-        const newId = typeof inserted === 'number' ? inserted : (inserted as any);
-        const row = await db('work_order_messages').where('id', newId).first();
+      if (!inserted || typeof inserted === "number") {
+        const newId =
+          typeof inserted === "number" ? inserted : (inserted as any);
+        const row = await db("work_order_messages").where("id", newId).first();
         return res.status(201).json(row);
       }
 
       res.status(201).json(inserted);
     } catch (error) {
-      console.error('Error creating work order message:', error);
-      res.status(500).json({ error: 'Failed to create message' });
+      console.error("Error creating work order message:", error);
+      res.status(500).json({ error: "Failed to create message" });
     }
-  }
+  },
 );
 
 // ─── Crafts/Trades ──────────────────────────────────────────────────────────
@@ -564,90 +635,136 @@ router.post(
  * GET /api/maintenance/crafts
  * Get list of available crafts/trades for work order assignment
  */
-router.get('/crafts', async (_req: AuthRequest, res: Response) => {
+router.get("/crafts", async (_req: AuthRequest, res: Response) => {
   try {
-    const result = await db('work_orders')
-      .distinct('craft')
-      .whereNotNull('craft')
-      .orderBy('craft', 'asc');
+    const result = await db("work_orders")
+      .distinct("craft")
+      .whereNotNull("craft")
+      .orderBy("craft", "asc");
 
     const crafts = result.map((row: any) => row.craft);
 
     res.json({ crafts });
   } catch (error) {
-    console.error('Error fetching crafts:', error);
-    res.status(500).json({ error: 'Failed to fetch crafts' });
+    console.error("Error fetching crafts:", error);
+    res.status(500).json({ error: "Failed to fetch crafts" });
   }
 });
 
 // ─── Assetic Integration Endpoints ─────────────────────────────────────
 
 /**
+ * GET /api/maintenance/assetic/location-hierarchy
+ * Returns cached Assetic hierarchy structured as regions -> sites -> buildings.
+ * Pass ?refresh=true to force a re-fetch from Assetic.
+ */
+router.get(
+  "/assetic/location-hierarchy",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+
+      const forceRefresh =
+        String(req.query.refresh || "").toLowerCase() === "true";
+      const hierarchy = forceRefresh
+        ? await asseticLocationHierarchyService.refreshFromAssetic()
+        : await asseticLocationHierarchyService.getOrRefresh();
+
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("Error fetching Assetic location hierarchy:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch location hierarchy from Assetic" });
+    }
+  },
+);
+
+/**
  * GET /api/maintenance/assetic/work-request-types
  * Get available work request types from Assetic API
  */
-router.get('/assetic/work-request-types', async (_req: AuthRequest, res: Response) => {
-  try {
-    const enabled = await asseticClient.isEnabled();
-    if (!enabled) {
-      return res.status(503).json({ error: 'Assetic integration is not enabled' });
-    }
+router.get(
+  "/assetic/work-request-types",
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
 
-    const types = await asseticClient.getWorkRequestTypes();
-    res.json(types);
-  } catch (error) {
-    console.error('Error fetching work request types:', error);
-    res.status(500).json({ error: 'Failed to fetch work request types from Assetic' });
-  }
-});
+      const types = await asseticClient.getWorkRequestTypes();
+      res.json(types);
+    } catch (error) {
+      console.error("Error fetching work request types:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch work request types from Assetic" });
+    }
+  },
+);
 
 /**
  * GET /api/maintenance/assetic/work-request-sources
  * Get available work request sources from Assetic API
  * This endpoint fetches work requests and extracts unique source IDs
- * 
+ *
  * NOTE: This is a temporary implementation that samples existing work requests
  * to discover available sources. In production, consider:
  * 1. Caching the sources list (with TTL)
  * 2. Using a dedicated Assetic API endpoint if available
  * 3. Storing sources in the database during sync operations
  */
-router.get('/assetic/work-request-sources', async (_req: AuthRequest, res: Response) => {
-  try {
-    const enabled = await asseticClient.isEnabled();
-    if (!enabled) {
-      return res.status(503).json({ error: 'Assetic integration is not enabled' });
-    }
+router.get(
+  "/assetic/work-request-sources",
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
 
-    // Fetch a sample of work requests to extract source IDs
-    const data = await asseticClient.getWorkRequests({ pageSize: 100 });
-    
-    // Extract unique source IDs from the response
-    interface WorkRequestSource {
-      id: string;
-      name: string;
-    }
-    
-    const sources: WorkRequestSource[] = [];
-    const seenIds = new Set<string>();
-    
-    if (data && data.ResourceList) {
-      for (const wr of data.ResourceList) {
-        if (wr.WorkRequestSourceId && !seenIds.has(wr.WorkRequestSourceId)) {
-          seenIds.add(wr.WorkRequestSourceId);
-          sources.push({
-            id: wr.WorkRequestSourceId,
-            name: wr.WorkRequestSource || `Source ${wr.WorkRequestSourceId}`,
-          });
+      // Fetch a sample of work requests to extract source IDs
+      const data = await asseticClient.getWorkRequests({ pageSize: 100 });
+
+      // Extract unique source IDs from the response
+      interface WorkRequestSource {
+        id: string;
+        name: string;
+      }
+
+      const sources: WorkRequestSource[] = [];
+      const seenIds = new Set<string>();
+
+      if (data && data.ResourceList) {
+        for (const wr of data.ResourceList) {
+          if (wr.WorkRequestSourceId && !seenIds.has(wr.WorkRequestSourceId)) {
+            seenIds.add(wr.WorkRequestSourceId);
+            sources.push({
+              id: wr.WorkRequestSourceId,
+              name: wr.WorkRequestSource || `Source ${wr.WorkRequestSourceId}`,
+            });
+          }
         }
       }
-    }
 
-    res.json({ sources });
-  } catch (error) {
-    console.error('Error fetching work request sources:', error);
-    res.status(500).json({ error: 'Failed to fetch work request sources from Assetic' });
-  }
-});
+      res.json({ sources });
+    } catch (error) {
+      console.error("Error fetching work request sources:", error);
+      res
+        .status(500)
+        .json({ error: "Failed to fetch work request sources from Assetic" });
+    }
+  },
+);
 
 export default router;

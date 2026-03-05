@@ -1,12 +1,13 @@
-import { Router, Response } from 'express';
-import bcrypt from 'bcrypt';
-import { body, validationResult } from 'express-validator';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
-import db from '../database';
-import settingsService from '../services/settingsService';
-import activityService from '../services/activityService';
-import asseticClient from '../services/asseticClient';
-import asseticApiLogger from '../services/asseticApiLogger';
+import { Router, Response } from "express";
+import bcrypt from "bcrypt";
+import { body, validationResult } from "express-validator";
+import { authenticateToken, AuthRequest } from "../middleware/auth";
+import db from "../database";
+import settingsService from "../services/settingsService";
+import activityService from "../services/activityService";
+import asseticClient from "../services/asseticClient";
+import asseticApiLogger from "../services/asseticApiLogger";
+import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 
 const router = Router();
 
@@ -14,15 +15,22 @@ const router = Router();
 router.use(authenticateToken);
 
 // Middleware: require admin role
-const requireAdmin = async (req: AuthRequest, res: Response, next: Function) => {
+const requireAdmin = async (
+  req: AuthRequest,
+  res: Response,
+  next: Function,
+) => {
   try {
-    const user = await db('users').where('id', req.user.id).select('role').first();
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
+    const user = await db("users")
+      .where("id", req.user.id)
+      .select("role")
+      .first();
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
     }
     next();
   } catch {
-    res.status(500).json({ error: 'Authorization check failed' });
+    res.status(500).json({ error: "Authorization check failed" });
   }
 };
 
@@ -30,8 +38,8 @@ router.use(requireAdmin);
 
 // Set Assetic logging context (user + source) for every request through this router
 router.use((req: AuthRequest, _res: Response, next: Function) => {
-  asseticClient.setContext(req.user?.id, 'admin');
-  _res.on('finish', () => asseticClient.clearContext());
+  asseticClient.setContext(req.user?.id, "admin");
+  _res.on("finish", () => asseticClient.clearContext());
   next();
 });
 
@@ -43,14 +51,16 @@ router.use((req: AuthRequest, _res: Response, next: Function) => {
  * GET /api/admin/settings
  * Get all system settings (optionally filtered by category)
  */
-router.get('/settings', async (req: AuthRequest, res: Response) => {
+router.get("/settings", async (req: AuthRequest, res: Response) => {
   try {
     const { category } = req.query;
-    const settings = await settingsService.getAll(category as string | undefined);
+    const settings = await settingsService.getAll(
+      category as string | undefined,
+    );
     res.json({ settings });
   } catch (error) {
-    console.error('Error fetching settings:', error);
-    res.status(500).json({ error: 'Failed to fetch settings' });
+    console.error("Error fetching settings:", error);
+    res.status(500).json({ error: "Failed to fetch settings" });
   }
 });
 
@@ -59,39 +69,39 @@ router.get('/settings', async (req: AuthRequest, res: Response) => {
  * Bulk update settings
  * Body: { settings: { key: value, ... } }
  */
-router.put('/settings', async (req: AuthRequest, res: Response) => {
+router.put("/settings", async (req: AuthRequest, res: Response) => {
   try {
     const { settings } = req.body;
-    if (!settings || typeof settings !== 'object') {
-      return res.status(400).json({ error: 'Settings object required' });
+    if (!settings || typeof settings !== "object") {
+      return res.status(400).json({ error: "Settings object required" });
     }
 
     await settingsService.bulkSet(settings, req.user.id);
 
     // If any assetic/worker settings changed, refresh the worker pool
-    const asseticKeys = Object.keys(settings).filter(
-      (k) => k.startsWith('assetic_'),
+    const asseticKeys = Object.keys(settings).filter((k) =>
+      k.startsWith("assetic_"),
     );
     if (asseticKeys.length > 0) {
       try {
         await asseticClient.refreshWorkerPool();
       } catch (e) {
-        console.warn('Worker pool refresh after settings update failed:', e);
+        console.warn("Worker pool refresh after settings update failed:", e);
       }
     }
 
     await activityService.log({
-      entity_type: 'setting',
+      entity_type: "setting",
       entity_id: 0,
-      action: 'updated',
+      action: "updated",
       details: { keys: Object.keys(settings) },
       performed_by: req.user.id,
     });
 
-    res.json({ message: 'Settings updated successfully' });
+    res.json({ message: "Settings updated successfully" });
   } catch (error) {
-    console.error('Error updating settings:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
+    console.error("Error updating settings:", error);
+    res.status(500).json({ error: "Failed to update settings" });
   }
 });
 
@@ -99,38 +109,48 @@ router.put('/settings', async (req: AuthRequest, res: Response) => {
  * POST /api/admin/settings/test-assetic
  * Test Assetic API connection using the Validate Login endpoint (GET /api/v2/auth)
  */
-router.post('/settings/test-assetic', async (req: AuthRequest, res: Response) => {
-  try {
-    const apiUrl = await settingsService.get('assetic_api_url');
-    const apiKey = await settingsService.get('assetic_api_key');
-    const apiUsername = await settingsService.get('assetic_api_username');
+router.post(
+  "/settings/test-assetic",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const apiUrl = await settingsService.get("assetic_api_url");
+      const apiKey = await settingsService.get("assetic_api_key");
+      const apiUsername = await settingsService.get("assetic_api_username");
 
-    if (!apiUrl || !apiKey || !apiUsername) {
-      return res.status(400).json({ error: 'Assetic site URL, username, and API key must be configured first' });
+      if (!apiUrl || !apiKey || !apiUsername) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Assetic site URL, username, and API key must be configured first",
+          });
+      }
+
+      // Use the asseticClient directly — it handles auth, URL construction, and rate limiting
+      const result = await asseticClient.validateLogin();
+
+      res.json({
+        success: true,
+        message: "Assetic connection successful — credentials validated",
+        status: 200,
+        data: result,
+      });
+    } catch (error: any) {
+      const status = error.response?.status || 0;
+      let message =
+        error.response?.data?.message || error.message || "Connection failed";
+
+      if (status === 401) {
+        message = "Authentication failed — check your username and API key";
+      } else if (status === 404) {
+        message =
+          "Endpoint not found — check your Assetic site URL (should be e.g. https://yoursite.assetic.net)";
+      }
+
+      res.json({ success: false, message, status });
     }
-
-    // Use the asseticClient directly — it handles auth, URL construction, and rate limiting
-    const result = await asseticClient.validateLogin();
-
-    res.json({
-      success: true,
-      message: 'Assetic connection successful — credentials validated',
-      status: 200,
-      data: result,
-    });
-  } catch (error: any) {
-    const status = error.response?.status || 0;
-    let message = error.response?.data?.message || error.message || 'Connection failed';
-
-    if (status === 401) {
-      message = 'Authentication failed — check your username and API key';
-    } else if (status === 404) {
-      message = 'Endpoint not found — check your Assetic site URL (should be e.g. https://yoursite.assetic.net)';
-    }
-
-    res.json({ success: false, message, status });
-  }
-});
+  },
+);
 
 /**
  * GET /api/admin/settings/assetic-rate-limit
@@ -138,28 +158,64 @@ router.post('/settings/test-assetic', async (req: AuthRequest, res: Response) =>
  * The frontend polls this to show toast notifications.
  * Includes per-worker breakdown when multiple workers are configured.
  */
-router.get('/settings/assetic-rate-limit', async (_req: AuthRequest, res: Response) => {
-  try {
-    const status = asseticClient.getRateLimitStatus();
-    res.json(status);
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to retrieve rate limit status' });
-  }
-});
+router.get(
+  "/settings/assetic-rate-limit",
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const status = asseticClient.getRateLimitStatus();
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to retrieve rate limit status" });
+    }
+  },
+);
 
 /**
  * POST /api/admin/settings/assetic-refresh-workers
  * Force-reload the worker pool configuration from DB settings.
  */
-router.post('/settings/assetic-refresh-workers', async (_req: AuthRequest, res: Response) => {
-  try {
-    await asseticClient.refreshWorkerPool();
-    const status = asseticClient.getRateLimitStatus();
-    res.json({ message: 'Worker pool refreshed', status });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to refresh worker pool' });
-  }
-});
+router.post(
+  "/settings/assetic-refresh-workers",
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      await asseticClient.refreshWorkerPool();
+      const status = asseticClient.getRateLimitStatus();
+      res.json({ message: "Worker pool refreshed", status });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to refresh worker pool" });
+    }
+  },
+);
+
+/**
+ * GET /api/admin/settings/assetic-location-hierarchy
+ * Return region/site/building hierarchy for visual review in settings.
+ * Pass ?refresh=true to force an immediate refresh from Assetic.
+ */
+router.get(
+  "/settings/assetic-location-hierarchy",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+
+      const forceRefresh =
+        String(req.query.refresh || "").toLowerCase() === "true";
+      const hierarchy = forceRefresh
+        ? await asseticLocationHierarchyService.refreshFromAssetic()
+        : await asseticLocationHierarchyService.getOrRefresh();
+
+      res.json(hierarchy);
+    } catch (error: any) {
+      console.error("Error fetching Assetic location hierarchy:", error);
+      res.status(500).json({ error: "Failed to fetch location hierarchy" });
+    }
+  },
+);
 
 // ═══════════════════════════════════════════════════════════════════════
 // USER MANAGEMENT
@@ -169,16 +225,29 @@ router.post('/settings/assetic-refresh-workers', async (_req: AuthRequest, res: 
  * GET /api/admin/users
  * List all users
  */
-router.get('/users', async (req: AuthRequest, res: Response) => {
+router.get("/users", async (req: AuthRequest, res: Response) => {
   try {
-    const users = await db('users')
-      .select('id', 'username', 'email', 'first_name', 'last_name', 'role', 'auth_provider', 'is_active', 'department', 'phone', 'created_at', 'updated_at')
-      .orderBy('created_at', 'desc');
+    const users = await db("users")
+      .select(
+        "id",
+        "username",
+        "email",
+        "first_name",
+        "last_name",
+        "role",
+        "auth_provider",
+        "is_active",
+        "department",
+        "phone",
+        "created_at",
+        "updated_at",
+      )
+      .orderBy("created_at", "desc");
 
     res.json({ users });
   } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
@@ -187,15 +256,15 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
  * Create a new local user
  */
 router.post(
-  '/users',
+  "/users",
   [
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 6 }),
-    body('firstName').optional().trim(),
-    body('lastName').optional().trim(),
-    body('role').optional().isIn(['admin', 'manager', 'user']),
-    body('department').optional().trim(),
-    body('phone').optional().trim(),
+    body("email").isEmail().normalizeEmail(),
+    body("password").isLength({ min: 6 }),
+    body("firstName").optional().trim(),
+    body("lastName").optional().trim(),
+    body("role").optional().isIn(["admin", "manager", "user"]),
+    body("department").optional().trim(),
+    body("phone").optional().trim(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -204,43 +273,44 @@ router.post(
     }
 
     try {
-      const { email, password, firstName, lastName, role, department, phone } = req.body;
+      const { email, password, firstName, lastName, role, department, phone } =
+        req.body;
 
       // Check if user already exists
-      const existing = await db('users').where('email', email).first();
+      const existing = await db("users").where("email", email).first();
       if (existing) {
-        return res.status(409).json({ error: 'Email already exists' });
+        return res.status(409).json({ error: "Email already exists" });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
-      const username = email.split('@')[0]; // derive username from email
+      const username = email.split("@")[0]; // derive username from email
 
-      const [inserted] = await db('users')
+      const [inserted] = await db("users")
         .insert({
           username,
           email,
           password_hash: passwordHash,
           first_name: firstName || null,
           last_name: lastName || null,
-          role: role || 'user',
-          auth_provider: 'local',
+          role: role || "user",
+          auth_provider: "local",
           is_active: true,
           department: department || null,
           phone: phone || null,
         })
-        .returning('*');
+        .returning("*");
 
       let user = inserted;
-      if (!user || typeof user === 'number') {
-        const id = typeof user === 'number' ? user : (user as any);
-        user = await db('users').where('id', id).first();
+      if (!user || typeof user === "number") {
+        const id = typeof user === "number" ? user : (user as any);
+        user = await db("users").where("id", id).first();
       }
 
       await activityService.log({
-        entity_type: 'user',
+        entity_type: "user",
         entity_id: user.id,
-        action: 'created',
-        details: { email, role: role || 'user' },
+        action: "created",
+        details: { email, role: role || "user" },
         performed_by: req.user.id,
       });
 
@@ -256,10 +326,10 @@ router.post(
         },
       });
     } catch (error) {
-      console.error('Error creating user:', error);
-      res.status(500).json({ error: 'Failed to create user' });
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user" });
     }
-  }
+  },
 );
 
 /**
@@ -267,16 +337,16 @@ router.post(
  * Update a user
  */
 router.put(
-  '/users/:id',
+  "/users/:id",
   [
-    body('email').optional().isEmail().normalizeEmail(),
-    body('firstName').optional().trim(),
-    body('lastName').optional().trim(),
-    body('role').optional().isIn(['admin', 'manager', 'user']),
-    body('isActive').optional().isBoolean(),
-    body('password').optional().isLength({ min: 6 }),
-    body('department').optional().trim(),
-    body('phone').optional().trim(),
+    body("email").optional().isEmail().normalizeEmail(),
+    body("firstName").optional().trim(),
+    body("lastName").optional().trim(),
+    body("role").optional().isIn(["admin", "manager", "user"]),
+    body("isActive").optional().isBoolean(),
+    body("password").optional().isLength({ min: 6 }),
+    body("department").optional().trim(),
+    body("phone").optional().trim(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -286,11 +356,20 @@ router.put(
 
     try {
       const { id } = req.params;
-      const { email, firstName, lastName, role, isActive, password, department, phone } = req.body;
+      const {
+        email,
+        firstName,
+        lastName,
+        role,
+        isActive,
+        password,
+        department,
+        phone,
+      } = req.body;
 
-      const existing = await db('users').where('id', id).first();
+      const existing = await db("users").where("id", id).first();
       if (!existing) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ error: "User not found" });
       }
 
       const updateData: any = { updated_at: db.fn.now() };
@@ -305,55 +384,74 @@ router.put(
         updateData.password_hash = await bcrypt.hash(password, 10);
       }
 
-      await db('users').where('id', id).update(updateData);
+      await db("users").where("id", id).update(updateData);
 
       await activityService.log({
-        entity_type: 'user',
+        entity_type: "user",
         entity_id: Number(id),
-        action: 'updated',
-        details: { fields: Object.keys(updateData).filter((k) => k !== 'updated_at' && k !== 'password_hash') },
+        action: "updated",
+        details: {
+          fields: Object.keys(updateData).filter(
+            (k) => k !== "updated_at" && k !== "password_hash",
+          ),
+        },
         performed_by: req.user.id,
       });
 
-      const updated = await db('users')
-        .where('id', id)
-        .select('id', 'username', 'email', 'first_name', 'last_name', 'role', 'auth_provider', 'is_active', 'department', 'phone')
+      const updated = await db("users")
+        .where("id", id)
+        .select(
+          "id",
+          "username",
+          "email",
+          "first_name",
+          "last_name",
+          "role",
+          "auth_provider",
+          "is_active",
+          "department",
+          "phone",
+        )
         .first();
 
       res.json({ user: updated });
     } catch (error) {
-      console.error('Error updating user:', error);
-      res.status(500).json({ error: 'Failed to update user' });
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
     }
-  }
+  },
 );
 
 /**
  * DELETE /api/admin/users/:id
  * Deactivate a user (soft delete)
  */
-router.delete('/users/:id', async (req: AuthRequest, res: Response) => {
+router.delete("/users/:id", async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
     // Prevent self-deletion
     if (Number(id) === req.user.id) {
-      return res.status(400).json({ error: 'Cannot deactivate your own account' });
+      return res
+        .status(400)
+        .json({ error: "Cannot deactivate your own account" });
     }
 
-    await db('users').where('id', id).update({ is_active: false, updated_at: db.fn.now() });
+    await db("users")
+      .where("id", id)
+      .update({ is_active: false, updated_at: db.fn.now() });
 
     await activityService.log({
-      entity_type: 'user',
+      entity_type: "user",
       entity_id: Number(id),
-      action: 'deactivated',
+      action: "deactivated",
       performed_by: req.user.id,
     });
 
-    res.json({ message: 'User deactivated' });
+    res.json({ message: "User deactivated" });
   } catch (error) {
-    console.error('Error deactivating user:', error);
-    res.status(500).json({ error: 'Failed to deactivate user' });
+    console.error("Error deactivating user:", error);
+    res.status(500).json({ error: "Failed to deactivate user" });
   }
 });
 
@@ -365,14 +463,14 @@ router.delete('/users/:id', async (req: AuthRequest, res: Response) => {
  * GET /api/admin/activity
  * Get recent activity log
  */
-router.get('/activity', async (req: AuthRequest, res: Response) => {
+router.get("/activity", async (req: AuthRequest, res: Response) => {
   try {
     const { limit = 50 } = req.query;
     const activity = await activityService.getRecent(Number(limit));
     res.json({ activity });
   } catch (error) {
-    console.error('Error fetching activity log:', error);
-    res.status(500).json({ error: 'Failed to fetch activity log' });
+    console.error("Error fetching activity log:", error);
+    res.status(500).json({ error: "Failed to fetch activity log" });
   }
 });
 
@@ -384,29 +482,36 @@ router.get('/activity', async (req: AuthRequest, res: Response) => {
  * GET /api/admin/stats
  * Get dashboard statistics
  */
-router.get('/stats', async (req: AuthRequest, res: Response) => {
+router.get("/stats", async (req: AuthRequest, res: Response) => {
   try {
-    const [requestStats] = await db('maintenance_requests')
-      .select(
-        db.raw('COUNT(*) as total'),
-        db.raw("COUNT(CASE WHEN status = 'open' THEN 1 END) as open_count"),
-        db.raw("COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_count"),
-        db.raw("COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count")
-      );
+    const [requestStats] = await db("maintenance_requests").select(
+      db.raw("COUNT(*) as total"),
+      db.raw("COUNT(CASE WHEN status = 'open' THEN 1 END) as open_count"),
+      db.raw(
+        "COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_count",
+      ),
+      db.raw(
+        "COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count",
+      ),
+    );
 
-    const [workOrderStats] = await db('work_orders')
-      .select(
-        db.raw('COUNT(*) as total'),
-        db.raw("COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count"),
-        db.raw("COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_count"),
-        db.raw("COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count")
-      );
+    const [workOrderStats] = await db("work_orders").select(
+      db.raw("COUNT(*) as total"),
+      db.raw("COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count"),
+      db.raw(
+        "COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_count",
+      ),
+      db.raw(
+        "COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count",
+      ),
+    );
 
-    const [userStats] = await db('users')
-      .select(
-        db.raw('COUNT(*) as total'),
-        db.raw("COUNT(CASE WHEN is_active = 1 OR is_active = true THEN 1 END) as active_count")
-      );
+    const [userStats] = await db("users").select(
+      db.raw("COUNT(*) as total"),
+      db.raw(
+        "COUNT(CASE WHEN is_active = 1 OR is_active = true THEN 1 END) as active_count",
+      ),
+    );
 
     res.json({
       requests: requestStats,
@@ -414,8 +519,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       users: userStats,
     });
   } catch (error) {
-    console.error('Error fetching stats:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ error: "Failed to fetch statistics" });
   }
 });
 
@@ -429,9 +534,19 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
  * Supports filters: entityType, entityGuid, httpStatus, status,
  * performedBy, from, to, limit, offset
  */
-router.get('/api-logs', async (req: AuthRequest, res: Response) => {
+router.get("/api-logs", async (req: AuthRequest, res: Response) => {
   try {
-    const { entityType, entityGuid, httpStatus, status, performedBy, from, to, limit = 100, offset = 0 } = req.query;
+    const {
+      entityType,
+      entityGuid,
+      httpStatus,
+      status,
+      performedBy,
+      from,
+      to,
+      limit = 100,
+      offset = 0,
+    } = req.query;
 
     const params = {
       entityType: entityType as any,
@@ -452,8 +567,8 @@ router.get('/api-logs', async (req: AuthRequest, res: Response) => {
 
     res.json({ logs, total, limit: params.limit, offset: params.offset });
   } catch (error) {
-    console.error('Error fetching API logs:', error);
-    res.status(500).json({ error: 'Failed to fetch API logs' });
+    console.error("Error fetching API logs:", error);
+    res.status(500).json({ error: "Failed to fetch API logs" });
   }
 });
 
@@ -461,16 +576,16 @@ router.get('/api-logs', async (req: AuthRequest, res: Response) => {
  * GET /api/admin/api-logs/:id
  * Get a single API log entry with full request/response payloads.
  */
-router.get('/api-logs/:id', async (req: AuthRequest, res: Response) => {
+router.get("/api-logs/:id", async (req: AuthRequest, res: Response) => {
   try {
     const log = await asseticApiLogger.getById(Number(req.params.id));
     if (!log) {
-      return res.status(404).json({ error: 'Log entry not found' });
+      return res.status(404).json({ error: "Log entry not found" });
     }
     res.json(log);
   } catch (error) {
-    console.error('Error fetching API log entry:', error);
-    res.status(500).json({ error: 'Failed to fetch API log entry' });
+    console.error("Error fetching API log entry:", error);
+    res.status(500).json({ error: "Failed to fetch API log entry" });
   }
 });
 
@@ -478,14 +593,17 @@ router.get('/api-logs/:id', async (req: AuthRequest, res: Response) => {
  * DELETE /api/admin/api-logs/purge
  * Purge API log entries older than `days` (default 30).
  */
-router.delete('/api-logs/purge', async (req: AuthRequest, res: Response) => {
+router.delete("/api-logs/purge", async (req: AuthRequest, res: Response) => {
   try {
     const days = Number(req.query.days) || 30;
     const deleted = await asseticApiLogger.purgeOlderThan(days);
-    res.json({ message: `Purged ${deleted} log entries older than ${days} days`, deleted });
+    res.json({
+      message: `Purged ${deleted} log entries older than ${days} days`,
+      deleted,
+    });
   } catch (error) {
-    console.error('Error purging API logs:', error);
-    res.status(500).json({ error: 'Failed to purge API logs' });
+    console.error("Error purging API logs:", error);
+    res.status(500).json({ error: "Failed to purge API logs" });
   }
 });
 
