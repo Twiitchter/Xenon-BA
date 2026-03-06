@@ -1,11 +1,12 @@
-import axios from 'axios';
-import { authService } from './authService';
+import axios from "axios";
+import { authService } from "./authService";
 
-const API_URL = '/api';
+const API_URL = "/api";
 
 interface GenerateReportParams {
   status?: string;
   category?: string;
+  location?: string;
   assetId?: number;
   startDate?: string;
   endDate?: string;
@@ -27,7 +28,12 @@ class ReportService {
     return response.data;
   }
 
-  async sendEmail(data: { to: string; subject: string; body: string; attachmentFileName?: string }) {
+  async sendEmail(data: {
+    to: string;
+    subject: string;
+    body: string;
+    attachmentFileName?: string;
+  }) {
     const response = await axios.post(`${API_URL}/reports/email`, data, {
       headers: authService.getAuthHeader(),
     });

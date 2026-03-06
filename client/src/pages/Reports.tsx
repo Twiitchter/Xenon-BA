@@ -1,38 +1,66 @@
-import React, { useState } from 'react';
-import { reportService } from '../services/reportService';
+import React, { useState } from "react";
+import { reportService } from "../services/reportService";
+import { maintenanceService } from "../services/maintenanceService";
+import LocationHierarchyPicker, {
+  EMPTY_LOCATION_SELECTION,
+  LocationSelection,
+  buildLocationPath,
+} from "../components/LocationHierarchyPicker";
 
 const Reports: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'assets' | 'changes'>('assets');
+  const [activeTab, setActiveTab] = useState<"assets" | "changes">("assets");
   const [assetFilters, setAssetFilters] = useState({
-    status: '',
-    category: '',
-    email: '',
+    status: "",
+    category: "",
+    email: "",
   });
   const [changeFilters, setChangeFilters] = useState({
-    assetId: '',
-    startDate: '',
-    endDate: '',
-    email: '',
+    assetId: "",
+    startDate: "",
+    endDate: "",
+    email: "",
   });
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [locationHierarchy, setLocationHierarchy] = useState<any | null>(null);
+  const [locationSelection, setLocationSelection] = useState<LocationSelection>(
+    EMPTY_LOCATION_SELECTION,
+  );
+
+  React.useEffect(() => {
+    void (async () => {
+      try {
+        const data = await maintenanceService.getLocationHierarchy();
+        setLocationHierarchy(data);
+      } catch {
+        // Optional enhancement only.
+      }
+    })();
+  }, []);
 
   const handleAssetReportGenerate = async () => {
     setLoading(true);
-    setMessage('');
-    setError('');
+    setMessage("");
+    setError("");
 
     try {
-      const result = await reportService.generateAssetReport(assetFilters);
+      const selectedPath = buildLocationPath(
+        locationHierarchy,
+        locationSelection,
+      );
+      const result = await reportService.generateAssetReport({
+        ...assetFilters,
+        location: selectedPath || undefined,
+      });
       setMessage(result.message);
-      
+
       if (result.downloadUrl && !assetFilters.email) {
         // Open download URL in new tab
-        window.open(result.downloadUrl, '_blank');
+        window.open(result.downloadUrl, "_blank");
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to generate report');
+      setError(err.response?.data?.error || "Failed to generate report");
     } finally {
       setLoading(false);
     }
@@ -40,22 +68,24 @@ const Reports: React.FC = () => {
 
   const handleChangeReportGenerate = async () => {
     setLoading(true);
-    setMessage('');
-    setError('');
+    setMessage("");
+    setError("");
 
     try {
       const result = await reportService.generateChangeReport({
         ...changeFilters,
-        assetId: changeFilters.assetId ? Number(changeFilters.assetId) : undefined,
+        assetId: changeFilters.assetId
+          ? Number(changeFilters.assetId)
+          : undefined,
       });
       setMessage(result.message);
-      
+
       if (result.downloadUrl && !changeFilters.email) {
         // Open download URL in new tab
-        window.open(result.downloadUrl, '_blank');
+        window.open(result.downloadUrl, "_blank");
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to generate report');
+      setError(err.response?.data?.error || "Failed to generate report");
     } finally {
       setLoading(false);
     }
@@ -66,26 +96,26 @@ const Reports: React.FC = () => {
       <h2>Reports</h2>
 
       <div className="card">
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
           <button
-            onClick={() => setActiveTab('assets')}
+            onClick={() => setActiveTab("assets")}
             style={{
-              backgroundColor: activeTab === 'assets' ? '#007bff' : '#6c757d',
+              backgroundColor: activeTab === "assets" ? "#007bff" : "#6c757d",
             }}
           >
             Asset Reports
           </button>
           <button
-            onClick={() => setActiveTab('changes')}
+            onClick={() => setActiveTab("changes")}
             style={{
-              backgroundColor: activeTab === 'changes' ? '#007bff' : '#6c757d',
+              backgroundColor: activeTab === "changes" ? "#007bff" : "#6c757d",
             }}
           >
             Change Reports
           </button>
         </div>
 
-        {activeTab === 'assets' && (
+        {activeTab === "assets" && (
           <div>
             <h3>Generate Asset Report</h3>
             <p>Create a PDF report of assets with optional filters.</p>
@@ -121,6 +151,35 @@ const Reports: React.FC = () => {
             </div>
 
             <div className="form-group">
+              <label>Location Filter (optional)</label>
+              {locationHierarchy ? (
+                <>
+                  <LocationHierarchyPicker
+                    hierarchy={locationHierarchy}
+                    selection={locationSelection}
+                    onChange={setLocationSelection}
+                  />
+                  {buildLocationPath(locationHierarchy, locationSelection) && (
+                    <div
+                      className="settings-muted"
+                      style={{ marginBottom: "8px" }}
+                    >
+                      Selected path:{" "}
+                      <strong>
+                        {buildLocationPath(
+                          locationHierarchy,
+                          locationSelection,
+                        )}
+                      </strong>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="settings-muted">Hierarchy not available.</div>
+              )}
+            </div>
+
+            <div className="form-group">
               <label>Email (optional - leave empty to download directly)</label>
               <input
                 type="email"
@@ -133,12 +192,12 @@ const Reports: React.FC = () => {
             </div>
 
             <button onClick={handleAssetReportGenerate} disabled={loading}>
-              {loading ? 'Generating...' : 'Generate Report'}
+              {loading ? "Generating..." : "Generate Report"}
             </button>
           </div>
         )}
 
-        {activeTab === 'changes' && (
+        {activeTab === "changes" && (
           <div>
             <h3>Generate Change Report</h3>
             <p>Create a PDF report of asset changes with optional filters.</p>
@@ -149,7 +208,10 @@ const Reports: React.FC = () => {
                 type="number"
                 value={changeFilters.assetId}
                 onChange={(e) =>
-                  setChangeFilters({ ...changeFilters, assetId: e.target.value })
+                  setChangeFilters({
+                    ...changeFilters,
+                    assetId: e.target.value,
+                  })
                 }
                 placeholder="Leave empty for all assets"
               />
@@ -161,7 +223,10 @@ const Reports: React.FC = () => {
                 type="date"
                 value={changeFilters.startDate}
                 onChange={(e) =>
-                  setChangeFilters({ ...changeFilters, startDate: e.target.value })
+                  setChangeFilters({
+                    ...changeFilters,
+                    startDate: e.target.value,
+                  })
                 }
               />
             </div>
@@ -172,7 +237,10 @@ const Reports: React.FC = () => {
                 type="date"
                 value={changeFilters.endDate}
                 onChange={(e) =>
-                  setChangeFilters({ ...changeFilters, endDate: e.target.value })
+                  setChangeFilters({
+                    ...changeFilters,
+                    endDate: e.target.value,
+                  })
                 }
               />
             </div>
@@ -190,18 +258,26 @@ const Reports: React.FC = () => {
             </div>
 
             <button onClick={handleChangeReportGenerate} disabled={loading}>
-              {loading ? 'Generating...' : 'Generate Report'}
+              {loading ? "Generating..." : "Generate Report"}
             </button>
           </div>
         )}
 
-        {message && <div className="success" style={{ marginTop: '20px' }}>{message}</div>}
-        {error && <div className="error" style={{ marginTop: '20px' }}>{error}</div>}
+        {message && (
+          <div className="success" style={{ marginTop: "20px" }}>
+            {message}
+          </div>
+        )}
+        {error && (
+          <div className="error" style={{ marginTop: "20px" }}>
+            {error}
+          </div>
+        )}
       </div>
 
       <div className="card">
         <h3>About Reports</h3>
-        <ul style={{ marginLeft: '20px' }}>
+        <ul style={{ marginLeft: "20px" }}>
           <li>Reports are generated as PDF files</li>
           <li>You can download reports directly or have them emailed to you</li>
           <li>Asset reports include current asset information</li>

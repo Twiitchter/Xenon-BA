@@ -14,7 +14,8 @@
     "migrate": "ts-node src/server/database/migrate.ts",
     "migrate:rollback": "ts-node src/server/database/migrate.ts rollback",
     "docker:dev": "bash docker-dev.sh up --build",
-    "docker:dev:down": "bash docker-dev.sh down"
+    "docker:dev:down": "bash docker-dev.sh down",
+    "reboot": "bash docker-dev.sh down --remove-orphans && bash docker-dev.sh up --build --force-recreate"
   },
   "dependencies": {
     "@node-saml/passport-saml": "^5.1.0",

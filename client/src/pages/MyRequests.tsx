@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { maintenanceService } from "../services/maintenanceService";
+import LocationHierarchyPicker, {
+  EMPTY_LOCATION_SELECTION,
+  LocationSelection,
+  buildLocationPath,
+} from "../components/LocationHierarchyPicker";
 
 interface MyItem {
   id: number;
@@ -38,6 +43,10 @@ const MyRequests: React.FC = () => {
   const [filters, setFilters] = useState({ status: "", priority: "" });
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [locationHierarchy, setLocationHierarchy] = useState<any | null>(null);
+  const [locationSelection, setLocationSelection] = useState<LocationSelection>(
+    EMPTY_LOCATION_SELECTION,
+  );
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -54,7 +63,17 @@ const MyRequests: React.FC = () => {
 
   useEffect(() => {
     fetchMyItems();
+    void fetchHierarchy();
   }, []);
+
+  const fetchHierarchy = async () => {
+    try {
+      const data = await maintenanceService.getLocationHierarchy();
+      setLocationHierarchy(data);
+    } catch {
+      // Hierarchy is optional for non-Assetic environments.
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -86,7 +105,21 @@ const MyRequests: React.FC = () => {
     setCreating(true);
 
     try {
-      await maintenanceService.createRequest(formData);
+      const selectedPath = buildLocationPath(
+        locationHierarchy,
+        locationSelection,
+      );
+      const freeTextLocation = formData.location.trim();
+      const combinedLocation = selectedPath
+        ? freeTextLocation
+          ? `${selectedPath} - ${freeTextLocation}`
+          : selectedPath
+        : freeTextLocation;
+
+      await maintenanceService.createRequest({
+        ...formData,
+        location: combinedLocation,
+      });
       setFormData({
         title: "",
         description: "",
@@ -94,6 +127,7 @@ const MyRequests: React.FC = () => {
         category: "",
         location: "",
       });
+      setLocationSelection(EMPTY_LOCATION_SELECTION);
       setShowCreateForm(false);
 
       // Remove deep-link flag after successful create.
@@ -265,13 +299,36 @@ const MyRequests: React.FC = () => {
 
             <div className="form-group">
               <label>Location</label>
+              {locationHierarchy && (
+                <>
+                  <LocationHierarchyPicker
+                    hierarchy={locationHierarchy}
+                    selection={locationSelection}
+                    onChange={setLocationSelection}
+                  />
+                  {buildLocationPath(locationHierarchy, locationSelection) && (
+                    <div
+                      className="settings-muted"
+                      style={{ marginBottom: "8px" }}
+                    >
+                      Selected hierarchy path:{" "}
+                      <strong>
+                        {buildLocationPath(
+                          locationHierarchy,
+                          locationSelection,
+                        )}
+                      </strong>
+                    </div>
+                  )}
+                </>
+              )}
               <input
                 type="text"
                 value={formData.location}
                 onChange={(e) =>
                   setFormData({ ...formData, location: e.target.value })
                 }
-                placeholder="e.g. Building A, Room 204"
+                placeholder="Additional location notes"
               />
             </div>
 

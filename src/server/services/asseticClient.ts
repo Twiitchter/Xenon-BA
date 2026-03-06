@@ -175,6 +175,103 @@ class AsseticClient {
     return asseticWorkerPool.refresh();
   }
 
+  /**
+   * Fetch OData $metadata XML from the Assetic instance.
+   * This reveals the internal field names (Property Name) for all
+   * entity types including assets and functionallocations.
+   *
+   * The OData endpoint lives at {siteUrl}/odata/$metadata — outside
+   * the normal /api/v2/ prefix — so we build a one-off Axios call
+   * through the worker pool to reuse credentials + rate-limiting.
+   */
+  async getODataMetadata(): Promise<string> {
+    return this.call(async (client) => {
+      // The worker's client baseURL is {siteUrl}/api/{version}.
+      // We need {siteUrl}/odata/$metadata, so derive the site root.
+      const baseURL = client.defaults.baseURL || "";
+      const siteRoot = baseURL.replace(/\/api\/[^/]+\/?$/, "");
+      const resp = await client.get(`${siteRoot}/odata/$metadata`, {
+        baseURL: "", // override so Axios uses the full URL
+        headers: {
+          ...client.defaults.headers.common,
+          Accept: "application/xml",
+        },
+        responseType: "text",
+      });
+      return resp.data as string;
+    }, "GET /odata/$metadata");
+  }
+
+  /**
+   * Parse the OData $metadata XML to find internal field names for
+   * an entity type (e.g. "functionallocations" or "assets").
+   *
+   * Returns a map of lowercase label → internal Property Name for
+   * fields whose label contains the search term (case-insensitive).
+   */
+  async discoverFieldNames(
+    entityType: string,
+    labelFilter: string,
+  ): Promise<Map<string, string>> {
+    const xml = await this.getODataMetadata();
+    const result = new Map<string, string>();
+
+    // The XML contains <EntityType Name="..."> blocks.
+    // Each has <Property Name="InternalName" ... /> elements
+    // with an annotation like:
+    //   <Annotation Term="..." String="User-Friendly Label" />
+    // We look for our entity type and then match labels.
+
+    const filterLower = labelFilter.toLowerCase();
+
+    // Find the EntityType block for our target
+    // OData metadata names the type with a capital first letter
+    // e.g. "Assets", "FunctionalLocations" etc.
+
+    // Extract all Property elements with their names and annotations
+    const propertyRegex =
+      /<Property\s+Name="([^"]+)"[^>]*(?:Type="([^"]*)")?[^>]*\/?>([\s\S]*?)(?:<\/Property>|(?=<Property\s|<\/EntityType>|<NavigationProperty))/gi;
+    const annotationRegex = /<Annotation[^>]*String="([^"]*)"[^>]*\/?>/gi;
+
+    // Find entity type section
+    const entityTypeRegex = new RegExp(
+      `<EntityType\\s+Name="[^"]*${entityType}[^"]*"[^>]*>([\\s\\S]*?)</EntityType>`,
+      "gi",
+    );
+
+    let entityMatch: RegExpExecArray | null;
+    while ((entityMatch = entityTypeRegex.exec(xml)) !== null) {
+      const block = entityMatch[1];
+
+      let propMatch: RegExpExecArray | null;
+      const propRegex = /<Property\s+Name="([^"]+)"[^>]*\/?>/gi;
+
+      // Re-scan with a simpler approach: find each Property name,
+      // then check if any nearby annotation string matches our filter
+      const lines = block.split("\n");
+      let currentPropName = "";
+
+      for (const line of lines) {
+        const propNameMatch = line.match(/<Property\s+Name="([^"]+)"/i);
+        if (propNameMatch) {
+          currentPropName = propNameMatch[1];
+        }
+
+        const annMatch = line.match(
+          /<Annotation[^>]*String="([^"]*)"[^>]*\/?>/i,
+        );
+        if (annMatch && currentPropName) {
+          const label = annMatch[1];
+          if (label.toLowerCase().includes(filterLower)) {
+            result.set(label.toLowerCase(), currentPropName);
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // AUTH / CONNECTION TEST
   // ═══════════════════════════════════════════════════════════════════

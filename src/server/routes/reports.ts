@@ -1,9 +1,9 @@
-import { Router, Response } from 'express';
-import { body, validationResult } from 'express-validator';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
-import pdfService from '../services/pdfService';
-import emailService from '../services/emailService';
-import db from '../database';
+import { Router, Response } from "express";
+import { body, validationResult } from "express-validator";
+import { authenticateToken, AuthRequest } from "../middleware/auth";
+import pdfService from "../services/pdfService";
+import emailService from "../services/emailService";
+import db from "../database";
 
 const router = Router();
 
@@ -14,22 +14,26 @@ router.use(authenticateToken);
  * POST /api/reports/assets
  * Generate PDF report for assets
  */
-router.post('/assets', async (req: AuthRequest, res: Response) => {
+router.post("/assets", async (req: AuthRequest, res: Response) => {
   try {
-    const { status, category, email } = req.body;
+    const { status, category, location, email } = req.body;
 
     // Fetch assets based on filters
-    let qb = db('assets');
+    let qb = db("assets");
 
     if (status) {
-      qb = qb.where('status', status);
+      qb = qb.where("status", status);
     }
 
     if (category) {
-      qb = qb.where('category', category);
+      qb = qb.where("category", category);
     }
 
-    const assets = await qb.orderBy('created_at', 'desc');
+    if (location) {
+      qb = qb.where("location", "like", `%${location}%`);
+    }
+
+    const assets = await qb.orderBy("created_at", "desc");
 
     // Generate PDF
     const fileName = await pdfService.generateAssetReport(assets);
@@ -38,32 +42,32 @@ router.post('/assets', async (req: AuthRequest, res: Response) => {
     // Log report generation
     await pdfService.logReport(
       {
-        title: 'Asset Report',
-        type: 'assets',
+        title: "Asset Report",
+        type: "assets",
         generatedBy: req.user.id,
-        data: { status, category, assetCount: assets.length },
+        data: { status, category, location, assetCount: assets.length },
       },
       fileName,
-      'success'
+      "success",
     );
 
     // Send email if requested
     if (email) {
       await emailService.sendAssetReport(email, fileName, filePath);
       return res.json({
-        message: 'Report generated and emailed successfully',
+        message: "Report generated and emailed successfully",
         fileName,
       });
     }
 
     res.json({
-      message: 'Report generated successfully',
+      message: "Report generated successfully",
       fileName,
       downloadUrl: `/api/reports/download/${fileName}`,
     });
   } catch (error) {
-    console.error('Error generating asset report:', error);
-    res.status(500).json({ error: 'Failed to generate report' });
+    console.error("Error generating asset report:", error);
+    res.status(500).json({ error: "Failed to generate report" });
   }
 });
 
@@ -71,26 +75,26 @@ router.post('/assets', async (req: AuthRequest, res: Response) => {
  * POST /api/reports/changes
  * Generate PDF report for asset changes
  */
-router.post('/changes', async (req: AuthRequest, res: Response) => {
+router.post("/changes", async (req: AuthRequest, res: Response) => {
   try {
     const { assetId, startDate, endDate, email } = req.body;
 
     // Fetch changes based on filters
-    let qb = db('asset_changes');
+    let qb = db("asset_changes");
 
     if (assetId) {
-      qb = qb.where('asset_id', assetId);
+      qb = qb.where("asset_id", assetId);
     }
 
     if (startDate) {
-      qb = qb.where('changed_at', '>=', startDate);
+      qb = qb.where("changed_at", ">=", startDate);
     }
 
     if (endDate) {
-      qb = qb.where('changed_at', '<=', endDate);
+      qb = qb.where("changed_at", "<=", endDate);
     }
 
-    const changes = await qb.orderBy('changed_at', 'desc');
+    const changes = await qb.orderBy("changed_at", "desc");
 
     // Generate PDF
     const fileName = await pdfService.generateChangeReport(changes);
@@ -99,32 +103,32 @@ router.post('/changes', async (req: AuthRequest, res: Response) => {
     // Log report generation
     await pdfService.logReport(
       {
-        title: 'Change Report',
-        type: 'changes',
+        title: "Change Report",
+        type: "changes",
         generatedBy: req.user.id,
         data: { assetId, startDate, endDate, changeCount: changes.length },
       },
       fileName,
-      'success'
+      "success",
     );
 
     // Send email if requested
     if (email) {
       await emailService.sendChangeNotification(email, changes, true, filePath);
       return res.json({
-        message: 'Report generated and emailed successfully',
+        message: "Report generated and emailed successfully",
         fileName,
       });
     }
 
     res.json({
-      message: 'Report generated successfully',
+      message: "Report generated successfully",
       fileName,
       downloadUrl: `/api/reports/download/${fileName}`,
     });
   } catch (error) {
-    console.error('Error generating change report:', error);
-    res.status(500).json({ error: 'Failed to generate report' });
+    console.error("Error generating change report:", error);
+    res.status(500).json({ error: "Failed to generate report" });
   }
 });
 
@@ -132,21 +136,21 @@ router.post('/changes', async (req: AuthRequest, res: Response) => {
  * GET /api/reports/download/:fileName
  * Download a generated report
  */
-router.get('/download/:fileName', async (req: AuthRequest, res: Response) => {
+router.get("/download/:fileName", async (req: AuthRequest, res: Response) => {
   try {
     const { fileName } = req.params;
     const filePath = pdfService.getReportPath(fileName);
 
     // Check if file exists
-    const fs = require('fs');
+    const fs = require("fs");
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Report not found' });
+      return res.status(404).json({ error: "Report not found" });
     }
 
     res.download(filePath, fileName);
   } catch (error) {
-    console.error('Error downloading report:', error);
-    res.status(500).json({ error: 'Failed to download report' });
+    console.error("Error downloading report:", error);
+    res.status(500).json({ error: "Failed to download report" });
   }
 });
 
@@ -155,11 +159,11 @@ router.get('/download/:fileName', async (req: AuthRequest, res: Response) => {
  * Send an email with optional PDF attachment
  */
 router.post(
-  '/email',
+  "/email",
   [
-    body('to').isEmail().normalizeEmail(),
-    body('subject').isLength({ min: 1 }).trim(),
-    body('body').isLength({ min: 1 }),
+    body("to").isEmail().normalizeEmail(),
+    body("subject").isLength({ min: 1 }).trim(),
+    body("body").isLength({ min: 1 }),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -181,12 +185,12 @@ router.post(
         });
       }
 
-      res.json({ message: 'Email sent successfully' });
+      res.json({ message: "Email sent successfully" });
     } catch (error) {
-      console.error('Error sending email:', error);
-      res.status(500).json({ error: 'Failed to send email' });
+      console.error("Error sending email:", error);
+      res.status(500).json({ error: "Failed to send email" });
     }
-  }
+  },
 );
 
 export default router;

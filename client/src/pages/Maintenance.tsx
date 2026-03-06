@@ -3,6 +3,11 @@ import {
   LocationHierarchyResponse,
   maintenanceService,
 } from "../services/maintenanceService";
+import LocationHierarchyPicker, {
+  EMPTY_LOCATION_SELECTION,
+  LocationSelection,
+  buildLocationPath,
+} from "../components/LocationHierarchyPicker";
 
 interface WorkRequestSource {
   id: string;
@@ -54,6 +59,9 @@ const Maintenance: React.FC = () => {
   const [asseticEnabled, setAsseticEnabled] = useState(false);
   const [locationHierarchy, setLocationHierarchy] =
     useState<LocationHierarchyResponse | null>(null);
+  const [locationSelection, setLocationSelection] = useState<LocationSelection>(
+    EMPTY_LOCATION_SELECTION,
+  );
 
   // Messages state
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(
@@ -115,7 +123,21 @@ const Maintenance: React.FC = () => {
     e.preventDefault();
     setError("");
     try {
-      await maintenanceService.createRequest(formData);
+      const selectedPath = buildLocationPath(
+        locationHierarchy,
+        locationSelection,
+      );
+      const freeTextLocation = formData.location.trim();
+      const combinedLocation = selectedPath
+        ? freeTextLocation
+          ? `${selectedPath} - ${freeTextLocation}`
+          : selectedPath
+        : freeTextLocation;
+
+      await maintenanceService.createRequest({
+        ...formData,
+        location: combinedLocation,
+      });
       setShowForm(false);
       setFormData({
         title: "",
@@ -136,6 +158,7 @@ const Maintenance: React.FC = () => {
         workRequestSourceId: "",
         workRequestSubtypeId: "",
       });
+      setLocationSelection(EMPTY_LOCATION_SELECTION);
       fetchRequests();
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to create request");
@@ -376,15 +399,35 @@ const Maintenance: React.FC = () => {
                 {locationHierarchy.source}).
               </div>
             )}
+            {locationHierarchy && (
+              <>
+                <LocationHierarchyPicker
+                  hierarchy={locationHierarchy}
+                  selection={locationSelection}
+                  onChange={setLocationSelection}
+                />
+                {buildLocationPath(locationHierarchy, locationSelection) && (
+                  <div
+                    className="settings-muted"
+                    style={{ marginBottom: "8px" }}
+                  >
+                    Selected hierarchy path:{" "}
+                    <strong>
+                      {buildLocationPath(locationHierarchy, locationSelection)}
+                    </strong>
+                  </div>
+                )}
+              </>
+            )}
             <div className="form-group">
-              <label>General Location</label>
+              <label>Additional Location Details</label>
               <input
                 type="text"
                 value={formData.location}
                 onChange={(e) =>
                   setFormData({ ...formData, location: e.target.value })
                 }
-                placeholder="e.g. Building A, Room 101"
+                placeholder="e.g. Room 101, opposite reception"
               />
             </div>
             <div style={{ display: "flex", gap: "10px" }}>

@@ -18,6 +18,13 @@ export interface LocationHierarchyBuilding {
   name: string;
   siteId: string;
   regionId: string;
+  floors?: {
+    id: string;
+    name: string;
+    buildingId: string;
+    siteId: string;
+    regionId: string;
+  }[];
 }
 
 export interface LocationHierarchySite {

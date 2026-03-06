@@ -19,6 +19,47 @@ dotenv.config();
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function initializeDatabaseWithRetry() {
+  const retryIntervalMs = parseInt(
+    process.env.STARTUP_RETRY_INTERVAL_MS || "5000",
+    10,
+  );
+  const defaultMaxAttempts = process.env.NODE_ENV === "production" ? 5 : 0;
+  const maxAttempts = parseInt(
+    process.env.STARTUP_MAX_ATTEMPTS || String(defaultMaxAttempts),
+    10,
+  );
+
+  let attempt = 0;
+  while (true) {
+    attempt += 1;
+    try {
+      await initializeDatabase();
+      return;
+    } catch (error) {
+      const attemptsText =
+        maxAttempts > 0 ? `${attempt}/${maxAttempts}` : `${attempt}`;
+      console.error(
+        `Database initialization failed (attempt ${attemptsText}).`,
+        error,
+      );
+
+      if (maxAttempts > 0 && attempt >= maxAttempts) {
+        throw error;
+      }
+
+      console.log(
+        `Retrying database initialization in ${Math.floor(retryIntervalMs / 1000)}s...`,
+      );
+      await sleep(retryIntervalMs);
+    }
+  }
+}
+
 // Middleware
 app.use(helmet());
 app.use(cors());
@@ -83,7 +124,7 @@ app.use(
 // Initialize database and start server
 async function startServer() {
   try {
-    await initializeDatabase();
+    await initializeDatabaseWithRetry();
     console.log("Database initialized successfully");
 
     // Load settings cache
