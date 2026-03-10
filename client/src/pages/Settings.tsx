@@ -10,11 +10,12 @@ interface SettingItem {
   description: string | null;
 }
 
-const categories = ["general", "assetic", "hierarchy", "sso", "email"];
+const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email"];
 const categoryLabels: Record<string, string> = {
   general: "General",
   assetic: "Assetic API",
   hierarchy: "Location Hierarchy",
+  sync: "Asset Sync",
   sso: "SSO / Authentication",
   email: "Email",
 };
@@ -32,6 +33,10 @@ const Settings: React.FC = () => {
   const [hierarchyError, setHierarchyError] = useState("");
   const [hierarchyData, setHierarchyData] =
     useState<AdminHierarchyResponse | null>(null);
+  const [syncStatus, setSyncStatus] = useState<any>(null);
+  const [syncLogs, setSyncLogs] = useState<any[]>([]);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncTriggering, setSyncTriggering] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchSettings();
@@ -54,6 +59,19 @@ const Settings: React.FC = () => {
       void fetchAsseticHierarchy(false);
     }
   }, [activeCategory, hierarchyData, hierarchyLoading]);
+
+  useEffect(() => {
+    if (activeCategory === "sync") {
+      void fetchSyncStatus();
+    }
+  }, [activeCategory]);
+
+  // Auto-refresh sync status while running
+  useEffect(() => {
+    if (activeCategory !== "sync" || !syncStatus?.isRunning) return;
+    const timer = setInterval(() => void fetchSyncStatus(), 3000);
+    return () => clearInterval(timer);
+  }, [activeCategory, syncStatus?.isRunning]);
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -168,6 +186,51 @@ const Settings: React.FC = () => {
     );
   };
 
+  const fetchSyncStatus = async () => {
+    setSyncLoading(true);
+    try {
+      const [status, logs] = await Promise.all([
+        adminService.getAssetSyncStatus(),
+        adminService.getAssetSyncLogs(10),
+      ]);
+      setSyncStatus(status);
+      setSyncLogs(logs);
+    } catch {
+      // ignore
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  const handleTriggerStep = async (
+    step: "full" | "fls" | "assets" | "enrichment",
+  ) => {
+    setSyncTriggering(step);
+    setError("");
+    setSuccess("");
+    const labels: Record<string, string> = {
+      full: "Full sync",
+      fls: "Functional location sync",
+      assets: "Asset sync",
+      enrichment: "FL enrichment",
+    };
+    try {
+      if (step === "full") await adminService.triggerAssetSync();
+      else if (step === "fls") await adminService.triggerFlSync();
+      else if (step === "assets") await adminService.triggerAssetOnlySync();
+      else await adminService.triggerFlEnrichment();
+      setSuccess(
+        `${labels[step]} started. Progress will update automatically.`,
+      );
+      setTimeout(() => setSuccess(""), 5000);
+      setTimeout(() => void fetchSyncStatus(), 2000);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || `Failed to start ${labels[step]}`);
+    } finally {
+      setSyncTriggering(null);
+    }
+  };
+
   const formatKey = (key: string) =>
     key
       .replace(/^(assetic_|sso_|email_|app_)/, "")
@@ -202,8 +265,222 @@ const Settings: React.FC = () => {
         </aside>
 
         <section className="card settings-panel">
-          {loading && activeCategory !== "hierarchy" ? (
+          {loading &&
+          activeCategory !== "hierarchy" &&
+          activeCategory !== "sync" ? (
             <div className="loading">Loading settings...</div>
+          ) : activeCategory === "sync" ? (
+            /* ── Asset Sync section ── */
+            <>
+              <h3 style={{ marginTop: 0 }}>Asset Sync</h3>
+              <p className="settings-muted">
+                Sync all assets from the Assetic API into the local database.
+                The system checks hourly if the API asset count differs from the
+                local count and triggers a sync automatically. After syncing
+                assets, each asset's functional location is fetched to build the
+                location hierarchy.
+              </p>
+
+              {/* Running banner */}
+              {syncStatus?.isRunning && (
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    marginBottom: "12px",
+                    background: "var(--bg-tertiary, #2a2a2a)",
+                    borderRadius: "6px",
+                    fontSize: "0.9em",
+                  }}
+                >
+                  ⏳ <strong>{syncStatus.syncType}</strong> running…{" "}
+                  {syncStatus.progress != null && `${syncStatus.progress}%`}
+                  {syncStatus.syncedCount != null &&
+                    syncStatus.totalCount != null &&
+                    ` (${syncStatus.syncedCount.toLocaleString()} / ${syncStatus.totalCount.toLocaleString()})`}
+                </div>
+              )}
+
+              {/* Step buttons */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                  gap: "8px",
+                  marginBottom: "16px",
+                }}
+              >
+                <button
+                  onClick={() => handleTriggerStep("full")}
+                  disabled={!!syncTriggering || syncStatus?.isRunning}
+                  title="Run all three steps in sequence"
+                >
+                  {syncTriggering === "full" ? "Starting…" : "Full Sync"}
+                </button>
+                <button
+                  className="btn-outline"
+                  onClick={() => handleTriggerStep("fls")}
+                  disabled={!!syncTriggering || syncStatus?.isRunning}
+                  title="Fetch all functional locations from /functionallocations"
+                >
+                  {syncTriggering === "fls" ? "Starting…" : "Sync FL List"}
+                </button>
+                <button
+                  className="btn-outline"
+                  onClick={() => handleTriggerStep("assets")}
+                  disabled={!!syncTriggering || syncStatus?.isRunning}
+                  title="Fetch all assets from /assets"
+                >
+                  {syncTriggering === "assets" ? "Starting…" : "Sync Assets"}
+                </button>
+                <button
+                  className="btn-outline"
+                  onClick={() => handleTriggerStep("enrichment")}
+                  disabled={!!syncTriggering || syncStatus?.isRunning}
+                  title="Fetch FL relationship per asset from /assets/{guid}/functionallocation"
+                >
+                  {syncTriggering === "enrichment"
+                    ? "Starting…"
+                    : "FL Enrichment"}
+                </button>
+                <button
+                  className="btn-outline"
+                  onClick={() => void fetchSyncStatus()}
+                  disabled={syncLoading}
+                >
+                  {syncLoading ? "Refreshing…" : "Refresh Status"}
+                </button>
+              </div>
+
+              {syncStatus && (
+                <div
+                  className="card"
+                  style={{ marginBottom: "16px", padding: "16px" }}
+                >
+                  <h4 style={{ marginTop: 0 }}>Current Status</h4>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "8px",
+                    }}
+                  >
+                    <div>
+                      <span className="settings-muted">API Assets:</span>{" "}
+                      <strong>{syncStatus.apiAssetCount ?? "–"}</strong>
+                    </div>
+                    <div>
+                      <span className="settings-muted">DB Assets:</span>{" "}
+                      <strong>{syncStatus.dbAssetCount ?? 0}</strong>
+                    </div>
+                    <div>
+                      <span className="settings-muted">Running:</span>{" "}
+                      <strong>
+                        {syncStatus.isRunning
+                          ? `Yes (${syncStatus.syncType})`
+                          : "No"}
+                      </strong>
+                    </div>
+                    {syncStatus.isRunning && (
+                      <div>
+                        <span className="settings-muted">Progress:</span>{" "}
+                        <strong>
+                          {syncStatus.syncedCount ?? 0} /{" "}
+                          {syncStatus.totalCount ?? "?"} (
+                          {syncStatus.progress ?? 0}%)
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {syncStatus.isRunning && syncStatus.progress != null && (
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        background: "var(--bg-tertiary, #333)",
+                        borderRadius: "4px",
+                        height: "8px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${syncStatus.progress}%`,
+                          height: "100%",
+                          background: "var(--accent, #4f8eff)",
+                          transition: "width 0.3s ease",
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {syncStatus.lastSync && (
+                    <div style={{ marginTop: "12px" }}>
+                      <span className="settings-muted">Last sync:</span>{" "}
+                      <strong>{syncStatus.lastSync.type}</strong> —{" "}
+                      {syncStatus.lastSync.status} (
+                      {syncStatus.lastSync.syncedCount ?? 0} synced
+                      {syncStatus.lastSync.errorCount
+                        ? `, ${syncStatus.lastSync.errorCount} errors`
+                        : ""}
+                      )
+                      {syncStatus.lastSync.completedAt &&
+                        ` — ${new Date(syncStatus.lastSync.completedAt).toLocaleString()}`}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {syncLogs.length > 0 && (
+                <div>
+                  <h4>Recent Sync Logs</h4>
+                  <table style={{ width: "100%", fontSize: "0.85em" }}>
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Synced</th>
+                        <th>Errors</th>
+                        <th>Started</th>
+                        <th>Completed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {syncLogs.map((log: any) => (
+                        <tr key={log.id}>
+                          <td>{log.sync_type}</td>
+                          <td>
+                            <span
+                              style={{
+                                color:
+                                  log.status === "completed"
+                                    ? "var(--success, #4caf50)"
+                                    : log.status === "failed"
+                                      ? "var(--error, #f44336)"
+                                      : "var(--warning, #ff9800)",
+                              }}
+                            >
+                              {log.status}
+                            </span>
+                          </td>
+                          <td>{log.synced_count ?? "–"}</td>
+                          <td>{log.error_count ?? 0}</td>
+                          <td>
+                            {log.started_at
+                              ? new Date(log.started_at).toLocaleString()
+                              : "–"}
+                          </td>
+                          <td>
+                            {log.completed_at
+                              ? new Date(log.completed_at).toLocaleString()
+                              : "–"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           ) : activeCategory === "hierarchy" ? (
             /* ── Location Hierarchy section ── */
             <>
@@ -295,6 +572,170 @@ const Settings: React.FC = () => {
             <div className="settings-muted">
               No settings in this category yet.
             </div>
+          ) : activeCategory === "assetic" ? (
+            /* ── Assetic API: custom layout with dynamic worker fields ── */
+            (() => {
+              const workerKeyPattern =
+                /^assetic_worker_\d+_(username|api_key)$/;
+              const coreSettings = categorySettings.filter(
+                (s) =>
+                  s.setting_key !== "assetic_worker_count" &&
+                  !workerKeyPattern.test(s.setting_key),
+              );
+              const workerCountVal = parseInt(
+                editedValues["assetic_worker_count"] || "1",
+                10,
+              );
+              const workerCount = Math.max(
+                1,
+                Math.min(10, workerCountVal || 1),
+              );
+
+              return (
+                <>
+                  {/* Core Assetic settings */}
+                  {coreSettings.map((setting) => (
+                    <div
+                      className="form-group"
+                      key={setting.setting_key}
+                      style={{ marginBottom: "16px" }}
+                    >
+                      <label>{formatKey(setting.setting_key)}</label>
+                      {setting.description && (
+                        <div className="settings-muted">
+                          {setting.description}
+                        </div>
+                      )}
+                      {renderInput(setting)}
+                    </div>
+                  ))}
+
+                  {/* Worker Pool section */}
+                  <hr
+                    style={{
+                      border: "none",
+                      borderTop: "1px solid var(--border, #444)",
+                      margin: "24px 0 16px",
+                    }}
+                  />
+                  <h4 style={{ margin: "0 0 4px" }}>Worker Pool</h4>
+                  <p
+                    className="settings-muted"
+                    style={{ marginBottom: "16px" }}
+                  >
+                    Each worker uses a separate Assetic API account with its own
+                    250 req/min rate limit. Total throughput = workers × 250
+                    req/min.
+                  </p>
+
+                  <div className="form-group" style={{ marginBottom: "20px" }}>
+                    <label>Number of Workers</label>
+                    <select
+                      value={String(workerCount)}
+                      onChange={(e) =>
+                        setEditedValues((prev) => ({
+                          ...prev,
+                          assetic_worker_count: e.target.value,
+                        }))
+                      }
+                      style={{ maxWidth: "120px" }}
+                    >
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={String(n)}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <div
+                      className="settings-muted"
+                      style={{ marginTop: "4px" }}
+                    >
+                      Capacity: <strong>{workerCount * 250}</strong> req/min
+                    </div>
+                  </div>
+
+                  {/* Dynamic worker credential fields */}
+                  {Array.from({ length: workerCount }, (_, i) => i + 1).map(
+                    (n) => {
+                      const uKey = `assetic_worker_${n}_username`;
+                      const kKey = `assetic_worker_${n}_api_key`;
+                      return (
+                        <div
+                          key={n}
+                          style={{
+                            border: "1px solid var(--border, #444)",
+                            borderRadius: "6px",
+                            padding: "12px 16px",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              marginBottom: "8px",
+                              fontSize: "0.9em",
+                            }}
+                          >
+                            Worker {n}
+                          </div>
+                          <div
+                            className="form-group"
+                            style={{ marginBottom: "10px" }}
+                          >
+                            <label style={{ fontSize: "0.85em" }}>
+                              Username
+                            </label>
+                            <input
+                              type="text"
+                              value={editedValues[uKey] ?? ""}
+                              onChange={(e) =>
+                                setEditedValues((prev) => ({
+                                  ...prev,
+                                  [uKey]: e.target.value,
+                                }))
+                              }
+                              placeholder="Leave blank to use default"
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label style={{ fontSize: "0.85em" }}>
+                              API Key
+                            </label>
+                            <input
+                              type="password"
+                              value={editedValues[kKey] ?? ""}
+                              onChange={(e) =>
+                                setEditedValues((prev) => ({
+                                  ...prev,
+                                  [kKey]: e.target.value,
+                                }))
+                              }
+                              placeholder="Leave blank to use default"
+                            />
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+
+                  <div
+                    style={{ display: "flex", gap: "10px", marginTop: "20px" }}
+                  >
+                    <button onClick={handleSave} disabled={saving}>
+                      {saving ? "Saving..." : "Save Settings"}
+                    </button>
+                    <button
+                      className="btn-outline"
+                      onClick={handleTestAssetic}
+                      disabled={testingAssetic}
+                      type="button"
+                    >
+                      {testingAssetic ? "Testing..." : "Test Connection"}
+                    </button>
+                  </div>
+                </>
+              );
+            })()
           ) : (
             /* ── Normal category: show all settings inline ── */
             <>
@@ -316,16 +757,6 @@ const Settings: React.FC = () => {
                 <button onClick={handleSave} disabled={saving}>
                   {saving ? "Saving..." : "Save Settings"}
                 </button>
-                {activeCategory === "assetic" && (
-                  <button
-                    className="btn-outline"
-                    onClick={handleTestAssetic}
-                    disabled={testingAssetic}
-                    type="button"
-                  >
-                    {testingAssetic ? "Testing..." : "Test Connection"}
-                  </button>
-                )}
               </div>
             </>
           )}

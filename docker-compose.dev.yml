@@ -57,6 +57,8 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: ${DB_PASSWORD:-YourStrong!Passw0rd}
       MSSQL_PID: Developer
+      MSSQL_MEMORY_LIMIT_MB: "1800"
+    mem_limit: "2g"
     healthcheck:
       test:
         [

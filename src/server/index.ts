@@ -13,6 +13,7 @@ import { initializePassport } from "./config/passport";
 import { initializeDatabase } from "./database";
 import settingsService from "./services/settingsService";
 import asseticLocationHierarchyService from "./services/asseticLocationHierarchyService";
+import asseticAssetSyncService from "./services/asseticAssetSyncService";
 
 dotenv.config();
 
@@ -148,6 +149,9 @@ async function startServer() {
           console.log(
             `[AsseticHierarchy] Preloaded ${hierarchy.regions.length} region(s) from ${hierarchy.source}`,
           );
+
+          // Start the asset sync polling (checks count hourly)
+          await asseticAssetSyncService.startPolling();
         }
       } catch (error) {
         console.warn("[AsseticHierarchy] Startup preload failed:", error);

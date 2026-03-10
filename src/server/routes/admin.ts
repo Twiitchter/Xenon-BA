@@ -8,6 +8,7 @@ import activityService from "../services/activityService";
 import asseticClient from "../services/asseticClient";
 import asseticApiLogger from "../services/asseticApiLogger";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
+import asseticAssetSyncService from "../services/asseticAssetSyncService";
 
 const router = Router();
 
@@ -249,6 +250,188 @@ router.get(
       const mapped = buildAsseticHierarchyError(error);
       console.error(`Error fetching Assetic location hierarchy: ${mapped.log}`);
       res.status(mapped.status).json({ error: mapped.message });
+    }
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════════════
+// ASSET SYNC
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/admin/settings/asset-sync-status
+ * Returns current sync status including progress and last sync info.
+ */
+router.get(
+  "/settings/asset-sync-status",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const status = await asseticAssetSyncService.getStatus();
+      const apiCount = await asseticAssetSyncService
+        .getApiAssetCount()
+        .catch(() => null);
+      const dbCount = await asseticAssetSyncService.getDbAssetCount();
+      res.json({ ...status, apiAssetCount: apiCount, dbAssetCount: dbCount });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/settings/asset-sync-trigger
+ * Manually trigger a full asset sync.
+ */
+router.post(
+  "/settings/asset-sync-trigger",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+
+      const status = await asseticAssetSyncService.getStatus();
+      if (status.isRunning) {
+        return res
+          .status(409)
+          .json({ error: "A sync operation is already running", status });
+      }
+
+      // Start sync in background
+      asseticAssetSyncService.runFullSync().catch((err) => {
+        console.error("[AssetSync] Manual trigger failed:", err);
+      });
+
+      res.json({
+        message: "Asset sync started",
+        status: await asseticAssetSyncService.getStatus(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/settings/asset-sync-trigger-fls
+ * Manually trigger functional locations sync only.
+ */
+router.post(
+  "/settings/asset-sync-trigger-fls",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+      const status = await asseticAssetSyncService.getStatus();
+      if (status.isRunning) {
+        return res
+          .status(409)
+          .json({ error: "A sync operation is already running", status });
+      }
+      asseticAssetSyncService.syncFunctionalLocations().catch((err) => {
+        console.error("[AssetSync] Manual FL sync failed:", err);
+      });
+      res.json({
+        message: "Functional location sync started",
+        status: await asseticAssetSyncService.getStatus(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/settings/asset-sync-trigger-assets
+ * Manually trigger asset sync only.
+ */
+router.post(
+  "/settings/asset-sync-trigger-assets",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+      const status = await asseticAssetSyncService.getStatus();
+      if (status.isRunning) {
+        return res
+          .status(409)
+          .json({ error: "A sync operation is already running", status });
+      }
+      asseticAssetSyncService.syncAssets().catch((err) => {
+        console.error("[AssetSync] Manual asset sync failed:", err);
+      });
+      res.json({
+        message: "Asset sync started",
+        status: await asseticAssetSyncService.getStatus(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/settings/asset-sync-trigger-enrichment
+ * Manually trigger FL enrichment (per-asset FL relationship) only.
+ */
+router.post(
+  "/settings/asset-sync-trigger-enrichment",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+      const status = await asseticAssetSyncService.getStatus();
+      if (status.isRunning) {
+        return res
+          .status(409)
+          .json({ error: "A sync operation is already running", status });
+      }
+      asseticAssetSyncService.enrichFunctionalLocations().catch((err) => {
+        console.error("[AssetSync] Manual FL enrichment failed:", err);
+      });
+      res.json({
+        message: "FL enrichment started",
+        status: await asseticAssetSyncService.getStatus(),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+/**
+ * GET /api/admin/settings/asset-sync-logs
+ * Returns recent sync log entries.
+ */
+router.get(
+  "/settings/asset-sync-logs",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const limit = Math.min(
+        parseInt(String(req.query.limit || "20"), 10),
+        100,
+      );
+      const logs = await db("assetic_sync_log")
+        .orderBy("started_at", "desc")
+        .limit(limit);
+      res.json(logs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   },
 );

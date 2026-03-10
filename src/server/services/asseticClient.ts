@@ -186,12 +186,10 @@ class AsseticClient {
    */
   async getODataMetadata(): Promise<string> {
     return this.call(async (client) => {
-      // The worker's client baseURL is {siteUrl}/api/{version}.
-      // We need {siteUrl}/odata/$metadata, so derive the site root.
       const baseURL = client.defaults.baseURL || "";
       const siteRoot = baseURL.replace(/\/api\/[^/]+\/?$/, "");
       const resp = await client.get(`${siteRoot}/odata/$metadata`, {
-        baseURL: "", // override so Axios uses the full URL
+        baseURL: "",
         headers: {
           ...client.defaults.headers.common,
           Accept: "application/xml",
@@ -203,11 +201,55 @@ class AsseticClient {
   }
 
   /**
-   * Parse the OData $metadata XML to find internal field names for
-   * an entity type (e.g. "functionallocations" or "assets").
+   * Query the OData endpoint for functional location data with
+   * specific $select fields (e.g. hierarchy level columns).
    *
-   * Returns a map of lowercase label → internal Property Name for
-   * fields whose label contains the search term (case-insensitive).
+   * The OData endpoint supports field selection via $select,
+   * filtering via $filter, pagination via $top/$skip, and
+   * returns JSON by default.
+   *
+   * @param entitySet  - e.g. "functionallocations" or "assets"
+   * @param select     - OData $select fields (internal names)
+   * @param top        - max rows to return (default 10000)
+   */
+  async queryOData(
+    entitySet: string,
+    select: string[],
+    top: number = 10000,
+  ): Promise<any[]> {
+    return this.call(async (client) => {
+      const baseURL = client.defaults.baseURL || "";
+      const siteRoot = baseURL.replace(/\/api\/[^/]+\/?$/, "");
+      const params: Record<string, string> = {
+        $top: String(top),
+      };
+      if (select.length > 0) {
+        params.$select = select.join(",");
+      }
+      const resp = await client.get(`${siteRoot}/odata/${entitySet}`, {
+        baseURL: "",
+        params,
+        headers: {
+          ...client.defaults.headers.common,
+          Accept: "application/json",
+        },
+      });
+      const data = resp.data;
+      // OData responses wrap rows in "value"
+      if (data && Array.isArray(data.value)) return data.value;
+      if (Array.isArray(data)) return data;
+      return [];
+    }, `GET /odata/${entitySet}`);
+  }
+
+  /**
+   * Parse the OData $metadata XML to find internal field names for
+   * an entity type (e.g. "functionallocation" or "asset").
+   *
+   * Returns a map of lowercase label → internal Property Name.
+   * If labelFilter is non-empty, only fields whose label contains
+   * that string (case-insensitive) are included.  If labelFilter is
+   * empty, ALL fields with annotations are returned.
    */
   async discoverFieldNames(
     entityType: string,
@@ -215,55 +257,58 @@ class AsseticClient {
   ): Promise<Map<string, string>> {
     const xml = await this.getODataMetadata();
     const result = new Map<string, string>();
-
-    // The XML contains <EntityType Name="..."> blocks.
-    // Each has <Property Name="InternalName" ... /> elements
-    // with an annotation like:
-    //   <Annotation Term="..." String="User-Friendly Label" />
-    // We look for our entity type and then match labels.
-
     const filterLower = labelFilter.toLowerCase();
 
-    // Find the EntityType block for our target
-    // OData metadata names the type with a capital first letter
-    // e.g. "Assets", "FunctionalLocations" etc.
-
-    // Extract all Property elements with their names and annotations
-    const propertyRegex =
-      /<Property\s+Name="([^"]+)"[^>]*(?:Type="([^"]*)")?[^>]*\/?>([\s\S]*?)(?:<\/Property>|(?=<Property\s|<\/EntityType>|<NavigationProperty))/gi;
-    const annotationRegex = /<Annotation[^>]*String="([^"]*)"[^>]*\/?>/gi;
-
-    // Find entity type section
-    const entityTypeRegex = new RegExp(
-      `<EntityType\\s+Name="[^"]*${entityType}[^"]*"[^>]*>([\\s\\S]*?)</EntityType>`,
+    // ── 1. Find relevant <EntityType> blocks ──
+    // The block may be named "assets", "functionallocations", etc.
+    // Match case-insensitively and allow partial name match.
+    const entityBlockRegex = new RegExp(
+      `<EntityType\\s+Name="([^"]*${entityType}[^"]*)"[^>]*>([\\s\\S]*?)</EntityType>`,
       "gi",
     );
 
     let entityMatch: RegExpExecArray | null;
-    while ((entityMatch = entityTypeRegex.exec(xml)) !== null) {
-      const block = entityMatch[1];
+    while ((entityMatch = entityBlockRegex.exec(xml)) !== null) {
+      const block = entityMatch[2];
 
-      let propMatch: RegExpExecArray | null;
-      const propRegex = /<Property\s+Name="([^"]+)"[^>]*\/?>/gi;
+      // ── 2. Extract all <Property> elements ──
+      // Collect each property name and any annotation strings within it.
+      // Properties may be self-closing or have children (annotations).
+      //
+      // Pattern A (self-closing): <Property Name="Foo" Type="Edm.String" />
+      // Pattern B (with annotations):
+      //   <Property Name="Foo" Type="Edm.String">
+      //     <Annotation Term="..." String="Label" />
+      //   </Property>
 
-      // Re-scan with a simpler approach: find each Property name,
-      // then check if any nearby annotation string matches our filter
-      const lines = block.split("\n");
-      let currentPropName = "";
+      // First collect all property names with their positions
+      const propRegex = /<Property\s+Name="([^"]+)"/gi;
+      const props: { name: string; startIdx: number }[] = [];
+      let pm: RegExpExecArray | null;
+      while ((pm = propRegex.exec(block)) !== null) {
+        props.push({ name: pm[1], startIdx: pm.index });
+      }
 
-      for (const line of lines) {
-        const propNameMatch = line.match(/<Property\s+Name="([^"]+)"/i);
-        if (propNameMatch) {
-          currentPropName = propNameMatch[1];
-        }
+      // For each property, find annotations between it and the next property
+      for (let i = 0; i < props.length; i++) {
+        const prop = props[i];
+        const nextStart =
+          i + 1 < props.length ? props[i + 1].startIdx : block.length;
+        const segment = block.substring(prop.startIdx, nextStart);
 
-        const annMatch = line.match(
-          /<Annotation[^>]*String="([^"]*)"[^>]*\/?>/i,
-        );
-        if (annMatch && currentPropName) {
-          const label = annMatch[1];
-          if (label.toLowerCase().includes(filterLower)) {
-            result.set(label.toLowerCase(), currentPropName);
+        // Find all annotation strings in this segment
+        const annRegex = /String="([^"]*)"/gi;
+        let am: RegExpExecArray | null;
+        while ((am = annRegex.exec(segment)) !== null) {
+          const label = am[1];
+          if (!label) continue;
+
+          // Skip Term="..." annotations that aren't labels
+          // (e.g. Term references often appear before String)
+          // Accept the annotation if it looks like a field label
+
+          if (filterLower === "" || label.toLowerCase().includes(filterLower)) {
+            result.set(label.toLowerCase(), prop.name);
           }
         }
       }
@@ -512,6 +557,28 @@ class AsseticClient {
           .then((r) => r.data),
       "GET /functionallocations",
     );
+  }
+
+  /**
+   * Try to get child functional locations of a parent FL.
+   * Returns null if the endpoint doesn't exist (404).
+   */
+  async getChildFunctionalLocations(
+    parentGuid: string,
+    params?: AsseticQueryParams,
+  ): Promise<any | null> {
+    return this.call(async (c) => {
+      try {
+        const resp = await c.get(
+          `/functionallocations/${parentGuid}/functionallocations`,
+          { params: toAsseticParams(params) },
+        );
+        return resp.data;
+      } catch (err: any) {
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }
+    }, `GET /functionallocations/${parentGuid}/functionallocations`);
   }
 
   async createFunctionalLocation(data: any) {

@@ -154,6 +154,59 @@ class AdminService {
     });
     return response.data;
   }
+
+  // ─── Asset Sync ─────────────────────────────────────────────────
+
+  async getAssetSyncStatus() {
+    const response = await axios.get(`${API_URL}/settings/asset-sync-status`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data;
+  }
+
+  async triggerAssetSync() {
+    const response = await axios.post(
+      `${API_URL}/settings/asset-sync-trigger`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  async getAssetSyncLogs(limit = 20) {
+    const response = await axios.get(`${API_URL}/settings/asset-sync-logs`, {
+      headers: authService.getAuthHeader(),
+      params: { limit },
+    });
+    return response.data;
+  }
+
+  async triggerFlSync() {
+    const response = await axios.post(
+      `${API_URL}/settings/asset-sync-trigger-fls`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  async triggerAssetOnlySync() {
+    const response = await axios.post(
+      `${API_URL}/settings/asset-sync-trigger-assets`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  async triggerFlEnrichment() {
+    const response = await axios.post(
+      `${API_URL}/settings/asset-sync-trigger-enrichment`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
 }
 
 export const adminService = new AdminService();

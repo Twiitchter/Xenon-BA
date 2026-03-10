@@ -39,6 +39,9 @@ COPY --from=builder /app/client/dist ./public
 COPY --from=builder /app/src/server/database/migrations ./dist/server/database/migrations
 COPY --from=builder /app/knexfile.ts ./
 
+# Copy FL parent mapping data (needed at runtime for hierarchy building)
+COPY --from=builder /app/src/server/data ./dist/server/data
+
 EXPOSE 3000
 
 CMD ["node", "dist/server/index.js"]

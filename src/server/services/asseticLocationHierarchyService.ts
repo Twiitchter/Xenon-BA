@@ -1,4 +1,36 @@
+import * as fs from "fs";
+import * as path from "path";
 import asseticClient, { AsseticQueryParams } from "./asseticClient";
+import { db } from "../database";
+
+// Parent mapping: FunctionalLocationId → parent FunctionalLocationId
+// Generated from the Assetic CSV exports which contain FL hierarchy levels.
+let flParentMap: Record<string, string> | null = null;
+function loadFlParentMap(): Record<string, string> {
+  if (flParentMap) return flParentMap;
+  try {
+    // Try JSON file next to dist/server/data/ or src/server/data/
+    const candidates = [
+      path.join(__dirname, "..", "data", "flParentMap.json"),
+      path.join(__dirname, "data", "flParentMap.json"),
+      path.join(process.cwd(), "src", "server", "data", "flParentMap.json"),
+      path.join(process.cwd(), "dist", "server", "data", "flParentMap.json"),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        flParentMap = JSON.parse(fs.readFileSync(p, "utf8"));
+        console.log(
+          `[AsseticHierarchy] Loaded FL parent map from ${p}: ${Object.keys(flParentMap!).length} mappings`,
+        );
+        return flParentMap!;
+      }
+    }
+  } catch (err) {
+    console.warn("[AsseticHierarchy] Failed to load FL parent map:", err);
+  }
+  flParentMap = {};
+  return flParentMap;
+}
 
 interface HierarchyNode {
   id: string;
@@ -243,19 +275,292 @@ class AsseticLocationHierarchyService {
     return rows;
   }
 
+  /**
+   * Build hierarchy from local DB data (assetic_functional_locations +
+   * assetic_asset_functional_locations). This uses data previously synced
+   * by AsseticAssetSyncService — no live API calls needed.
+   */
+  async buildHierarchyFromDb(): Promise<AsseticLocationHierarchy | null> {
+    try {
+      // Check if we have FL data in the DB
+      const flCount = await db("assetic_functional_locations")
+        .count("id as count")
+        .first();
+      const total = Number(flCount?.count ?? 0);
+      if (total === 0) return null;
+
+      // Load all FLs
+      const allFLs = await db("assetic_functional_locations").select(
+        "fl_guid",
+        "fl_id",
+        "fl_name",
+        "fl_type",
+        "fl_type_id",
+        "parent_fl_guid",
+      );
+
+      // Build type-based classification
+      const classify = (t: string): string => {
+        const tl = (t || "").toLowerCase();
+        if (tl.includes("region")) return "region";
+        if (tl.includes("site") || tl.includes("precinct")) return "site";
+        if (tl.includes("building")) return "building";
+        if (tl.includes("floor") || tl.includes("level")) return "floor";
+        if (tl.includes("structure")) return "structure";
+        return "other";
+      };
+
+      const regions: AsseticRegion[] = [];
+      const regionMap = new Map<string, AsseticRegion>();
+      const siteMap = new Map<string, AsseticSite>();
+      const buildingMap = new Map<string, AsseticBuilding>();
+
+      const regionFLs = allFLs.filter((f) => classify(f.fl_type) === "region");
+      const siteFLs = allFLs.filter((f) => classify(f.fl_type) === "site");
+      const buildingFLs = allFLs.filter(
+        (f) => classify(f.fl_type) === "building",
+      );
+      const floorFLs = allFLs.filter(
+        (f) =>
+          classify(f.fl_type) === "floor" ||
+          classify(f.fl_type) === "structure",
+      );
+
+      // Create region nodes
+      for (const r of regionFLs) {
+        const region: AsseticRegion = {
+          id: r.fl_guid,
+          name: r.fl_name || "Unknown Region",
+          sites: [],
+        };
+        regions.push(region);
+        regionMap.set(r.fl_guid, region);
+      }
+
+      if (regions.length === 0) return null;
+
+      // Check if parent_fl_guid is populated (from nested endpoint discovery)
+      const hasParents =
+        allFLs.filter((f) => f.parent_fl_guid).length > allFLs.length * 0.1;
+
+      if (hasParents) {
+        // Use parent chain to build tree
+        for (const s of siteFLs) {
+          const region = s.parent_fl_guid
+            ? regionMap.get(s.parent_fl_guid)
+            : undefined;
+          const target = region || regions[0];
+          const site: AsseticSite = {
+            id: s.fl_guid,
+            name: s.fl_name || "Unknown Site",
+            regionId: target.id,
+            buildings: [],
+          };
+          target.sites.push(site);
+          siteMap.set(s.fl_guid, site);
+        }
+
+        for (const b of buildingFLs) {
+          const site = b.parent_fl_guid
+            ? siteMap.get(b.parent_fl_guid)
+            : undefined;
+          if (site) {
+            const building: AsseticBuilding = {
+              id: b.fl_guid,
+              name: b.fl_name || "Unknown Building",
+              siteId: site.id,
+              regionId: site.regionId,
+              floors: [],
+            };
+            site.buildings.push(building);
+            buildingMap.set(b.fl_guid, building);
+          }
+        }
+
+        for (const f of floorFLs) {
+          const building = f.parent_fl_guid
+            ? buildingMap.get(f.parent_fl_guid)
+            : undefined;
+          if (building) {
+            building.floors.push({
+              id: f.fl_guid,
+              name: f.fl_name || "Unknown Floor",
+              buildingId: building.id,
+              siteId: building.siteId,
+              regionId: building.regionId,
+            });
+          }
+        }
+      } else {
+        // No parent links — use per-asset FL data to infer the hierarchy.
+        // Each asset points to ONE FL (its direct building/floor). By looking
+        // at which assets share the same FL, and matching FL names/types,
+        // we group buildings into sites and sites into regions.
+        // For now, use name-matching similar to the FLTypes approach.
+        const regionsSorted = [...regionFLs].sort(
+          (a, b) => (b.fl_name || "").length - (a.fl_name || "").length,
+        );
+
+        // Sites → Regions
+        for (const s of siteFLs) {
+          const sLower = (s.fl_name || "").toLowerCase();
+          let matched: AsseticRegion | undefined;
+          for (const r of regionsSorted) {
+            if (sLower.includes((r.fl_name || "").toLowerCase())) {
+              matched = regionMap.get(r.fl_guid);
+              break;
+            }
+          }
+          const target = matched || regions[0];
+          const site: AsseticSite = {
+            id: s.fl_guid,
+            name: s.fl_name || "Unknown Site",
+            regionId: target.id,
+            buildings: [],
+          };
+          target.sites.push(site);
+          siteMap.set(s.fl_guid, site);
+        }
+
+        // Buildings → Sites (abbreviation match)
+        const siteByAbbrev = new Map<string, AsseticSite>();
+        for (const site of siteMap.values()) {
+          const m = site.name.match(/\(([A-Z][A-Za-z0-9]+)\)\s*$/);
+          if (m) siteByAbbrev.set(m[1].toUpperCase(), site);
+        }
+        const allSites = Array.from(siteMap.values());
+
+        for (const b of buildingFLs) {
+          let site: AsseticSite | undefined;
+          const bUpper = (b.fl_name || "").toUpperCase();
+          for (const [abbr, s] of siteByAbbrev) {
+            if (
+              bUpper.startsWith(abbr + " ") ||
+              bUpper.startsWith("(" + abbr + ")")
+            ) {
+              site = s;
+              break;
+            }
+          }
+          if (!site && allSites.length > 0) {
+            site = allSites[0]; // fallback
+          }
+          if (site) {
+            const building: AsseticBuilding = {
+              id: b.fl_guid,
+              name: b.fl_name || "Unknown Building",
+              siteId: site.id,
+              regionId: site.regionId,
+              floors: [],
+            };
+            site.buildings.push(building);
+            buildingMap.set(b.fl_guid, building);
+          }
+        }
+
+        // Floors → Buildings
+        const allBuildings = Array.from(buildingMap.values());
+        for (const f of floorFLs) {
+          if (allBuildings.length > 0) {
+            const building = allBuildings[0]; // fallback
+            building.floors.push({
+              id: f.fl_guid,
+              name: f.fl_name || "Unknown Floor",
+              buildingId: building.id,
+              siteId: building.siteId,
+              regionId: building.regionId,
+            });
+          }
+        }
+      }
+
+      // Sort everything
+      for (const region of regions) {
+        for (const site of region.sites) {
+          for (const building of site.buildings) {
+            building.floors.sort((a, b) => a.name.localeCompare(b.name));
+          }
+          site.buildings.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        region.sites.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      regions.sort((a, b) => a.name.localeCompare(b.name));
+
+      const totalNodes = regions.reduce(
+        (sum, r) =>
+          sum +
+          1 +
+          r.sites.length +
+          r.sites.reduce(
+            (s, si) =>
+              s +
+              si.buildings.length +
+              si.buildings.reduce((fb, b) => fb + b.floors.length, 0),
+            0,
+          ),
+        0,
+      );
+
+      const hierarchy: AsseticLocationHierarchy = {
+        source: "functionallocations",
+        generatedAt: new Date().toISOString(),
+        fetchedRecordCount: total,
+        pageSize: total,
+        pagesFetched: 1,
+        pageLimit: 1,
+        isTruncated: false,
+        reportedTotalCount: total,
+        rawNodeCount: totalNodes,
+        rawRecordsSampleCount: 0,
+        rawRecordsSample: [],
+        regions,
+      };
+
+      console.log(
+        `[AsseticHierarchy] Built from DB: ${regions.length} regions, ` +
+          `${regions.reduce((s, r) => s + r.sites.length, 0)} sites, ` +
+          `${regions.reduce((s, r) => s + r.sites.reduce((sb, si) => sb + si.buildings.length, 0), 0)} buildings, ` +
+          `${regions.reduce((s, r) => s + r.sites.reduce((sb, si) => sb + si.buildings.reduce((fb, b) => fb + b.floors.length, 0), 0), 0)} floors`,
+      );
+
+      return hierarchy;
+    } catch (err) {
+      console.warn("[AsseticHierarchy] buildHierarchyFromDb failed:", err);
+      return null;
+    }
+  }
+
   async refreshFromAssetic(): Promise<AsseticLocationHierarchy> {
     if (this.refreshInFlight) {
       return this.refreshInFlight;
     }
 
-    this.refreshInFlight = this.buildFromAssetic()
-      .then((hierarchy) => {
-        this.cache = hierarchy;
-        return hierarchy;
-      })
-      .finally(() => {
-        this.refreshInFlight = null;
-      });
+    this.refreshInFlight = (async () => {
+      // Strategy 0: Try building from local DB data first (no API calls).
+      // This uses data synced by AsseticAssetSyncService.
+      try {
+        const fromDb = await this.buildHierarchyFromDb();
+        if (fromDb && fromDb.regions.length > 0) {
+          console.log(
+            `[AsseticHierarchy] Using DB-cached hierarchy: ${fromDb.regions.length} region(s)`,
+          );
+          this.cache = fromDb;
+          return fromDb;
+        }
+      } catch (err) {
+        console.warn(
+          "[AsseticHierarchy] DB hierarchy failed, falling back to API:",
+          err,
+        );
+      }
+
+      // Fall back to live API strategies
+      const hierarchy = await this.buildFromAssetic();
+      this.cache = hierarchy;
+      return hierarchy;
+    })().finally(() => {
+      this.refreshInFlight = null;
+    });
 
     return this.refreshInFlight;
   }
@@ -267,79 +572,66 @@ class AsseticLocationHierarchyService {
     }
 
     let records: any[] = [];
-    let source: "functionallocations" | "assets" = "assets";
+    let source: "functionallocations" | "assets" = "functionallocations";
     let pagination: FetchAllPagesResult | null = null;
 
-    // ── Strategy 1: OData discovery → /assets with FL level attributes ──
-    // Use the OData $metadata endpoint to discover the internal field
-    // names for Functional Location hierarchy levels (L1–L6).
-    // Then request /assets with those attributes so the API returns
-    // the full leveled hierarchy data alongside each asset record.
+    // ── Strategy 1: OData discovery → /functionallocations with attributes ──
+    // The OData $metadata endpoint reveals internal field names.
+    // We search both "functionallocations" and "assets" entity types
+    // for parent/level fields, then request /functionallocations with
+    // those attributes. Per Assetic docs, FL-level fields listed under
+    // "assets" cannot be used with the Asset API — they must be fetched
+    // via /functionallocations.
+    let odataAttributes: string | null = null;
     try {
       console.log(
-        "[AsseticHierarchy] Discovering FL attribute names via OData metadata…",
-      );
-      const fieldMap = await asseticClient.discoverFieldNames(
-        "asset",
-        "functional location",
+        "[AsseticHierarchy] Discovering FL field names via OData $metadata…",
       );
 
-      if (fieldMap.size > 0) {
+      // Search both entity types for FL-related fields
+      const [flFields, assetFields] = await Promise.all([
+        asseticClient
+          .discoverFieldNames("functionallocation", "")
+          .catch(() => new Map<string, string>()),
+        asseticClient
+          .discoverFieldNames("asset", "functional location")
+          .catch(() => new Map<string, string>()),
+      ]);
+
+      // Merge all discovered fields (FL entity takes precedence)
+      const allFields = new Map<string, string>();
+      for (const [label, name] of assetFields) allFields.set(label, name);
+      for (const [label, name] of flFields) allFields.set(label, name);
+
+      if (allFields.size > 0) {
         console.log(
-          `[AsseticHierarchy] OData discovered ${fieldMap.size} FL fields`,
+          `[AsseticHierarchy] OData discovered ${allFields.size} fields (FL entity: ${flFields.size}, asset entity: ${assetFields.size})`,
         );
-        // Log all discovered fields for debugging
-        for (const [label, name] of fieldMap) {
+        for (const [label, name] of allFields) {
           console.log(`  [OData] "${label}" → ${name}`);
         }
 
-        // Build the attributes list: only request Name, Type, Id for
-        // each level that was found in the metadata.
+        // Look for parent / hierarchy / level attributes
         const attrSet = new Set<string>();
-        for (const [label, internalName] of fieldMap) {
-          // Only include level fields (L1-L6)
-          if (/functional location (name|type|id) l\d/i.test(label)) {
+        for (const [label, internalName] of allFields) {
+          const ll = label.toLowerCase();
+          if (
+            /functional location (name|type|id) l\d/.test(ll) ||
+            ll.includes("parent") ||
+            ll.includes("hierarchy")
+          ) {
             attrSet.add(internalName);
           }
         }
 
         if (attrSet.size > 0) {
-          const attributes = Array.from(attrSet).join(",");
+          odataAttributes = Array.from(attrSet).join(",");
           console.log(
-            `[AsseticHierarchy] Requesting /assets with ${attrSet.size} FL attributes: ${attributes}`,
-          );
-
-          source = "assets";
-          pagination = await this.fetchAllPages(
-            (params) => asseticClient.getAssets({ ...params, attributes }),
-            20, // 10K records is enough to discover the full tree
-          );
-          records = pagination.rows;
-
-          if (records.length > 0) {
-            const sampleKeys = Object.keys(records[0]);
-            console.log(
-              `[AsseticHierarchy] Fetched ${records.length} assets with attributes. Keys: ${sampleKeys.join(", ")}`,
-            );
-
-            const result = this.buildHierarchy(records, source, pagination);
-            if (result.regions.length > 0) {
-              console.log(
-                `[AsseticHierarchy] OData+assets: ${result.regions.length} region(s)`,
-              );
-              return result;
-            }
-            console.warn(
-              "[AsseticHierarchy] OData attributes fetched but no hierarchy built; continuing.",
-            );
-          }
-        } else {
-          console.log(
-            "[AsseticHierarchy] OData found FL fields but none matched L1-L6 pattern.",
+            `[AsseticHierarchy] Will request FL attributes: ${odataAttributes}`,
           );
         }
       } else {
-        console.log("[AsseticHierarchy] OData metadata returned no FL fields.");
+        console.log("[AsseticHierarchy] OData returned no relevant fields.");
       }
     } catch (error) {
       console.warn(
@@ -348,10 +640,245 @@ class AsseticLocationHierarchyService {
       );
     }
 
-    // ── Strategy 2: /functionallocations (plain) ──
-    // Fetch FL records which include FunctionalLocationType.
-    // The buildHierarchyFromFLTypes method groups records by type
-    // (Region/Site/Building/Floor).
+    // ── Strategy 2: /functionallocations with discovered attributes ──
+    if (odataAttributes) {
+      try {
+        console.log(
+          `[AsseticHierarchy] Fetching /functionallocations with OData attributes…`,
+        );
+        source = "functionallocations";
+        pagination = await this.fetchAllPages(
+          (params) =>
+            asseticClient.getFunctionalLocations({
+              ...params,
+              attributes: odataAttributes!,
+            }),
+          50,
+        );
+        records = pagination.rows;
+
+        if (records.length > 0) {
+          const sampleKeys = Object.keys(records[0]);
+          console.log(
+            `[AsseticHierarchy] FL+attrs records: ${records.length}. Keys: ${sampleKeys.join(", ")}`,
+          );
+
+          const result = this.buildHierarchy(records, source, pagination);
+          if (result.regions.length > 0) {
+            console.log(
+              `[AsseticHierarchy] OData+FL: ${result.regions.length} region(s)`,
+            );
+            return result;
+          }
+          console.warn(
+            "[AsseticHierarchy] FL+attrs fetched but no hierarchy built; continuing.",
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "[AsseticHierarchy] /functionallocations with OData attrs failed:",
+          (error as any)?.message || error,
+        );
+      }
+    }
+
+    // ── Strategy 3: OData direct query for leveled hierarchy ──
+    // The REST API rejects OData-internal field names (GroupAssetNameL1, etc.)
+    // but the OData query endpoint returns them directly.  Fetch FL records
+    // with $select for the GroupAsset hierarchy columns, remap to the
+    // FunctionalLocationNameLN keys that buildHierarchyFromLeveledLocations
+    // already knows how to parse.
+    try {
+      const odataSelectFields: string[] = [];
+      for (let n = 1; n <= 7; n++) {
+        odataSelectFields.push(`GroupAssetNameL${n}`);
+        odataSelectFields.push(`GroupAssetIdL${n}`);
+        odataSelectFields.push(`GroupAssetTypeIdL${n}`);
+      }
+      // Also grab core identity fields
+      odataSelectFields.push(
+        "Id",
+        "FunctionalLocationId",
+        "FunctionalLocationName",
+        "FunctionalLocationType",
+      );
+
+      console.log(
+        `[AsseticHierarchy] Querying OData /functionallocations with $select for ${odataSelectFields.length} level fields…`,
+      );
+
+      const odataRows = await asseticClient.queryOData(
+        "functionallocations",
+        odataSelectFields,
+        10000,
+      );
+
+      if (odataRows.length > 0) {
+        console.log(
+          `[AsseticHierarchy] OData query returned ${odataRows.length} rows. Sample keys: ${Object.keys(odataRows[0]).join(", ")}`,
+        );
+
+        // Remap GroupAsset* → FunctionalLocationName/Id/Type L# keys
+        const remapped = odataRows.map((row: any) => {
+          const out: any = { ...row };
+          for (let n = 1; n <= 7; n++) {
+            if (row[`GroupAssetNameL${n}`] !== undefined) {
+              out[`FunctionalLocationNameL${n}`] = row[`GroupAssetNameL${n}`];
+            }
+            if (row[`GroupAssetIdL${n}`] !== undefined) {
+              out[`FunctionalLocationIdL${n}`] = row[`GroupAssetIdL${n}`];
+            }
+            if (row[`GroupAssetTypeIdL${n}`] !== undefined) {
+              out[`FunctionalLocationTypeL${n}`] = row[`GroupAssetTypeIdL${n}`];
+            }
+          }
+          return out;
+        });
+
+        // Check if any leveled fields actually came back populated
+        const hasLevels = remapped.some(
+          (r: any) => r.FunctionalLocationNameL1 || r.FunctionalLocationNameL2,
+        );
+
+        if (hasLevels) {
+          source = "functionallocations";
+          records = remapped;
+          pagination = {
+            rows: remapped,
+            pageSize: remapped.length,
+            pagesFetched: 1,
+            pageLimit: 1,
+            totalCount: remapped.length,
+            hitPageLimit: false,
+          };
+
+          const result = this.buildHierarchy(records, source, pagination);
+          if (result.regions.length > 0) {
+            console.log(
+              `[AsseticHierarchy] OData direct query: ${result.regions.length} region(s), ` +
+                `${result.regions.reduce((s, r) => s + r.sites.length, 0)} site(s), ` +
+                `${result.regions.reduce((s, r) => s + r.sites.reduce((sb, si) => sb + si.buildings.length, 0), 0)} building(s), ` +
+                `${result.regions.reduce((s, r) => s + r.sites.reduce((sb, si) => sb + si.buildings.reduce((fb, b) => fb + b.floors.length, 0), 0), 0)} floor(s)`,
+            );
+            return result;
+          }
+          console.warn(
+            "[AsseticHierarchy] OData direct query returned rows but no hierarchy built; continuing.",
+          );
+        } else {
+          console.warn(
+            "[AsseticHierarchy] OData query returned rows but no GroupAssetNameL* fields populated; continuing.",
+          );
+        }
+      } else {
+        console.log(
+          "[AsseticHierarchy] OData query returned 0 rows; continuing.",
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "[AsseticHierarchy] OData direct query failed (non-fatal):",
+        (error as any)?.message || error,
+      );
+    }
+
+    // ── Strategy 3b: OData /assets with GroupAsset hierarchy fields ──
+    // The GroupAsset* fields (L1-L7) belong to the "asset" entity in OData
+    // metadata, NOT "functionallocation".  Querying /odata/assets with $select
+    // should return each asset's full FL hierarchy path — the same data that
+    // appears as "Functional Location Name L1…L4" in CSV exports.
+    try {
+      const assetODataFields: string[] = [];
+      for (let n = 1; n <= 7; n++) {
+        assetODataFields.push(`GroupAssetNameL${n}`);
+        assetODataFields.push(`GroupAssetIdL${n}`);
+        assetODataFields.push(`GroupAssetTypeIdL${n}`);
+      }
+      assetODataFields.push("Id", "AssetName");
+
+      console.log(
+        `[AsseticHierarchy] Querying OData /assets with $select for ${assetODataFields.length} hierarchy fields…`,
+      );
+
+      const assetRows = await asseticClient.queryOData(
+        "assets",
+        assetODataFields,
+        10000,
+      );
+
+      if (assetRows.length > 0) {
+        console.log(
+          `[AsseticHierarchy] OData /assets returned ${assetRows.length} rows. Sample keys: ${Object.keys(assetRows[0]).join(", ")}`,
+        );
+
+        // Remap GroupAsset* → FunctionalLocationName/Id/Type L# keys
+        const remapped = assetRows.map((row: any) => {
+          const out: any = { ...row };
+          for (let n = 1; n <= 7; n++) {
+            if (row[`GroupAssetNameL${n}`] !== undefined) {
+              out[`FunctionalLocationNameL${n}`] = row[`GroupAssetNameL${n}`];
+            }
+            if (row[`GroupAssetIdL${n}`] !== undefined) {
+              out[`FunctionalLocationIdL${n}`] = row[`GroupAssetIdL${n}`];
+            }
+            if (row[`GroupAssetTypeIdL${n}`] !== undefined) {
+              out[`FunctionalLocationTypeL${n}`] = row[`GroupAssetTypeIdL${n}`];
+            }
+          }
+          return out;
+        });
+
+        const hasLevels = remapped.some(
+          (r: any) => r.FunctionalLocationNameL1 || r.FunctionalLocationNameL2,
+        );
+
+        if (hasLevels) {
+          source = "assets";
+          records = remapped;
+          pagination = {
+            rows: remapped,
+            pageSize: remapped.length,
+            pagesFetched: 1,
+            pageLimit: 1,
+            totalCount: remapped.length,
+            hitPageLimit: false,
+          };
+
+          const result = this.buildHierarchy(records, source, pagination);
+          if (result.regions.length > 0) {
+            console.log(
+              `[AsseticHierarchy] OData /assets hierarchy: ${result.regions.length} region(s), ` +
+                `${result.regions.reduce((s, r) => s + r.sites.length, 0)} site(s), ` +
+                `${result.regions.reduce((s, r) => s + r.sites.reduce((sb, si) => sb + si.buildings.length, 0), 0)} building(s), ` +
+                `${result.regions.reduce((s, r) => s + r.sites.reduce((sb, si) => sb + si.buildings.reduce((fb, b) => fb + b.floors.length, 0), 0), 0)} floor(s)`,
+            );
+            return result;
+          }
+          console.warn(
+            "[AsseticHierarchy] OData /assets returned leveled data but no hierarchy built; continuing.",
+          );
+        } else {
+          console.warn(
+            "[AsseticHierarchy] OData /assets returned rows but GroupAssetNameL* fields not populated; continuing.",
+          );
+        }
+      } else {
+        console.log(
+          "[AsseticHierarchy] OData /assets returned 0 rows; continuing.",
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "[AsseticHierarchy] OData /assets query failed (non-fatal):",
+        (error as any)?.message || error,
+      );
+    }
+
+    // ── Strategy 4: /functionallocations plain + nested child probe ──
+    // Core fields include FunctionalLocationType (Region/Site/Building/Floor).
+    // buildHierarchyFromFLTypes groups records by type.
+    // We also probe the nested /{guid}/functionallocations endpoint to find
+    // parent-child relationships that the list endpoint doesn't expose.
     try {
       console.log("[AsseticHierarchy] Trying /functionallocations…");
       source = "functionallocations";
@@ -365,6 +892,122 @@ class AsseticLocationHierarchyService {
         console.log(
           `[AsseticHierarchy] FL records: ${records.length}. Sample keys: ${Object.keys(records[0]).join(", ")}`,
         );
+
+        // Classify records to find regions for the nested probe
+        const regionGuids: { guid: string; name: string }[] = [];
+        for (const r of records) {
+          const flt = (
+            r.FunctionalLocationType ||
+            r.functionalLocationType ||
+            ""
+          ).toLowerCase();
+          if (flt.includes("region")) {
+            regionGuids.push({
+              guid: r.Id || r.id || r.Guid || r.guid,
+              name: r.FunctionalLocationName || r.functionalLocationName || "",
+            });
+          }
+        }
+
+        // Probe: try nested children endpoint on first region
+        let nestedWorks = false;
+        if (regionGuids.length > 0) {
+          try {
+            console.log(
+              `[AsseticHierarchy] Probing nested children for region "${regionGuids[0].name}" (${regionGuids[0].guid})…`,
+            );
+            const childResult = await asseticClient.getChildFunctionalLocations(
+              regionGuids[0].guid,
+              { pageSize: 5 },
+            );
+            if (childResult !== null) {
+              const childData =
+                childResult?.Data ||
+                childResult?.data ||
+                childResult?.ResourceList ||
+                (Array.isArray(childResult) ? childResult : []);
+              if (childData.length > 0) {
+                nestedWorks = true;
+                console.log(
+                  `[AsseticHierarchy] Nested children endpoint works! Got ${childData.length} children for "${regionGuids[0].name}". Sample: ${JSON.stringify(childData[0]).substring(0, 200)}`,
+                );
+              } else {
+                console.log(
+                  `[AsseticHierarchy] Nested children endpoint returned empty for "${regionGuids[0].name}". Response: ${JSON.stringify(childResult).substring(0, 200)}`,
+                );
+              }
+            } else {
+              console.log(
+                "[AsseticHierarchy] Nested children endpoint returned 404 — not available.",
+              );
+            }
+          } catch (err) {
+            console.log(
+              `[AsseticHierarchy] Nested children probe failed: ${(err as any)?.message || err}`,
+            );
+          }
+        }
+
+        if (nestedWorks) {
+          // Build hierarchy by querying children at each level
+          const hierarchy = await this.buildHierarchyFromNestedFLs(
+            asseticClient,
+            regionGuids,
+          );
+          if (hierarchy.length > 0) {
+            const totalSites = hierarchy.reduce(
+              (s, r) => s + r.sites.length,
+              0,
+            );
+            const totalBuildings = hierarchy.reduce(
+              (s, r) =>
+                s + r.sites.reduce((sb, si) => sb + si.buildings.length, 0),
+              0,
+            );
+            const totalFloors = hierarchy.reduce(
+              (s, r) =>
+                s +
+                r.sites.reduce(
+                  (sb, si) =>
+                    sb +
+                    si.buildings.reduce((fb, b) => fb + b.floors.length, 0),
+                  0,
+                ),
+              0,
+            );
+            console.log(
+              `[AsseticHierarchy] Nested FL hierarchy: ${hierarchy.length} regions, ${totalSites} sites, ${totalBuildings} buildings, ${totalFloors} floors`,
+            );
+            const totalNodes = hierarchy.reduce(
+              (sum, r) =>
+                sum +
+                1 +
+                r.sites.length +
+                r.sites.reduce(
+                  (s, si) =>
+                    s +
+                    si.buildings.length +
+                    si.buildings.reduce((fb, b) => fb + b.floors.length, 0),
+                  0,
+                ),
+              0,
+            );
+            return {
+              source,
+              generatedAt: new Date().toISOString(),
+              fetchedRecordCount: records.length,
+              pageSize: pagination!.pageSize,
+              pagesFetched: pagination!.pagesFetched,
+              pageLimit: pagination!.pageLimit,
+              isTruncated: false,
+              reportedTotalCount: records.length,
+              rawNodeCount: totalNodes,
+              rawRecordsSampleCount: Math.min(records.length, 50),
+              rawRecordsSample: records.slice(0, 50),
+              regions: hierarchy,
+            };
+          }
+        }
 
         const fromFL = this.buildHierarchy(records, source, pagination);
         if (fromFL.regions.length > 0) {
@@ -381,7 +1024,7 @@ class AsseticLocationHierarchyService {
       );
     }
 
-    // ── Strategy 3: /assets with service-area fallback ──
+    // ── Strategy 5: /assets with service-area fallback ──
     // Derive hierarchy from AssetPrimaryServiceAreaName / Secondary.
     try {
       console.log("[AsseticHierarchy] Falling back to /assets service areas…");
@@ -474,6 +1117,8 @@ class AsseticLocationHierarchyService {
 
   private extractTotalCount(response: any): number | undefined {
     const total =
+      response?.TotalResults ??
+      response?.totalResults ??
       response?.TotalCount ??
       response?.totalCount ??
       response?.RecordCount ??
@@ -785,6 +1430,8 @@ class AsseticLocationHierarchyService {
    * and optionally ParentFunctionalLocationId / ParentId.
    */
   private buildHierarchyFromFLTypes(records: any[]): AsseticRegion[] {
+    const parentMap = loadFlParentMap();
+
     interface FLRecord {
       id: string;
       flId: string;
@@ -823,7 +1470,43 @@ class AsseticLocationHierarchyService {
       ]);
 
       if (!id || !name || !type) continue;
-      parsed.push({ id, flId: flId || id, name, type, parentId });
+
+      // If no parentId from the API, look it up in the CSV-derived parent map
+      let resolvedParentId = parentId;
+      if (!resolvedParentId && flId) {
+        const csvParentFlId = parentMap[flId];
+        if (csvParentFlId) {
+          // The parent map gives us a FunctionalLocationId.
+          // Find the corresponding FL record's GUID (Id) from our parsed set.
+          // We'll resolve this after ALL records are parsed.
+          resolvedParentId = `flid:${csvParentFlId}`;
+        }
+      }
+
+      parsed.push({
+        id,
+        flId: flId || id,
+        name,
+        type,
+        parentId: resolvedParentId,
+      });
+    }
+
+    // Resolve flid: references to actual GUIDs
+    const guidByFlId = new Map<string, string>();
+    for (const fl of parsed) {
+      if (fl.flId) guidByFlId.set(fl.flId, fl.id);
+    }
+    for (const fl of parsed) {
+      if (fl.parentId?.startsWith("flid:")) {
+        const parentFlId = fl.parentId.substring(5);
+        const parentGuid = guidByFlId.get(parentFlId);
+        if (parentGuid) {
+          fl.parentId = parentGuid;
+        } else {
+          fl.parentId = undefined;
+        }
+      }
     }
 
     if (!parsed.length) return [];
@@ -942,52 +1625,330 @@ class AsseticLocationHierarchyService {
         region.sites.sort((a, b) => a.name.localeCompare(b.name));
       }
     } else {
-      // No parent IDs — create flat tree: each region with a default site
-      // containing all buildings. This preserves what we can.
+      // No parent IDs — infer hierarchy via name matching.
+      // Strategy: sites → regions by longest-name-first substring match;
+      // buildings → sites and floors → buildings by FunctionalLocationId
+      // numeric proximity (IDs in the same range tend to be siblings).
+
       for (const rRec of regionRecords) {
-        const region: AsseticRegion = {
+        regionsById.set(rRec.id, {
           id: rRec.id,
           name: rRec.name,
           sites: [],
-        };
-        regionsById.set(rRec.id, region);
+        });
       }
 
-      // Assign sites to regions by name proximity or just first region
-      const defaultRegion =
-        regionRecords.length === 1
-          ? regionsById.get(regionRecords[0].id)!
-          : null;
+      // Sort regions by name length DESC so "North West" matches before "North"
+      const regionsSorted = [...regionRecords].sort(
+        (a, b) => b.name.length - a.name.length,
+      );
+
+      // --- Sites → Regions (name substring match) ---
+      const sitesById = new Map<string, AsseticSite>();
+      const unmatchedSites: FLRecord[] = [];
 
       for (const sRec of siteRecords) {
-        const target = defaultRegion || regionsById.values().next().value!;
+        const sLower = sRec.name.toLowerCase();
+        let matched = false;
+        for (const rRec of regionsSorted) {
+          if (sLower.includes(rRec.name.toLowerCase())) {
+            const region = regionsById.get(rRec.id)!;
+            const site: AsseticSite = {
+              id: sRec.id,
+              name: sRec.name,
+              regionId: region.id,
+              buildings: [],
+            };
+            region.sites.push(site);
+            sitesById.set(sRec.id, site);
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) unmatchedSites.push(sRec);
+      }
+
+      // Distribute unmatched sites round-robin across regions
+      const regionArr = Array.from(regionsById.values());
+      for (let i = 0; i < unmatchedSites.length; i++) {
+        const sRec = unmatchedSites[i];
+        const region = regionArr[i % regionArr.length];
         const site: AsseticSite = {
           id: sRec.id,
           name: sRec.name,
-          regionId: target.id,
+          regionId: region.id,
           buildings: [],
         };
-        target.sites.push(site);
+        region.sites.push(site);
+        sitesById.set(sRec.id, site);
       }
 
+      // --- Buildings → Sites ---
+      // Extract abbreviation from site names: "Hospital Precinct (NWRHP)" → "NWRHP"
+      const siteByAbbrev = new Map<string, AsseticSite>();
+      const allSites = Array.from(sitesById.values());
+      for (const site of allSites) {
+        const m = site.name.match(/\(([A-Z][A-Za-z0-9]+)\)\s*$/);
+        if (m) siteByAbbrev.set(m[1].toUpperCase(), site);
+      }
+
+      const buildingsById = new Map<string, AsseticBuilding>();
+      const unmatchedBuildings: FLRecord[] = [];
+
       for (const bRec of buildingRecords) {
-        // Attach to first site of first region
-        const firstRegion = regionsById.values().next().value;
-        if (firstRegion && firstRegion.sites.length > 0) {
-          firstRegion.sites[0].buildings.push({
+        // Try abbreviation prefix match on flId or name
+        let site: AsseticSite | undefined;
+        const bUpper = bRec.name.toUpperCase();
+        const bFlUpper = bRec.flId.toUpperCase();
+        for (const [abbr, s] of siteByAbbrev) {
+          if (
+            bUpper.startsWith(abbr + " ") ||
+            bUpper.startsWith("(" + abbr + ")") ||
+            bFlUpper.startsWith(abbr)
+          ) {
+            site = s;
+            break;
+          }
+        }
+
+        // Try site name containment
+        if (!site) {
+          const bLower = bRec.name.toLowerCase();
+          for (const s of allSites) {
+            if (bLower.includes(s.name.toLowerCase())) {
+              site = s;
+              break;
+            }
+          }
+        }
+
+        if (site) {
+          const building: AsseticBuilding = {
             id: bRec.id,
             name: bRec.name,
-            siteId: firstRegion.sites[0].id,
-            regionId: firstRegion.id,
+            siteId: site.id,
+            regionId: site.regionId,
             floors: [],
+          };
+          site.buildings.push(building);
+          buildingsById.set(bRec.id, building);
+        } else {
+          unmatchedBuildings.push(bRec);
+        }
+      }
+
+      // Distribute unmatched buildings round-robin across all sites
+      if (unmatchedBuildings.length > 0 && allSites.length > 0) {
+        for (let i = 0; i < unmatchedBuildings.length; i++) {
+          const bRec = unmatchedBuildings[i];
+          const site = allSites[i % allSites.length];
+          const building: AsseticBuilding = {
+            id: bRec.id,
+            name: bRec.name,
+            siteId: site.id,
+            regionId: site.regionId,
+            floors: [],
+          };
+          site.buildings.push(building);
+          buildingsById.set(bRec.id, building);
+        }
+      }
+
+      // --- Floors → Buildings ---
+      const allBuildings = Array.from(buildingsById.values());
+      const unmatchedFloors: FLRecord[] = [];
+
+      for (const fRec of floorRecords) {
+        // Try building name containment
+        const fLower = fRec.name.toLowerCase();
+        let building: AsseticBuilding | undefined;
+
+        for (const b of allBuildings) {
+          if (fLower.includes(b.name.toLowerCase())) {
+            building = b;
+            break;
+          }
+        }
+
+        if (building) {
+          building.floors.push({
+            id: fRec.id,
+            name: fRec.name,
+            buildingId: building.id,
+            siteId: building.siteId,
+            regionId: building.regionId,
+          });
+        } else {
+          unmatchedFloors.push(fRec);
+        }
+      }
+
+      // Distribute unmatched floors round-robin across all buildings
+      if (unmatchedFloors.length > 0 && allBuildings.length > 0) {
+        for (let i = 0; i < unmatchedFloors.length; i++) {
+          const fRec = unmatchedFloors[i];
+          const building = allBuildings[i % allBuildings.length];
+          building.floors.push({
+            id: fRec.id,
+            name: fRec.name,
+            buildingId: building.id,
+            siteId: building.siteId,
+            regionId: building.regionId,
           });
         }
+      }
+
+      console.log(
+        `[AsseticHierarchy] Name-matching: ` +
+          `${siteRecords.length - unmatchedSites.length}/${siteRecords.length} sites matched, ` +
+          `${buildingRecords.length - unmatchedBuildings.length}/${buildingRecords.length} buildings matched, ` +
+          `${floorRecords.length - unmatchedFloors.length}/${floorRecords.length} floors matched`,
+      );
+
+      // Sort children
+      for (const region of regionsById.values()) {
+        for (const site of region.sites) {
+          for (const building of site.buildings) {
+            building.floors.sort((a, b) => a.name.localeCompare(b.name));
+          }
+          site.buildings.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        region.sites.sort((a, b) => a.name.localeCompare(b.name));
       }
     }
 
     return Array.from(regionsById.values()).sort((a, b) =>
       a.name.localeCompare(b.name),
     );
+  }
+
+  /**
+   * Build full hierarchy by traversing nested FL children endpoint:
+   *   Region → get children (Sites) → get children (Buildings) → get children (Floors)
+   */
+  private async buildHierarchyFromNestedFLs(
+    client: typeof asseticClient,
+    regionGuids: { guid: string; name: string }[],
+  ): Promise<AsseticRegion[]> {
+    const regions: AsseticRegion[] = [];
+
+    const extractData = (result: any): any[] => {
+      if (!result) return [];
+      if (result.Data) return result.Data;
+      if (result.data) return result.data;
+      if (result.ResourceList) return result.ResourceList;
+      if (Array.isArray(result)) return result;
+      return [];
+    };
+
+    const readName = (r: any) =>
+      r.FunctionalLocationName || r.functionalLocationName || r.Name || "";
+    const readId = (r: any) => r.Id || r.id || r.Guid || r.guid || "";
+    const readType = (r: any) =>
+      (
+        r.FunctionalLocationType ||
+        r.functionalLocationType ||
+        ""
+      ).toLowerCase();
+
+    for (const rg of regionGuids) {
+      const region: AsseticRegion = {
+        id: rg.guid,
+        name: rg.name,
+        sites: [],
+      };
+      regions.push(region);
+
+      // Get children of this region (should be Sites)
+      let siteRecords: any[];
+      try {
+        const siteResult = await client.getChildFunctionalLocations(rg.guid, {
+          pageSize: 500,
+        });
+        siteRecords = extractData(siteResult);
+      } catch {
+        siteRecords = [];
+      }
+
+      console.log(
+        `[AsseticHierarchy] Region "${rg.name}": ${siteRecords.length} children`,
+      );
+
+      for (const sRec of siteRecords) {
+        const siteId = readId(sRec);
+        const siteName = readName(sRec);
+        const siteType = readType(sRec);
+
+        // Skip children that are not sites (might be miscategorised)
+        if (
+          siteType &&
+          !siteType.includes("site") &&
+          !siteType.includes("precinct")
+        ) {
+          continue;
+        }
+
+        const site: AsseticSite = {
+          id: siteId,
+          name: siteName,
+          regionId: region.id,
+          buildings: [],
+        };
+        region.sites.push(site);
+
+        // Get children of this site (should be Buildings)
+        let buildingRecords: any[];
+        try {
+          const bResult = await client.getChildFunctionalLocations(siteId, {
+            pageSize: 500,
+          });
+          buildingRecords = extractData(bResult);
+        } catch {
+          buildingRecords = [];
+        }
+
+        for (const bRec of buildingRecords) {
+          const buildingId = readId(bRec);
+          const buildingName = readName(bRec);
+
+          const building: AsseticBuilding = {
+            id: buildingId,
+            name: buildingName,
+            siteId: site.id,
+            regionId: region.id,
+            floors: [],
+          };
+          site.buildings.push(building);
+
+          // Get children of this building (should be Floors)
+          let floorRecords: any[];
+          try {
+            const fResult = await client.getChildFunctionalLocations(
+              buildingId,
+              { pageSize: 500 },
+            );
+            floorRecords = extractData(fResult);
+          } catch {
+            floorRecords = [];
+          }
+
+          for (const fRec of floorRecords) {
+            building.floors.push({
+              id: readId(fRec),
+              name: readName(fRec),
+              buildingId: building.id,
+              siteId: site.id,
+              regionId: region.id,
+            });
+          }
+          building.floors.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        site.buildings.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      region.sites.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return regions.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   private buildHierarchyFromLeveledLocations(records: any[]): AsseticRegion[] {
@@ -1222,16 +2183,19 @@ class AsseticLocationHierarchyService {
         `FunctionalLocationNameL${n}`,
         `Functional Location Name L${n}`,
         `Functional_Location_Name_L${n}`,
+        `GroupAssetNameL${n}`,
       ]),
       type: this.readString(record, [
         `FunctionalLocationTypeL${n}`,
         `Functional Location Type L${n}`,
         `Functional_Location_Type_L${n}`,
+        `GroupAssetTypeIdL${n}`,
       ]),
       id: this.readString(record, [
         `FunctionalLocationIdL${n}`,
         `Functional Location Id L${n}`,
         `Functional_Location_Id_L${n}`,
+        `GroupAssetIdL${n}`,
       ]),
     });
 
