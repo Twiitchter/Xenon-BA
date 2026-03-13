@@ -30,6 +30,8 @@ const Settings: React.FC = () => {
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
   const [testingAssetic, setTestingAssetic] = useState(false);
   const [hierarchyLoading, setHierarchyLoading] = useState(false);
+  const [hierarchyRebuildLoading, setHierarchyRebuildLoading] = useState(false);
+  const [hierarchyFlushLoading, setHierarchyFlushLoading] = useState(false);
   const [hierarchyError, setHierarchyError] = useState("");
   const [hierarchyData, setHierarchyData] =
     useState<AdminHierarchyResponse | null>(null);
@@ -144,6 +146,46 @@ const Settings: React.FC = () => {
       );
     } finally {
       setHierarchyLoading(false);
+    }
+  };
+
+  const handleRebuildFromDb = async () => {
+    setHierarchyRebuildLoading(true);
+    setHierarchyError("");
+    try {
+      const data = await adminService.rebuildHierarchyFromDb();
+      setHierarchyData(data);
+    } catch (err: any) {
+      setHierarchyError(
+        err?.response?.data?.error || "Failed to rebuild hierarchy from DB",
+      );
+    } finally {
+      setHierarchyRebuildLoading(false);
+    }
+  };
+
+  const handleFlushAndRebuild = async () => {
+    if (
+      !confirm(
+        "This will DELETE all synced assets and functional locations then re-fetch everything from the Assetic API.\n\nThe asset sync will run in the background and may take several hours.\n\nContinue?",
+      )
+    )
+      return;
+    setHierarchyFlushLoading(true);
+    setHierarchyError("");
+    try {
+      const data = await adminService.flushAndRebuild();
+      setHierarchyData(data);
+      setSuccess(
+        data.message || "Flush complete. Asset sync running in background.",
+      );
+      setTimeout(() => setSuccess(""), 8000);
+    } catch (err: any) {
+      setHierarchyError(
+        err?.response?.data?.error || "Flush and rebuild failed",
+      );
+    } finally {
+      setHierarchyFlushLoading(false);
     }
   };
 
@@ -495,11 +537,37 @@ const Settings: React.FC = () => {
               >
                 <button
                   onClick={() => void fetchAsseticHierarchy(true)}
-                  disabled={hierarchyLoading}
+                  disabled={hierarchyLoading || hierarchyRebuildLoading}
                 >
-                  {hierarchyLoading
-                    ? "Refreshing Hierarchy..."
-                    : "Refresh Hierarchy"}
+                  {hierarchyLoading ? "Refreshing..." : "Refresh Hierarchy"}
+                </button>
+                <button
+                  className="btn-outline"
+                  onClick={() => void handleRebuildFromDb()}
+                  disabled={
+                    hierarchyLoading ||
+                    hierarchyRebuildLoading ||
+                    hierarchyFlushLoading
+                  }
+                  title="Sync region assignments from asset data then rebuild the hierarchy from the local database — no Assetic API call"
+                >
+                  {hierarchyRebuildLoading
+                    ? "Rebuilding..."
+                    : "Rebuild from DB"}
+                </button>
+                <button
+                  className="btn-outline btn-danger-outline"
+                  onClick={() => void handleFlushAndRebuild()}
+                  disabled={
+                    hierarchyLoading ||
+                    hierarchyRebuildLoading ||
+                    hierarchyFlushLoading
+                  }
+                  title="DESTRUCTIVE: Wipe all synced data and re-fetch everything fresh from Assetic. Use when assets or buildings are missing."
+                >
+                  {hierarchyFlushLoading
+                    ? "Flushing..."
+                    : "Flush & Full Rebuild"}
                 </button>
               </div>
 

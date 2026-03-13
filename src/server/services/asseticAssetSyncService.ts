@@ -160,6 +160,13 @@ class AsseticAssetSyncService {
       let totalErrors = 0;
       const maxPages = 500; // Safety cap
 
+      // Load all existing GUIDs once to avoid per-row SELECT in the loop
+      const existingGuids = new Set<string>(
+        (await db("assetic_assets").select("assetic_guid")).map(
+          (r: any) => r.assetic_guid as string,
+        ),
+      );
+
       while (page <= maxPages) {
         let rows: any[] = [];
         try {
@@ -176,62 +183,75 @@ class AsseticAssetSyncService {
 
         if (rows.length === 0) break;
 
-        // Upsert each asset
+        const now = new Date();
+        const toInsert: any[] = [];
+        const toInsertGuids: string[] = [];
+
         for (const asset of rows) {
           try {
             const guid = asset.Id || asset.id || asset.Guid || asset.guid || "";
             if (!guid) continue;
 
-            const assetId =
-              asset.AssetId || asset.assetId || asset.AssetCode || "";
-            const assetName =
-              asset.AssetName || asset.assetName || asset.Name || "";
-            const assetStatus =
-              asset.AssetStatusName || asset.AssetStatus || asset.Status || "";
-            const assetType = asset.AssetTypeName || asset.AssetType || "";
-            const assetClass = asset.AssetClassName || asset.AssetClass || "";
-            const assetCategory =
-              asset.AssetCategoryName || asset.AssetCategory || "";
-
-            const exists = await db("assetic_assets")
-              .where("assetic_guid", guid)
-              .first();
-
-            if (exists) {
-              await db("assetic_assets")
-                .where("assetic_guid", guid)
-                .update({
-                  asset_id: assetId,
-                  asset_name: assetName,
-                  asset_status: assetStatus,
-                  asset_type: assetType,
-                  asset_class: assetClass,
-                  asset_category: assetCategory,
-                  data: JSON.stringify(asset),
-                  synced_at: new Date(),
-                  updated_at: new Date(),
-                });
-            } else {
-              await db("assetic_assets").insert({
-                assetic_guid: guid,
-                asset_id: assetId,
-                asset_name: assetName,
-                asset_status: assetStatus,
-                asset_type: assetType,
-                asset_class: assetClass,
-                asset_category: assetCategory,
-                data: JSON.stringify(asset),
-                synced_at: new Date(),
-                created_at: new Date(),
-                updated_at: new Date(),
-              });
+            // Only insert assets not already in DB.
+            // Existing assets are left as-is on routine syncs to avoid
+            // the heavy write load of updating 64k rows with large JSON blobs.
+            if (existingGuids.has(guid)) {
+              totalSynced++; // count as processed
+              continue;
             }
-            totalSynced++;
-          } catch (err) {
+
+            toInsert.push({
+              assetic_guid: guid,
+              asset_id: asset.AssetId || asset.assetId || asset.AssetCode || "",
+              asset_name:
+                asset.AssetName || asset.assetName || asset.Name || "",
+              asset_status:
+                asset.AssetStatusName ||
+                asset.AssetStatus ||
+                asset.Status ||
+                "",
+              asset_type: asset.AssetTypeName || asset.AssetType || "",
+              asset_class: asset.AssetClassName || asset.AssetClass || "",
+              asset_category:
+                asset.AssetCategoryName || asset.AssetCategory || "",
+              data: JSON.stringify(asset),
+              synced_at: now,
+              updated_at: now,
+              created_at: now,
+            });
+            toInsertGuids.push(guid);
+          } catch {
             totalErrors++;
           }
         }
 
+        // Batch INSERT new assets (100 at a time)
+        const INSERT_BATCH = 100;
+        let insertedThisPage = 0;
+        for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
+          const batchEnd = Math.min(i + INSERT_BATCH, toInsert.length);
+          try {
+            await db("assetic_assets").insert(toInsert.slice(i, batchEnd));
+            // Mark successfully inserted GUIDs so they're skipped on future pages/syncs
+            for (let j = i; j < batchEnd; j++) {
+              existingGuids.add(toInsertGuids[j]);
+            }
+            insertedThisPage += batchEnd - i;
+          } catch (err) {
+            // Try inserting individually to salvage as many as possible
+            for (let j = i; j < batchEnd; j++) {
+              try {
+                await db("assetic_assets").insert(toInsert[j]);
+                existingGuids.add(toInsertGuids[j]);
+                insertedThisPage++;
+              } catch {
+                totalErrors++;
+              }
+            }
+          }
+        }
+
+        totalSynced += insertedThisPage;
         this._syncedCount = totalSynced;
         this._errorCount = totalErrors;
         this._progress =
@@ -605,48 +625,70 @@ class AsseticAssetSyncService {
         `[AssetSync] FL sync: fetched ${allRows.length} functional locations`,
       );
 
-      let synced = 0;
+      // Load existing FL GUIDs in one query to avoid N individual SELECTs
+      const existingGuids = new Set<string>(
+        (await db("assetic_functional_locations").select("fl_guid")).map(
+          (r: any) => r.fl_guid as string,
+        ),
+      );
+
+      const now = new Date();
+      const toInsert: any[] = [];
+      const toUpdate: any[] = [];
+
       for (const fl of allRows) {
         const guid = fl.Id || fl.id || fl.Guid || "";
         if (!guid) continue;
 
-        const flId = fl.FunctionalLocationId || fl.functionalLocationId || null;
-        const flName =
-          fl.FunctionalLocationName || fl.functionalLocationName || null;
-        const flType =
-          fl.FunctionalLocationType || fl.functionalLocationType || null;
-        const flTypeId =
-          fl.FunctionalLocationTypeId || fl.functionalLocationTypeId || null;
+        const row = {
+          fl_guid: guid,
+          fl_id: fl.FunctionalLocationId || fl.functionalLocationId || null,
+          fl_name:
+            fl.FunctionalLocationName || fl.functionalLocationName || null,
+          fl_type:
+            fl.FunctionalLocationType || fl.functionalLocationType || null,
+          fl_type_id:
+            fl.FunctionalLocationTypeId || fl.functionalLocationTypeId || null,
+          fl_data: JSON.stringify(fl),
+          synced_at: now,
+        };
 
-        const exists = await db("assetic_functional_locations")
-          .where("fl_guid", guid)
-          .first();
-
-        if (exists) {
-          await db("assetic_functional_locations")
-            .where("fl_guid", guid)
-            .update({
-              fl_id: flId,
-              fl_name: flName,
-              fl_type: flType,
-              fl_type_id: flTypeId,
-              fl_data: JSON.stringify(fl),
-              synced_at: new Date(),
-            });
+        if (existingGuids.has(guid)) {
+          toUpdate.push(row);
         } else {
-          await db("assetic_functional_locations").insert({
-            fl_guid: guid,
-            fl_id: flId,
-            fl_name: flName,
-            fl_type: flType,
-            fl_type_id: flTypeId,
-            fl_data: JSON.stringify(fl),
-            synced_at: new Date(),
-          });
+          toInsert.push(row);
         }
-        synced++;
-        this._syncedCount = synced;
       }
+
+      // Batch INSERT new records (100 at a time)
+      const INSERT_BATCH = 100;
+      for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
+        await db("assetic_functional_locations").insert(
+          toInsert.slice(i, i + INSERT_BATCH),
+        );
+      }
+
+      // Batch UPDATE existing records (20 concurrent)
+      const UPDATE_CONCURRENCY = 20;
+      for (let i = 0; i < toUpdate.length; i += UPDATE_CONCURRENCY) {
+        await Promise.all(
+          toUpdate.slice(i, i + UPDATE_CONCURRENCY).map((row) =>
+            db("assetic_functional_locations")
+              .where("fl_guid", row.fl_guid)
+              .update({
+                fl_id: row.fl_id,
+                fl_name: row.fl_name,
+                fl_type: row.fl_type,
+                fl_type_id: row.fl_type_id,
+                fl_data: row.fl_data,
+                synced_at: row.synced_at,
+              }),
+          ),
+        );
+      }
+
+      const synced = toInsert.length + toUpdate.length;
+      this._syncedCount = synced;
 
       // Try to discover parent-child relationships by probing region children
       let parentsFound = 0;
@@ -768,6 +810,32 @@ class AsseticAssetSyncService {
     let enrichment = { enriched: 0, errors: 0, skipped: 0 };
     if (flEnabled) {
       enrichment = await this.enrichFunctionalLocations();
+    }
+
+    // Step 3.5: Assign parents to FLs using local data only (no API calls).
+    // a) Regions → Sites/Buildings via AssetWorkGroup prefix + NAN suffix
+    // b) Buildings → Floors via ExternalIdentifier prefix matching
+    try {
+      const regionAssigned = await this.syncRegionAssignments();
+      console.log(
+        `[AssetSync] Region assignment: ${regionAssigned} FLs updated.`,
+      );
+    } catch (err) {
+      console.error(
+        "[AssetSync] Region assignment failed:",
+        (err as any)?.message,
+      );
+    }
+    try {
+      const floorsAssigned = await this.syncFloorAssignments();
+      console.log(
+        `[AssetSync] Floor assignment: ${floorsAssigned} floors/structures assigned.`,
+      );
+    } catch (err) {
+      console.error(
+        "[AssetSync] Floor assignment failed:",
+        (err as any)?.message,
+      );
     }
 
     // Step 4: Rebuild hierarchy from the updated DB data
@@ -899,6 +967,321 @@ class AsseticAssetSyncService {
       this._pollTimer = null;
       console.log("[AssetSync] Polling stopped");
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // FLOOR ASSIGNMENT (ExternalIdentifier prefix matching)
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Assign parent_fl_guid for Floor FLs by matching their ExternalIdentifier
+   * prefix to Building FLs.
+   *
+   * The Assetic ExternalIdentifier format is:
+   *   Floor:    "0888-01"  (zero-padded building number + "-" + floor sequence)
+   *   Building: "888-BuildingName"  (numeric prefix + "-" + name)
+   *
+   * We strip leading zeros from the floor prefix and match against the
+   * building numeric prefix to find the parent building.
+   *
+   * This approach requires NO CSV files and NO external API calls beyond
+   * the regular FL sync that already stores fl_data.
+   */
+  async syncFloorAssignments(): Promise<number> {
+    // Load all Building FLs that have an ExternalIdentifier
+    const buildingFLs = await db("assetic_functional_locations")
+      .where("fl_type", "Building")
+      .whereNotNull("fl_data")
+      .select("fl_guid", "fl_name", "fl_data");
+
+    // Build numeric-prefix → guid map for buildings
+    // ExternalIdentifier like "888-BuildingName" → prefix "888"
+    const buildingByPrefix = new Map<string, string>();
+    for (const b of buildingFLs) {
+      try {
+        const data =
+          typeof b.fl_data === "string" ? JSON.parse(b.fl_data) : b.fl_data;
+        const extId: string = data?.ExternalIdentifier || "";
+        const dashIdx = extId.indexOf("-");
+        if (dashIdx > 0) {
+          const prefix = String(parseInt(extId.substring(0, dashIdx), 10)); // strip leading zeros
+          if (!buildingByPrefix.has(prefix)) {
+            buildingByPrefix.set(prefix, b.fl_guid);
+          }
+        }
+      } catch {
+        // skip unparseable fl_data
+      }
+    }
+
+    if (buildingByPrefix.size === 0) {
+      console.log(
+        "[AssetSync] Floor assignment: no building ExternalIdentifiers found.",
+      );
+      return 0;
+    }
+
+    // Load all Floor/Structure FLs without a parent
+    const floorFLs = await db("assetic_functional_locations")
+      .whereIn("fl_type", ["Floor", "Structure"])
+      .whereNull("parent_fl_guid")
+      .whereNotNull("fl_data")
+      .select("fl_guid", "fl_data");
+
+    const updates: Array<{ flGuid: string; parentGuid: string }> = [];
+    for (const f of floorFLs) {
+      try {
+        const data =
+          typeof f.fl_data === "string" ? JSON.parse(f.fl_data) : f.fl_data;
+        const extId: string = data?.ExternalIdentifier || "";
+        const dashIdx = extId.indexOf("-");
+        if (dashIdx > 0) {
+          const prefix = String(parseInt(extId.substring(0, dashIdx), 10));
+          const buildingGuid = buildingByPrefix.get(prefix);
+          if (buildingGuid) {
+            updates.push({ flGuid: f.fl_guid, parentGuid: buildingGuid });
+          }
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    if (updates.length === 0) {
+      console.log(
+        "[AssetSync] Floor assignment: no floor→building matches found.",
+      );
+      return 0;
+    }
+
+    // Batch update in chunks of 200
+    const CHUNK = 200;
+    let updated = 0;
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const chunk = updates.slice(i, i + CHUNK);
+      await Promise.all(
+        chunk.map(({ flGuid, parentGuid }) =>
+          db("assetic_functional_locations")
+            .where("fl_guid", flGuid)
+            .update({ parent_fl_guid: parentGuid }),
+        ),
+      );
+      updated += chunk.length;
+    }
+
+    console.log(
+      `[AssetSync] Floor assignment complete: ${updated} floors/structures assigned to buildings.`,
+    );
+    return updated;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // REGION ASSIGNMENT
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Infer and store Region-level parent_fl_guid for functional locations that
+   * have no parent set yet, using the AssetWorkGroup field on linked assets.
+   *
+   * Assetic encodes region in AssetWorkGroup as "<Region> - <workgroup>".
+   * e.g. "South - Mechanical" → Region FL named "South".
+   *
+   * This compensates for Assetic instances where the nested FL endpoint
+   * (GET /functionallocations/{id}/functionallocations) is unavailable.
+   */
+  async syncRegionAssignments(): Promise<number> {
+    const regions = await db("assetic_functional_locations").where(
+      "fl_type",
+      "Region",
+    );
+    if (regions.length === 0) {
+      console.log(
+        "[AssetSync] No Region FLs found, skipping region assignment.",
+      );
+      return 0;
+    }
+
+    // Build region name → guid map (first match wins for duplicates)
+    const regionByName = new Map<string, string>();
+    for (const r of regions) {
+      const name = (r.fl_name || "").trim();
+      if (name && !regionByName.has(name)) {
+        regionByName.set(name, r.fl_guid);
+      }
+    }
+
+    // For each FL, count linked assets grouped by extracted region prefix.
+    // AssetWorkGroup format: "<RegionName> - <workgroup>" where CHARINDEX
+    // finds the position of the first " - " separator.
+    const rawResult: any = await db.raw(`
+      SELECT
+        afl.fl_guid,
+        LEFT(
+          JSON_VALUE(a.data, '$.AssetWorkGroup'),
+          CHARINDEX(' - ', JSON_VALUE(a.data, '$.AssetWorkGroup')) - 1
+        ) AS region_prefix,
+        COUNT(*) AS cnt
+      FROM assetic_asset_functional_locations afl
+      INNER JOIN assetic_assets a ON afl.asset_guid = a.assetic_guid
+      WHERE afl.fl_guid IS NOT NULL
+        AND JSON_VALUE(a.data, '$.AssetWorkGroup') LIKE '% - %'
+        AND CHARINDEX(' - ', JSON_VALUE(a.data, '$.AssetWorkGroup')) > 1
+      GROUP BY
+        afl.fl_guid,
+        LEFT(
+          JSON_VALUE(a.data, '$.AssetWorkGroup'),
+          CHARINDEX(' - ', JSON_VALUE(a.data, '$.AssetWorkGroup')) - 1
+        )
+    `);
+
+    const rawRows: Array<{
+      fl_guid: string;
+      region_prefix: string;
+      cnt: number;
+    }> = Array.isArray(rawResult)
+      ? rawResult
+      : Array.isArray(rawResult?.[0])
+        ? rawResult[0]
+        : [];
+
+    if (rawRows.length === 0) {
+      console.log(
+        "[AssetSync] Region assignment: no asset work group data found.",
+      );
+      return 0;
+    }
+
+    // Determine dominant region prefix per FL (highest count wins)
+    const flBest = new Map<string, { prefix: string; cnt: number }>();
+    for (const row of rawRows) {
+      const existing = flBest.get(row.fl_guid);
+      if (!existing || Number(row.cnt) > existing.cnt) {
+        flBest.set(row.fl_guid, {
+          prefix: row.region_prefix,
+          cnt: Number(row.cnt),
+        });
+      }
+    }
+
+    // Map FL GUIDs → inferred region GUID
+    const updates: Array<{ flGuid: string; parentGuid: string }> = [];
+    for (const [flGuid, { prefix }] of flBest) {
+      const regionGuid = regionByName.get((prefix || "").trim());
+      if (regionGuid) {
+        updates.push({ flGuid, parentGuid: regionGuid });
+      }
+    }
+
+    if (updates.length === 0) {
+      console.log(
+        "[AssetSync] Region assignment: no FL→region mappings resolved.",
+      );
+      return 0;
+    }
+
+    // Batch-update parent_fl_guid in chunks of 200
+    let updated = 0;
+    const CHUNK = 200;
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const chunk = updates.slice(i, i + CHUNK);
+      await Promise.all(
+        chunk.map(({ flGuid, parentGuid }) =>
+          db("assetic_functional_locations")
+            .where("fl_guid", flGuid)
+            .where("fl_type", "!=", "Region")
+            .update({ parent_fl_guid: parentGuid }),
+        ),
+      );
+      updated += chunk.length;
+    }
+
+    // ── Pass 2: asset-name suffix (NAN / NANW / NAS) ───────────────────────
+    // For FLs still unassigned after Pass 1, look at linked asset names.
+    // PAE "Notional Asset" children carry a region suffix:
+    //   NAN  → North   |   NANW → North West   |   NAS → South
+    const suffixResult: any = await db.raw(`
+      SELECT
+        afl.fl_guid,
+        CASE
+          WHEN JSON_VALUE(a.data, '$.AssetName') LIKE '% NANW' THEN 'North West'
+          WHEN JSON_VALUE(a.data, '$.AssetName') LIKE '% NAN'  THEN 'North'
+          WHEN JSON_VALUE(a.data, '$.AssetName') LIKE '% NAS'  THEN 'South'
+        END AS region_name,
+        COUNT(*) AS cnt
+      FROM assetic_asset_functional_locations afl
+      INNER JOIN assetic_assets a ON afl.asset_guid = a.assetic_guid
+      INNER JOIN assetic_functional_locations fl ON fl.fl_guid = afl.fl_guid
+      WHERE fl.fl_type != 'Region'
+        AND fl.parent_fl_guid IS NULL
+        AND (
+          JSON_VALUE(a.data, '$.AssetName') LIKE '% NAN'
+          OR JSON_VALUE(a.data, '$.AssetName') LIKE '% NANW'
+          OR JSON_VALUE(a.data, '$.AssetName') LIKE '% NAS'
+        )
+      GROUP BY
+        afl.fl_guid,
+        CASE
+          WHEN JSON_VALUE(a.data, '$.AssetName') LIKE '% NANW' THEN 'North West'
+          WHEN JSON_VALUE(a.data, '$.AssetName') LIKE '% NAN'  THEN 'North'
+          WHEN JSON_VALUE(a.data, '$.AssetName') LIKE '% NAS'  THEN 'South'
+        END
+    `);
+
+    const suffixRows: Array<{
+      fl_guid: string;
+      region_name: string;
+      cnt: number;
+    }> = Array.isArray(suffixResult)
+      ? suffixResult
+      : Array.isArray(suffixResult?.[0])
+        ? suffixResult[0]
+        : [];
+
+    if (suffixRows.length > 0) {
+      // Determine dominant region name per FL
+      const suffixBest = new Map<string, { name: string; cnt: number }>();
+      for (const row of suffixRows) {
+        if (!row.region_name) continue;
+        const existing = suffixBest.get(row.fl_guid);
+        if (!existing || Number(row.cnt) > existing.cnt) {
+          suffixBest.set(row.fl_guid, {
+            name: row.region_name,
+            cnt: Number(row.cnt),
+          });
+        }
+      }
+
+      // Build updates using regionByName map (already populated in Pass 1)
+      const suffixUpdates: Array<{ flGuid: string; parentGuid: string }> = [];
+      for (const [flGuid, { name }] of suffixBest) {
+        const regionGuid = regionByName.get(name);
+        if (regionGuid) {
+          suffixUpdates.push({ flGuid, parentGuid: regionGuid });
+        }
+      }
+
+      for (let i = 0; i < suffixUpdates.length; i += CHUNK) {
+        const chunk = suffixUpdates.slice(i, i + CHUNK);
+        await Promise.all(
+          chunk.map(({ flGuid, parentGuid }) =>
+            db("assetic_functional_locations")
+              .where("fl_guid", flGuid)
+              .where("fl_type", "!=", "Region")
+              .update({ parent_fl_guid: parentGuid }),
+          ),
+        );
+        updated += chunk.length;
+      }
+
+      console.log(
+        `[AssetSync] Region assignment Pass 2 (NAN/NANW/NAS suffix): ${suffixUpdates.length} additional FLs assigned.`,
+      );
+    }
+
+    console.log(
+      `[AssetSync] Region assignment complete: ${updated} FLs assigned to regions.`,
+    );
+    return updated;
   }
 
   // ═══════════════════════════════════════════════════════════

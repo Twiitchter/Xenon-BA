@@ -254,6 +254,149 @@ router.get(
   },
 );
 
+/**
+ * POST /api/admin/settings/assetic-rebuild-hierarchy-from-db
+ * Sync region assignments from asset data then rebuild the hierarchy from DB only.
+ * Does NOT call the Assetic API.
+ */
+router.post(
+  "/settings/assetic-rebuild-hierarchy-from-db",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const assigned = await asseticAssetSyncService.syncRegionAssignments();
+      const floors = await asseticAssetSyncService.syncFloorAssignments();
+      const hierarchy =
+        await asseticLocationHierarchyService.buildHierarchyFromDb();
+      res.json({
+        ...hierarchy,
+        regionAssignmentsUpdated: assigned,
+        floorAssignmentsUpdated: floors,
+      });
+    } catch (error: any) {
+      console.error("Error rebuilding hierarchy from DB:", error);
+      res.status(500).json({ error: "Failed to rebuild hierarchy from DB" });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/settings/assetic-flush-and-rebuild
+ * DESTRUCTIVE: Wipes all synced asset/FL data then runs a full resync from the
+ * Assetic API. Used to recover from a corrupted or incomplete sync state.
+ *
+ * Flow:
+ *  1. Save Building→Site parent_fl_guid links (only available via CSV, not API)
+ *  2. Truncate assetic_assets, assetic_functional_locations,
+ *     assetic_asset_functional_locations
+ *  3. syncFunctionalLocations — re-fetch all FLs from API
+ *  4. Restore Building→Site parent links
+ *  5. syncRegionAssignments + syncFloorAssignments
+ *  6. Rebuild hierarchy cache
+ *  7. Fire syncAssets + enrichFunctionalLocations in background
+ *
+ * Returns immediately after step 6. The asset/enrichment sync continues in
+ * background — monitor progress via GET /settings/asset-sync-status.
+ */
+router.post(
+  "/settings/assetic-flush-and-rebuild",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+
+      const status = await asseticAssetSyncService.getStatus();
+      if (status.isRunning) {
+        return res
+          .status(409)
+          .json({ error: "A sync operation is already running", status });
+      }
+
+      // 1. Save Building→Site parent links before wiping
+      const buildingSiteLinks: Array<{
+        building_guid: string;
+        site_guid: string;
+      }> = await db("assetic_functional_locations as b")
+        .join(
+          "assetic_functional_locations as s",
+          "b.parent_fl_guid",
+          "s.fl_guid",
+        )
+        .where("b.fl_type", "Building")
+        .where("s.fl_type", "Site")
+        .select("b.fl_guid as building_guid", "b.parent_fl_guid as site_guid");
+
+      console.log(
+        `[FlushRebuild] Saved ${buildingSiteLinks.length} Building→Site links`,
+      );
+
+      // 2. Truncate tables (order matters: dependents first)
+      await db.raw("TRUNCATE TABLE assetic_asset_functional_locations");
+      await db.raw("TRUNCATE TABLE assetic_assets");
+      await db.raw("TRUNCATE TABLE assetic_functional_locations");
+      console.log("[FlushRebuild] Tables truncated");
+
+      // 3. Re-sync functional locations from Assetic API (blocks until done)
+      const flResult = await asseticAssetSyncService.syncFunctionalLocations();
+      console.log(`[FlushRebuild] FL sync done: ${flResult.synced} FLs`);
+
+      // 4. Restore Building→Site parent links
+      let restored = 0;
+      const BATCH = 50;
+      for (let i = 0; i < buildingSiteLinks.length; i += BATCH) {
+        const chunk = buildingSiteLinks.slice(i, i + BATCH);
+        await Promise.all(
+          chunk.map((link) =>
+            db("assetic_functional_locations")
+              .where("fl_guid", link.building_guid)
+              .whereNull("parent_fl_guid")
+              .update({ parent_fl_guid: link.site_guid }),
+          ),
+        );
+        restored += chunk.length;
+      }
+      console.log(`[FlushRebuild] Restored ${restored} Building→Site links`);
+
+      // 5. Sync region + floor assignments
+      const regionCount = await asseticAssetSyncService.syncRegionAssignments();
+      const floorCount = await asseticAssetSyncService.syncFloorAssignments();
+      console.log(
+        `[FlushRebuild] Region assignments: ${regionCount}, Floor assignments: ${floorCount}`,
+      );
+
+      // 6. Rebuild hierarchy cache
+      const hierarchy =
+        await asseticLocationHierarchyService.buildHierarchyFromDb();
+      console.log("[FlushRebuild] Hierarchy rebuilt");
+
+      // 7. Fire full asset sync in background
+      asseticAssetSyncService
+        .runFullSync()
+        .catch((err) =>
+          console.error("[FlushRebuild] Background asset sync failed:", err),
+        );
+
+      res.json({
+        message:
+          "Flush complete. FL hierarchy rebuilt. Asset sync running in background — monitor via sync status.",
+        flsSynced: flResult.synced,
+        buildingSiteLinksRestored: restored,
+        regionAssignmentsUpdated: regionCount,
+        floorAssignmentsUpdated: floorCount,
+        ...hierarchy,
+      });
+    } catch (error: any) {
+      console.error("[FlushRebuild] Error:", error);
+      res
+        .status(500)
+        .json({ error: "Flush and rebuild failed: " + error.message });
+    }
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════════════
 // ASSET SYNC
 // ═══════════════════════════════════════════════════════════════════════
@@ -401,9 +544,17 @@ router.post(
           .status(409)
           .json({ error: "A sync operation is already running", status });
       }
-      asseticAssetSyncService.enrichFunctionalLocations().catch((err) => {
-        console.error("[AssetSync] Manual FL enrichment failed:", err);
-      });
+      asseticAssetSyncService
+        .enrichFunctionalLocations()
+        .then(() => asseticAssetSyncService.syncRegionAssignments())
+        .then(() => asseticAssetSyncService.syncFloorAssignments())
+        .then(() => asseticLocationHierarchyService.getOrRefresh())
+        .catch((err) => {
+          console.error(
+            "[AssetSync] Manual FL enrichment + region assignment failed:",
+            err,
+          );
+        });
       res.json({
         message: "FL enrichment started",
         status: await asseticAssetSyncService.getStatus(),
@@ -458,6 +609,15 @@ router.get("/users", async (req: AuthRequest, res: Response) => {
         "is_active",
         "department",
         "phone",
+        "display_name",
+        "pref_region_id",
+        "pref_region_name",
+        "pref_site_id",
+        "pref_site_name",
+        "pref_building_id",
+        "pref_building_name",
+        "pref_floor_id",
+        "pref_floor_name",
         "created_at",
         "updated_at",
       )
@@ -484,6 +644,15 @@ router.post(
     body("role").optional().isIn(["admin", "manager", "user"]),
     body("department").optional().trim(),
     body("phone").optional().trim(),
+    body("displayName").optional().trim(),
+    body("prefRegionId").optional().trim(),
+    body("prefRegionName").optional().trim(),
+    body("prefSiteId").optional().trim(),
+    body("prefSiteName").optional().trim(),
+    body("prefBuildingId").optional().trim(),
+    body("prefBuildingName").optional().trim(),
+    body("prefFloorId").optional().trim(),
+    body("prefFloorName").optional().trim(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -492,8 +661,24 @@ router.post(
     }
 
     try {
-      const { email, password, firstName, lastName, role, department, phone } =
-        req.body;
+      const {
+        email,
+        password,
+        firstName,
+        lastName,
+        role,
+        department,
+        phone,
+        displayName,
+        prefRegionId,
+        prefRegionName,
+        prefSiteId,
+        prefSiteName,
+        prefBuildingId,
+        prefBuildingName,
+        prefFloorId,
+        prefFloorName,
+      } = req.body;
 
       // Check if user already exists
       const existing = await db("users").where("email", email).first();
@@ -516,6 +701,15 @@ router.post(
           is_active: true,
           department: department || null,
           phone: phone || null,
+          display_name: displayName || null,
+          pref_region_id: prefRegionId || null,
+          pref_region_name: prefRegionName || null,
+          pref_site_id: prefSiteId || null,
+          pref_site_name: prefSiteName || null,
+          pref_building_id: prefBuildingId || null,
+          pref_building_name: prefBuildingName || null,
+          pref_floor_id: prefFloorId || null,
+          pref_floor_name: prefFloorName || null,
         })
         .returning("*");
 
@@ -566,6 +760,15 @@ router.put(
     body("password").optional().isLength({ min: 6 }),
     body("department").optional().trim(),
     body("phone").optional().trim(),
+    body("displayName").optional().trim(),
+    body("prefRegionId").optional().trim(),
+    body("prefRegionName").optional().trim(),
+    body("prefSiteId").optional().trim(),
+    body("prefSiteName").optional().trim(),
+    body("prefBuildingId").optional().trim(),
+    body("prefBuildingName").optional().trim(),
+    body("prefFloorId").optional().trim(),
+    body("prefFloorName").optional().trim(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -584,6 +787,15 @@ router.put(
         password,
         department,
         phone,
+        displayName,
+        prefRegionId,
+        prefRegionName,
+        prefSiteId,
+        prefSiteName,
+        prefBuildingId,
+        prefBuildingName,
+        prefFloorId,
+        prefFloorName,
       } = req.body;
 
       const existing = await db("users").where("id", id).first();
@@ -599,6 +811,24 @@ router.put(
       if (isActive !== undefined) updateData.is_active = isActive;
       if (department !== undefined) updateData.department = department;
       if (phone !== undefined) updateData.phone = phone;
+      if (displayName !== undefined)
+        updateData.display_name = displayName || null;
+      if (prefRegionId !== undefined)
+        updateData.pref_region_id = prefRegionId || null;
+      if (prefRegionName !== undefined)
+        updateData.pref_region_name = prefRegionName || null;
+      if (prefSiteId !== undefined)
+        updateData.pref_site_id = prefSiteId || null;
+      if (prefSiteName !== undefined)
+        updateData.pref_site_name = prefSiteName || null;
+      if (prefBuildingId !== undefined)
+        updateData.pref_building_id = prefBuildingId || null;
+      if (prefBuildingName !== undefined)
+        updateData.pref_building_name = prefBuildingName || null;
+      if (prefFloorId !== undefined)
+        updateData.pref_floor_id = prefFloorId || null;
+      if (prefFloorName !== undefined)
+        updateData.pref_floor_name = prefFloorName || null;
       if (password) {
         updateData.password_hash = await bcrypt.hash(password, 10);
       }
@@ -630,6 +860,15 @@ router.put(
           "is_active",
           "department",
           "phone",
+          "display_name",
+          "pref_region_id",
+          "pref_region_name",
+          "pref_site_id",
+          "pref_site_name",
+          "pref_building_id",
+          "pref_building_name",
+          "pref_floor_id",
+          "pref_floor_name",
         )
         .first();
 

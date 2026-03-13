@@ -36,12 +36,6 @@ const Maintenance: React.FC = () => {
     requestorEmail: "",
     requestorPhone: "",
     requestorMobile: "",
-    // Physical location details
-    streetAddress: "",
-    citySuburb: "",
-    state: "",
-    zipPostcode: "",
-    country: "",
     // Optional fields
     supportingInformation: "",
     // Assetic fields
@@ -149,11 +143,6 @@ const Maintenance: React.FC = () => {
         requestorEmail: "",
         requestorPhone: "",
         requestorMobile: "",
-        streetAddress: "",
-        citySuburb: "",
-        state: "",
-        zipPostcode: "",
-        country: "",
         supportingInformation: "",
         workRequestSourceId: "",
         workRequestSubtypeId: "",
@@ -429,65 +418,6 @@ const Maintenance: React.FC = () => {
                 }
                 placeholder="e.g. Room 101, opposite reception"
               />
-            </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="form-group" style={{ flex: 2 }}>
-                <label>Street Address</label>
-                <input
-                  type="text"
-                  value={formData.streetAddress}
-                  onChange={(e) =>
-                    setFormData({ ...formData, streetAddress: e.target.value })
-                  }
-                  placeholder="Street address"
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>City/Suburb</label>
-                <input
-                  type="text"
-                  value={formData.citySuburb}
-                  onChange={(e) =>
-                    setFormData({ ...formData, citySuburb: e.target.value })
-                  }
-                  placeholder="City"
-                />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>State</label>
-                <input
-                  type="text"
-                  value={formData.state}
-                  onChange={(e) =>
-                    setFormData({ ...formData, state: e.target.value })
-                  }
-                  placeholder="State"
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Zip/Postcode</label>
-                <input
-                  type="text"
-                  value={formData.zipPostcode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, zipPostcode: e.target.value })
-                  }
-                  placeholder="Postcode"
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Country</label>
-                <input
-                  type="text"
-                  value={formData.country}
-                  onChange={(e) =>
-                    setFormData({ ...formData, country: e.target.value })
-                  }
-                  placeholder="Country"
-                />
-              </div>
             </div>
 
             <div className="form-group">

@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Maintenance from "./pages/Maintenance";
 import MyRequests from "./pages/MyRequests";
 import WorkOrders from "./pages/WorkOrders";
+import NewWorkRequest from "./pages/NewWorkRequest";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
 import { authService } from "./services/authService";
@@ -184,6 +185,21 @@ function AppContent() {
                   My Requests
                 </NavLink>
               )}
+              <NavLink to="/new-request">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="16" />
+                  <line x1="8" y1="12" x2="16" y2="12" />
+                </svg>
+                New Work Request
+              </NavLink>
             </div>
 
             {isAdmin && (
@@ -345,6 +361,16 @@ function AppContent() {
             element={
               isAuthenticated ? (
                 <MyRequests />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/new-request"
+            element={
+              isAuthenticated ? (
+                <NewWorkRequest />
               ) : (
                 <Navigate to="/login" replace />
               )

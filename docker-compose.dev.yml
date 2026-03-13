@@ -52,13 +52,13 @@ services:
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
     ports:
-      - "${MSSQL_HOST_PORT:-1433}:1433"
+      - "${MSSQL_HOST_PORT:-1434}:1433"
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: ${DB_PASSWORD:-YourStrong!Passw0rd}
       MSSQL_PID: Developer
-      MSSQL_MEMORY_LIMIT_MB: "1800"
-    mem_limit: "2g"
+      MSSQL_MEMORY_LIMIT_MB: "3072"
+    mem_limit: "4g"
     healthcheck:
       test:
         [

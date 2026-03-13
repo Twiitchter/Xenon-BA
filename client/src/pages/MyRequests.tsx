@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { maintenanceService } from "../services/maintenanceService";
+import { authService } from "../services/authService";
 import LocationHierarchyPicker, {
   EMPTY_LOCATION_SELECTION,
   LocationSelection,
@@ -47,6 +48,7 @@ const MyRequests: React.FC = () => {
   const [locationSelection, setLocationSelection] = useState<LocationSelection>(
     EMPTY_LOCATION_SELECTION,
   );
+  const [locationPrefilled, setLocationPrefilled] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -79,6 +81,16 @@ const MyRequests: React.FC = () => {
     const params = new URLSearchParams(location.search);
     if (params.get("new") === "1") {
       setShowCreateForm(true);
+      const user = authService.getUser();
+      if (user?.prefRegionId) {
+        setLocationSelection({
+          regionId: user.prefRegionId || "",
+          siteId: user.prefSiteId || "",
+          buildingId: user.prefBuildingId || "",
+          floorId: user.prefFloorId || "",
+        });
+        setLocationPrefilled(true);
+      }
     }
   }, [location.search]);
 
@@ -127,8 +139,22 @@ const MyRequests: React.FC = () => {
         category: "",
         location: "",
       });
-      setLocationSelection(EMPTY_LOCATION_SELECTION);
+      // Restore user's preferred location (not empty) so next request is pre-filled too
+      const user = authService.getUser();
+      if (user?.prefRegionId) {
+        setLocationSelection({
+          regionId: user.prefRegionId || "",
+          siteId: user.prefSiteId || "",
+          buildingId: user.prefBuildingId || "",
+          floorId: user.prefFloorId || "",
+        });
+        setLocationPrefilled(true);
+      } else {
+        setLocationSelection(EMPTY_LOCATION_SELECTION);
+        setLocationPrefilled(false);
+      }
       setShowCreateForm(false);
+      setLocationPrefilled(false);
 
       // Remove deep-link flag after successful create.
       if (location.search) {
@@ -149,8 +175,25 @@ const MyRequests: React.FC = () => {
     const next = !showCreateForm;
     setShowCreateForm(next);
 
-    if (!next && location.search) {
-      navigate("/my-requests", { replace: true });
+    // Pre-fill location from user's preferred location when opening the form
+    if (next) {
+      const user = authService.getUser();
+      if (user?.prefRegionId) {
+        setLocationSelection({
+          regionId: user.prefRegionId || "",
+          siteId: user.prefSiteId || "",
+          buildingId: user.prefBuildingId || "",
+          floorId: user.prefFloorId || "",
+        });
+        setLocationPrefilled(true);
+      } else {
+        setLocationPrefilled(false);
+      }
+    } else {
+      setLocationPrefilled(false);
+      if (location.search) {
+        navigate("/my-requests", { replace: true });
+      }
     }
   };
 
@@ -301,10 +344,21 @@ const MyRequests: React.FC = () => {
               <label>Location</label>
               {locationHierarchy && (
                 <>
+                  {locationPrefilled && (
+                    <div
+                      className="settings-muted"
+                      style={{ marginBottom: "6px", fontStyle: "italic" }}
+                    >
+                      Pre-filled from your account's default location
+                    </div>
+                  )}
                   <LocationHierarchyPicker
                     hierarchy={locationHierarchy}
                     selection={locationSelection}
-                    onChange={setLocationSelection}
+                    onChange={(sel) => {
+                      setLocationSelection(sel);
+                      setLocationPrefilled(false);
+                    }}
                   />
                   {buildLocationPath(locationHierarchy, locationSelection) && (
                     <div

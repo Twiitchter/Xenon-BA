@@ -100,6 +100,34 @@ class AdminService {
     return response.data;
   }
 
+  async rebuildHierarchyFromDb(): Promise<
+    AdminHierarchyResponse & { regionAssignmentsUpdated: number }
+  > {
+    const response = await axios.post(
+      `${API_URL}/settings/assetic-rebuild-hierarchy-from-db`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  async flushAndRebuild(): Promise<
+    AdminHierarchyResponse & {
+      message: string;
+      flsSynced: number;
+      buildingSiteLinksRestored: number;
+      regionAssignmentsUpdated: number;
+      floorAssignmentsUpdated: number;
+    }
+  > {
+    const response = await axios.post(
+      `${API_URL}/settings/assetic-flush-and-rebuild`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
   // ─── Users ────────────────────────────────────────────────────────
 
   async getUsers() {
@@ -117,6 +145,15 @@ class AdminService {
     role?: string;
     department?: string;
     phone?: string;
+    displayName?: string;
+    prefRegionId?: string;
+    prefRegionName?: string;
+    prefSiteId?: string;
+    prefSiteName?: string;
+    prefBuildingId?: string;
+    prefBuildingName?: string;
+    prefFloorId?: string;
+    prefFloorName?: string;
   }) {
     const response = await axios.post(`${API_URL}/users`, data, {
       headers: authService.getAuthHeader(),
