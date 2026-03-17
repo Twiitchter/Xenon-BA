@@ -158,6 +158,8 @@ class AsseticAssetSyncService {
       let page = 1;
       let totalSynced = 0;
       let totalErrors = 0;
+      let totalSkipped = 0;
+      let totalInserted = 0;
       const maxPages = 500; // Safety cap
 
       // Load all existing GUIDs once to avoid per-row SELECT in the loop
@@ -165,6 +167,10 @@ class AsseticAssetSyncService {
         (await db("assetic_assets").select("assetic_guid")).map(
           (r: any) => r.assetic_guid as string,
         ),
+      );
+      const preExistingCount = existingGuids.size;
+      console.log(
+        `[AssetSync] Pre-existing assets in DB: ${preExistingCount}. API total: ${apiTotal}. Delta: ${apiTotal - preExistingCount}.`,
       );
 
       while (page <= maxPages) {
@@ -196,6 +202,7 @@ class AsseticAssetSyncService {
             // Existing assets are left as-is on routine syncs to avoid
             // the heavy write load of updating 64k rows with large JSON blobs.
             if (existingGuids.has(guid)) {
+              totalSkipped++;
               totalSynced++; // count as processed
               continue;
             }
@@ -251,6 +258,7 @@ class AsseticAssetSyncService {
           }
         }
 
+        totalInserted += insertedThisPage;
         totalSynced += insertedThisPage;
         this._syncedCount = totalSynced;
         this._errorCount = totalErrors;
@@ -265,9 +273,20 @@ class AsseticAssetSyncService {
           });
         }
 
+        const skippedThisPage = rows.length - toInsert.length;
         console.log(
-          `[AssetSync] Page ${page}: +${rows.length} assets (${totalSynced} total, ${this._progress}%)`,
+          `[AssetSync] Page ${page}: ${rows.length} fetched, ${insertedThisPage} inserted, ${skippedThisPage} already-exist, ${totalErrors} errors (${totalSynced} processed, ${this._progress}%)`,
         );
+
+        // Log if a page returned no GUID (data quality issue)
+        const noGuidCount = rows.filter(
+          (a: any) => !(a.Id || a.id || a.Guid || a.guid),
+        ).length;
+        if (noGuidCount > 0) {
+          console.warn(
+            `[AssetSync] Page ${page}: ${noGuidCount} assets had no GUID and were skipped entirely`,
+          );
+        }
 
         if (rows.length < pageSize) break;
         if (apiTotal > 0 && totalSynced >= apiTotal) break;
@@ -281,9 +300,18 @@ class AsseticAssetSyncService {
         completed_at: new Date(),
       });
 
+      const finalDbCount = await this.getDbAssetCount();
       console.log(
-        `[AssetSync] Asset sync complete: ${totalSynced} synced, ${totalErrors} errors`,
+        `[AssetSync] Asset sync complete: ${totalInserted} newly inserted, ${totalSkipped} already existed, ${totalErrors} errors. ` +
+          `DB before: ${preExistingCount}, DB after: ${finalDbCount}, API reported: ${apiTotal}. ` +
+          `${apiTotal - finalDbCount > 0 ? `GAP: ${apiTotal - finalDbCount} assets not in DB.` : "DB matches API count."}`,
       );
+      if (apiTotal - finalDbCount > 100) {
+        console.warn(
+          `[AssetSync] SIGNIFICANT GAP: ${apiTotal - finalDbCount} assets missing from DB. ` +
+            `Possible causes: page limit hit (${page}/${maxPages} pages used), API inconsistent totals, or assets without GUIDs.`,
+        );
+      }
 
       return { synced: totalSynced, errors: totalErrors };
     } catch (err) {
@@ -358,7 +386,10 @@ class AsseticAssetSyncService {
       let enriched = 0;
       let errors = 0;
       let skipped = 0;
+      let noFlCount = 0;
+      let notFoundCount = 0;
       let loggedFirstFl = false;
+      const errorSamples = new Set<string>();
 
       // Determine concurrency from configured worker count
       const poolStatus = asseticClient.getRateLimitStatus();
@@ -383,6 +414,7 @@ class AsseticAssetSyncService {
               );
               loggedFirstFl = true;
             }
+            noFlCount++;
             await db("assetic_asset_functional_locations").insert({
               asset_guid: guid,
               fl_guid: null,
@@ -468,6 +500,7 @@ class AsseticAssetSyncService {
           return "enriched";
         } catch (err: any) {
           if (err?.response?.status === 404) {
+            notFoundCount++;
             await db("assetic_asset_functional_locations").insert({
               asset_guid: guid,
               fl_guid: null,
@@ -475,6 +508,14 @@ class AsseticAssetSyncService {
               synced_at: new Date(),
             });
             return "skipped";
+          }
+          // Log first few unique error messages for diagnosis
+          const errMsg =
+            err?.message || err?.response?.statusText || String(err);
+          if (errorSamples.size < 5) {
+            errorSamples.add(
+              `[${err?.response?.status || "unknown"}] ${errMsg}`,
+            );
           }
           return "error";
         }
@@ -552,8 +593,19 @@ class AsseticAssetSyncService {
         });
 
       console.log(
-        `[AssetSync] FL enrichment complete: ${enriched} enriched, ${skipped} no FL, ${errors} errors`,
+        `[AssetSync] FL enrichment complete: ${enriched} enriched, ${skipped} skipped (${noFlCount} no FL data, ${notFoundCount} 404 not found), ${errors} errors`,
       );
+      if (errorSamples.size > 0) {
+        console.warn(
+          `[AssetSync] FL enrichment error samples:\n` +
+            [...errorSamples].map((e) => `  - ${e}`).join("\n"),
+        );
+      }
+      if (noFlCount > 100) {
+        console.warn(
+          `[AssetSync] ${noFlCount} assets returned no functional location — these assets won't appear in the hierarchy tree.`,
+        );
+      }
 
       return { enriched, errors, skipped };
     } catch (err) {
@@ -622,8 +674,13 @@ class AsseticAssetSyncService {
 
       this._totalCount = allRows.length;
       console.log(
-        `[AssetSync] FL sync: fetched ${allRows.length} functional locations`,
+        `[AssetSync] FL sync: fetched ${allRows.length} functional locations across ${page - 1} page(s)`,
       );
+      if (page > 500) {
+        console.warn(
+          `[AssetSync] FL sync hit 500-page cap — some functional locations may be missing. Consider increasing page size.`,
+        );
+      }
 
       // Load existing FL GUIDs in one query to avoid N individual SELECTs
       const existingGuids = new Set<string>(
@@ -697,6 +754,58 @@ class AsseticAssetSyncService {
         "like",
         "%Region%",
       );
+      console.log(
+        `[AssetSync] FL sync: found ${regions.length} Region-type FLs. Probing nested children endpoint...`,
+      );
+
+      const upsertFlChild = async (
+        child: any,
+        parentGuid: string,
+      ): Promise<void> => {
+        const childGuid = child.Id || child.id || child.Guid || "";
+        if (!childGuid) return;
+        const childRow = {
+          fl_guid: childGuid,
+          fl_id:
+            child.FunctionalLocationId || child.functionalLocationId || null,
+          fl_name:
+            child.FunctionalLocationName ||
+            child.functionalLocationName ||
+            null,
+          fl_type:
+            child.FunctionalLocationType ||
+            child.functionalLocationType ||
+            null,
+          fl_type_id:
+            child.FunctionalLocationTypeId ||
+            child.functionalLocationTypeId ||
+            null,
+          parent_fl_guid: parentGuid,
+          fl_data: JSON.stringify(child),
+          synced_at: now,
+        };
+        if (!existingGuids.has(childGuid)) {
+          try {
+            await db("assetic_functional_locations").insert(childRow);
+            existingGuids.add(childGuid);
+          } catch {
+            // Race or duplicate — fall back to update
+            await db("assetic_functional_locations")
+              .where("fl_guid", childGuid)
+              .update({ parent_fl_guid: parentGuid });
+          }
+        } else {
+          await db("assetic_functional_locations")
+            .where("fl_guid", childGuid)
+            .update({
+              parent_fl_guid: parentGuid,
+              fl_name: childRow.fl_name,
+              fl_type: childRow.fl_type,
+              fl_data: childRow.fl_data,
+              synced_at: now,
+            });
+        }
+      };
 
       for (const region of regions) {
         try {
@@ -706,18 +815,25 @@ class AsseticAssetSyncService {
           );
           if (children) {
             const childRows = this.extractRows(children);
+            const newCount = childRows.filter(
+              (c: any) => !existingGuids.has(c.Id || c.id || ""),
+            ).length;
+            console.log(
+              `[AssetSync] Region "${region.fl_name}": ${childRows.length} children (${newCount} new Site FLs to insert)`,
+            );
             for (const child of childRows) {
-              const childGuid = child.Id || child.id || "";
-              if (childGuid) {
-                await db("assetic_functional_locations")
-                  .where("fl_guid", childGuid)
-                  .update({ parent_fl_guid: region.fl_guid });
-                parentsFound++;
-              }
+              await upsertFlChild(child, region.fl_guid);
+              parentsFound++;
             }
+          } else {
+            console.log(
+              `[AssetSync] Region "${region.fl_name}": nested endpoint returned null (not available)`,
+            );
           }
-        } catch {
-          // Nested endpoint may not be available — that's fine
+        } catch (err) {
+          console.log(
+            `[AssetSync] Region "${region.fl_name}": nested children probe failed: ${(err as any)?.message || err}`,
+          );
         }
       }
 
@@ -727,6 +843,10 @@ class AsseticAssetSyncService {
           .where("fl_type", "like", "%Site%")
           .orWhere("fl_type", "like", "%Precinct%");
 
+        console.log(
+          `[AssetSync] FL sync: probing ${sites.length} Site FLs for building children...`,
+        );
+        let siteChildErrors = 0;
         for (const site of sites) {
           try {
             const children = await asseticClient.getChildFunctionalLocations(
@@ -735,19 +855,29 @@ class AsseticAssetSyncService {
             );
             if (children) {
               const childRows = this.extractRows(children);
+              if (childRows.length > 0) {
+                console.log(
+                  `[AssetSync] Site "${site.fl_name}": ${childRows.length} building children`,
+                );
+              }
               for (const child of childRows) {
-                const childGuid = child.Id || child.id || "";
-                if (childGuid) {
-                  await db("assetic_functional_locations")
-                    .where("fl_guid", childGuid)
-                    .update({ parent_fl_guid: site.fl_guid });
-                  parentsFound++;
-                }
+                await upsertFlChild(child, site.fl_guid);
+                parentsFound++;
               }
             }
-          } catch {
-            break; // Stop if endpoint not available
+          } catch (err) {
+            siteChildErrors++;
+            if (siteChildErrors === 1) {
+              console.warn(
+                `[AssetSync] Site nested endpoint failed for "${site.fl_name}": ${(err as any)?.message || err}. Building→Site links will rely on syncRegionAssignments fallback.`,
+              );
+            }
           }
+        }
+        if (siteChildErrors > 1) {
+          console.warn(
+            `[AssetSync] ${siteChildErrors} sites failed nested children probe.`,
+          );
         }
       }
 
