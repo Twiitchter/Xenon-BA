@@ -398,7 +398,62 @@ class AsseticAssetSyncService {
         `[AssetSync] FL enrichment: using ${concurrency} concurrent workers`,
       );
 
-      // Process a single asset's FL enrichment
+      // ── Batch DB writer ───────────────────────────────────────────────────
+      // API fetches run concurrently but DB writes are batched and serialised
+      // to avoid overwhelming the DB connection pool with thousands of
+      // simultaneous single-row INSERTs.
+      const DB_BATCH_SIZE = 100;
+      type AflRow = {
+        asset_guid: string;
+        fl_guid: string | null;
+        fl_id: string | null;
+        fl_name: string | null;
+        fl_type: string | null;
+        fl_type_id: string | null;
+        parent_fl_guid: string | null;
+        fl_data: string | null;
+        synced_at: Date;
+      };
+      const writeBatch: AflRow[] = [];
+      let dbWriteInFlight = false;
+      const dbWriteQueue: Array<() => void> = [];
+
+      const runNextDbWrite = () => {
+        if (dbWriteInFlight || dbWriteQueue.length === 0) return;
+        dbWriteInFlight = true;
+        const next = dbWriteQueue.shift()!;
+        next();
+      };
+
+      const flushBatch = (force = false): Promise<void> => {
+        if (writeBatch.length === 0) return Promise.resolve();
+        if (!force && writeBatch.length < DB_BATCH_SIZE)
+          return Promise.resolve();
+        const rows = writeBatch.splice(0, writeBatch.length);
+        return new Promise<void>((resolve) => {
+          dbWriteQueue.push(async () => {
+            try {
+              await db("assetic_asset_functional_locations").insert(rows);
+            } catch {
+              // Batch failed — write rows individually to salvage as many as possible
+              for (const row of rows) {
+                try {
+                  await db("assetic_asset_functional_locations").insert(row);
+                } catch {
+                  // duplicate or constraint — ignore
+                }
+              }
+            } finally {
+              dbWriteInFlight = false;
+              resolve();
+              runNextDbWrite();
+            }
+          });
+          runNextDbWrite();
+        });
+      };
+
+      // Process a single asset's FL enrichment — API call only, no direct DB writes
       const processOne = async (
         guid: string,
       ): Promise<"enriched" | "skipped" | "error"> => {
@@ -415,16 +470,18 @@ class AsseticAssetSyncService {
               loggedFirstFl = true;
             }
             noFlCount++;
-            await db("assetic_asset_functional_locations").insert({
+            writeBatch.push({
               asset_guid: guid,
               fl_guid: null,
               fl_id: null,
               fl_name: null,
               fl_type: null,
               fl_type_id: null,
+              parent_fl_guid: null,
               fl_data: null,
               synced_at: new Date(),
             });
+            await flushBatch();
             return "skipped";
           }
 
@@ -462,7 +519,7 @@ class AsseticAssetSyncService {
             flData.parentFunctionalLocationId ||
             null;
 
-          await db("assetic_asset_functional_locations").insert({
+          writeBatch.push({
             asset_guid: guid,
             fl_guid: flGuid,
             fl_id: flId,
@@ -473,40 +530,23 @@ class AsseticAssetSyncService {
             fl_data: JSON.stringify(flData),
             synced_at: new Date(),
           });
-
-          if (flGuid) {
-            const existingFL = await db("assetic_functional_locations")
-              .where("fl_guid", flGuid)
-              .first();
-            if (existingFL) {
-              if (parentFlGuid && !existingFL.parent_fl_guid) {
-                await db("assetic_functional_locations")
-                  .where("fl_guid", flGuid)
-                  .update({ parent_fl_guid: parentFlGuid });
-              }
-            } else {
-              await db("assetic_functional_locations").insert({
-                fl_guid: flGuid,
-                fl_id: flId,
-                fl_name: flName,
-                fl_type: flType,
-                fl_type_id: flTypeId,
-                parent_fl_guid: parentFlGuid,
-                fl_data: JSON.stringify(flData),
-                synced_at: new Date(),
-              });
-            }
-          }
+          await flushBatch();
           return "enriched";
         } catch (err: any) {
           if (err?.response?.status === 404) {
             notFoundCount++;
-            await db("assetic_asset_functional_locations").insert({
+            writeBatch.push({
               asset_guid: guid,
               fl_guid: null,
+              fl_id: null,
+              fl_name: null,
+              fl_type: null,
+              fl_type_id: null,
+              parent_fl_guid: null,
               fl_data: null,
               synced_at: new Date(),
             });
+            await flushBatch();
             return "skipped";
           }
           // Log first few unique error messages for diagnosis
@@ -582,6 +622,9 @@ class AsseticAssetSyncService {
 
         tryDispatch();
       });
+
+      // Flush any remaining rows that didn't fill a full batch
+      await flushBatch(true);
 
       await db("assetic_sync_log")
         .where("id", syncLogId)
