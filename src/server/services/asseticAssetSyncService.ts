@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { db } from "../database";
 import asseticClient from "./asseticClient";
 import settingsService from "./settingsService";
@@ -1390,88 +1392,72 @@ class AsseticAssetSyncService {
       updated += chunk.length;
     }
 
-    // ── Pass 1B: Fix orphaned Site FLs via their Building children ────────
-    // Site FLs have fl_type='Site' but parent_fl_guid IS NULL because they
-    // came from the main /functionallocations endpoint without a parent link.
-    // We resolve their Region by looking at their Building children (which
-    // DO have assets linked) and extracting the dominant AssetWorkGroup prefix.
-    const orphanedSites = await db("assetic_functional_locations")
-      .where("fl_type", "Site")
-      .whereNull("parent_fl_guid")
-      .whereNot("fl_name", "()")
-      .select("fl_guid", "fl_name");
-
-    if (orphanedSites.length > 0) {
-      const siteGuids = orphanedSites.map((s: any) => s.fl_guid as string);
-
-      const siteRegionRaw: any = await db.raw(
-        `SELECT
-          b.parent_fl_guid AS site_guid,
-          LEFT(
-            JSON_VALUE(a.data, '$.AssetWorkGroup'),
-            CHARINDEX(' - ', JSON_VALUE(a.data, '$.AssetWorkGroup')) - 1
-          ) AS region_prefix,
-          COUNT(*) AS cnt
-        FROM assetic_functional_locations b
-        INNER JOIN assetic_asset_functional_locations afl ON afl.fl_guid = b.fl_guid
-        INNER JOIN assetic_assets a ON a.assetic_guid = afl.asset_guid
-        WHERE b.fl_type = 'Building'
-          AND b.parent_fl_guid IN (${siteGuids.map(() => "?").join(",")})
-          AND JSON_VALUE(a.data, '$.AssetWorkGroup') LIKE '% - %'
-          AND CHARINDEX(' - ', JSON_VALUE(a.data, '$.AssetWorkGroup')) > 1
-        GROUP BY
-          b.parent_fl_guid,
-          LEFT(
-            JSON_VALUE(a.data, '$.AssetWorkGroup'),
-            CHARINDEX(' - ', JSON_VALUE(a.data, '$.AssetWorkGroup')) - 1
-          )`,
-        siteGuids,
-      );
-
-      const siteRegionRows: Array<{
-        site_guid: string;
-        region_prefix: string;
-        cnt: number;
-      }> = Array.isArray(siteRegionRaw)
-        ? siteRegionRaw
-        : Array.isArray(siteRegionRaw?.[0])
-          ? siteRegionRaw[0]
-          : [];
-
-      // Dominant region per site (highest asset count wins)
-      const siteBest = new Map<string, { prefix: string; cnt: number }>();
-      for (const row of siteRegionRows) {
-        const existing = siteBest.get(row.site_guid);
-        if (!existing || Number(row.cnt) > existing.cnt) {
-          siteBest.set(row.site_guid, {
-            prefix: row.region_prefix,
-            cnt: Number(row.cnt),
-          });
+    // ── Pass 1B: Fix orphaned Site FLs using flParentMap.json ──────────────
+    // The flParentMap.json (CSV-derived) maps fl_id → parent fl_id for every
+    // FL in the hierarchy. We use this to set parent_fl_guid on Site FLs that
+    // have no parent yet (the asset-workgroup approach fails because assets
+    // linked to Site-parented buildings don't carry AssetWorkGroup data).
+    {
+      const mapCandidates = [
+        path.join(__dirname, "..", "data", "flParentMap.json"),
+        path.join(__dirname, "data", "flParentMap.json"),
+        path.join(process.cwd(), "src", "server", "data", "flParentMap.json"),
+        path.join(process.cwd(), "dist", "server", "data", "flParentMap.json"),
+      ];
+      let flParentMap: Record<string, string> = {};
+      for (const p of mapCandidates) {
+        if (fs.existsSync(p)) {
+          flParentMap = JSON.parse(fs.readFileSync(p, "utf8"));
+          break;
         }
       }
 
-      const siteUpdates: Array<{ flGuid: string; parentGuid: string }> = [];
-      for (const [siteGuid, { prefix }] of siteBest) {
-        const regionGuid = regionByName.get((prefix || "").trim());
-        if (regionGuid)
-          siteUpdates.push({ flGuid: siteGuid, parentGuid: regionGuid });
-      }
+      if (Object.keys(flParentMap).length > 0) {
+        // Load all orphaned Sites and all Regions (by fl_id → guid)
+        const orphanedSites = await db("assetic_functional_locations")
+          .where("fl_type", "Site")
+          .whereNull("parent_fl_guid")
+          .whereNot("fl_name", "()")
+          .select("fl_guid", "fl_id", "fl_name");
 
-      console.log(
-        `[AssetSync] Region assignment Pass 1B (Sites): ${orphanedSites.length} orphaned Sites, ${siteUpdates.length} resolved via building asset workgroups`,
-      );
+        const regionRows = await db("assetic_functional_locations")
+          .where("fl_type", "Region")
+          .select("fl_guid", "fl_id");
 
-      for (let i = 0; i < siteUpdates.length; i += CHUNK) {
-        const chunk = siteUpdates.slice(i, i + CHUNK);
-        await Promise.all(
-          chunk.map(({ flGuid, parentGuid }) =>
-            db("assetic_functional_locations")
-              .where("fl_guid", flGuid)
-              .whereNull("parent_fl_guid")
-              .update({ parent_fl_guid: parentGuid }),
-          ),
+        const regionByFlId = new Map<string, string>();
+        for (const r of regionRows) {
+          if (r.fl_id) regionByFlId.set(String(r.fl_id), r.fl_guid);
+        }
+
+        const siteUpdates: Array<{ flGuid: string; parentGuid: string }> = [];
+        for (const site of orphanedSites) {
+          const parentFlId = flParentMap[String(site.fl_id)];
+          if (!parentFlId) continue;
+          const regionGuid = regionByFlId.get(parentFlId);
+          if (regionGuid)
+            siteUpdates.push({ flGuid: site.fl_guid, parentGuid: regionGuid });
+        }
+
+        console.log(
+          `[AssetSync] Region assignment Pass 1B (Sites via flParentMap): ${orphanedSites.length} orphaned Sites, ${siteUpdates.length} resolved`,
         );
-        updated += chunk.length;
+
+        for (let i = 0; i < siteUpdates.length; i += CHUNK) {
+          const chunk = siteUpdates.slice(i, i + CHUNK);
+          await Promise.all(
+            chunk.map(({ flGuid, parentGuid }) =>
+              db("assetic_functional_locations")
+                .where("fl_guid", flGuid)
+                .whereNull("parent_fl_guid")
+                .update({ parent_fl_guid: parentGuid }),
+            ),
+          );
+          updated += chunk.length;
+        }
+      } else {
+        console.warn(
+          "[AssetSync] flParentMap.json not found — Pass 1B skipped",
+        );
       }
     }
 

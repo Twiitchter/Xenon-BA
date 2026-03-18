@@ -316,12 +316,9 @@ class AsseticLocationHierarchyService {
         if (tl.includes("region")) return "region";
         if (tl.includes("site") || tl.includes("precinct")) return "site";
         if (tl.includes("building")) return "building";
-        if (
-          tl.includes("floor") ||
-          tl.includes("level") ||
-          tl.includes("structure")
-        )
-          return "floor";
+        if (tl.includes("floor") || tl.includes("level")) return "floor";
+        // "Structure" FLs are physical shell records — excluded from hierarchy
+        if (tl.includes("structure")) return "structure";
         return "other";
       };
 
@@ -488,9 +485,11 @@ class AsseticLocationHierarchyService {
       }
 
       // Pass C — Floors: parent must be a known Building
+      // Skip Structure-type FLs — they are physical shell records, not floors
       for (const f of nonRegionFLs) {
         if (siteMap.has(f.fl_guid) || buildingMap.has(f.fl_guid)) continue;
         if (!f.parent_fl_guid) continue;
+        if (classifyType(f.fl_type) === "structure") continue;
 
         if (hasSites) {
           const building = buildingMap.get(f.parent_fl_guid);
