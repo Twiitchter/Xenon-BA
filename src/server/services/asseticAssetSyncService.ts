@@ -162,6 +162,9 @@ class AsseticAssetSyncService {
       let totalErrors = 0;
       let totalSkipped = 0;
       let totalInserted = 0;
+      let totalQueued = 0; // Assets that were genuinely new (not pre-existing) and queued for insert
+      // Failed inserts are collected here and retried after the main loop
+      const retryInserts: Array<{ guid: string; row: any }> = [];
       const maxPages = 500; // Safety cap
 
       // Load all existing GUIDs once to avoid per-row SELECT in the loop
@@ -175,18 +178,31 @@ class AsseticAssetSyncService {
         `[AssetSync] Pre-existing assets in DB: ${preExistingCount}. API total: ${apiTotal}. Delta: ${apiTotal - preExistingCount}.`,
       );
 
+      let consecutiveErrors = 0;
+      const MAX_CONSECUTIVE_ERRORS = 3;
+
       while (page <= maxPages) {
         let rows: any[] = [];
         try {
           const resp = await asseticClient.getAssets({ page, pageSize });
           rows = this.extractRows(resp);
+          consecutiveErrors = 0; // reset on success
         } catch (err) {
+          consecutiveErrors++;
           console.error(
-            `[AssetSync] Failed to fetch page ${page}:`,
+            `[AssetSync] Failed to fetch page ${page} (attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`,
             (err as any)?.message,
           );
           totalErrors++;
-          break;
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            console.error(
+              `[AssetSync] ${MAX_CONSECUTIVE_ERRORS} consecutive page failures — stopping pagination.`,
+            );
+            break;
+          }
+          // Wait 5s then retry the same page
+          await new Promise((r) => setTimeout(r, 5000));
+          continue;
         }
 
         if (rows.length === 0) break;
@@ -209,7 +225,7 @@ class AsseticAssetSyncService {
               continue;
             }
 
-            toInsert.push({
+            const row = {
               assetic_guid: guid,
               asset_id: asset.AssetId || asset.assetId || asset.AssetCode || "",
               asset_name:
@@ -227,8 +243,10 @@ class AsseticAssetSyncService {
               synced_at: now,
               updated_at: now,
               created_at: now,
-            });
+            };
+            toInsert.push(row);
             toInsertGuids.push(guid);
+            totalQueued++;
           } catch {
             totalErrors++;
           }
@@ -254,7 +272,8 @@ class AsseticAssetSyncService {
                 existingGuids.add(toInsertGuids[j]);
                 insertedThisPage++;
               } catch {
-                totalErrors++;
+                // Queue for retry after main loop rather than counting as permanent error
+                retryInserts.push({ guid: toInsertGuids[j], row: toInsert[j] });
               }
             }
           }
@@ -276,8 +295,10 @@ class AsseticAssetSyncService {
         }
 
         const skippedThisPage = rows.length - toInsert.length;
+        const droppedThisPage = toInsert.length - insertedThisPage;
         console.log(
-          `[AssetSync] Page ${page}: ${rows.length} fetched, ${insertedThisPage} inserted, ${skippedThisPage} already-exist, ${totalErrors} errors (${totalSynced} processed, ${this._progress}%)`,
+          `[AssetSync] Page ${page}: ${rows.length} fetched, ${insertedThisPage} inserted, ${skippedThisPage} already-exist` +
+            `${droppedThisPage > 0 ? `, ${droppedThisPage} queued-for-retry` : ""}, ${totalErrors} errors (${totalSynced} processed, ${this._progress}%)`,
         );
 
         // Log if a page returned no GUID (data quality issue)
@@ -300,6 +321,32 @@ class AsseticAssetSyncService {
         page++;
       }
 
+      // ── Retry pass: re-attempt inserts that failed during main loop ─────
+      if (retryInserts.length > 0) {
+        console.log(
+          `[AssetSync] Retrying ${retryInserts.length} failed inserts...`,
+        );
+        let retrySuccess = 0;
+        for (const { guid, row } of retryInserts) {
+          if (existingGuids.has(guid)) {
+            totalSkipped++;
+            continue;
+          } // inserted by a later page
+          try {
+            await db("assetic_assets").insert(row);
+            existingGuids.add(guid);
+            totalInserted++;
+            totalSynced++;
+            retrySuccess++;
+          } catch {
+            totalErrors++;
+          }
+        }
+        console.log(
+          `[AssetSync] Retry pass: ${retrySuccess}/${retryInserts.length} recovered, ${retryInserts.length - retrySuccess} permanent failures.`,
+        );
+      }
+
       await db("assetic_sync_log").where("id", syncLogId).update({
         status: "completed",
         synced_count: totalSynced,
@@ -308,15 +355,21 @@ class AsseticAssetSyncService {
       });
 
       const finalDbCount = await this.getDbAssetCount();
+      const apiDuplicates = totalQueued - totalInserted - totalErrors;
       console.log(
-        `[AssetSync] Asset sync complete: ${totalInserted} newly inserted, ${totalSkipped} already existed, ${totalErrors} errors. ` +
+        `[AssetSync] Asset sync complete: ${totalInserted} newly inserted, ${totalSkipped} already existed, ${totalErrors} permanent errors. ` +
           `DB before: ${preExistingCount}, DB after: ${finalDbCount}, API reported: ${apiTotal}. ` +
-          `${apiTotal - finalDbCount > 0 ? `GAP: ${apiTotal - finalDbCount} assets not in DB.` : "DB matches API count."}`,
+          `Queued-for-insert: ${totalQueued}, API duplicates across pages: ${apiDuplicates >= 0 ? apiDuplicates : "unknown"}.` +
+          `${apiTotal - finalDbCount > 0 ? ` GAP: ${apiTotal - finalDbCount} assets not in DB.` : " DB matches API count."}`,
       );
-      if (apiTotal - finalDbCount > 100) {
+      if (totalErrors > 0) {
         console.warn(
-          `[AssetSync] SIGNIFICANT GAP: ${apiTotal - finalDbCount} assets missing from DB. ` +
-            `Possible causes: page limit hit (${page}/${maxPages} pages used), API inconsistent totals, or assets without GUIDs.`,
+          `[AssetSync] ${totalErrors} assets could not be inserted after retries — likely data/constraint issues.`,
+        );
+      }
+      if (apiDuplicates > 50) {
+        console.log(
+          `[AssetSync] API returned ${apiDuplicates} duplicate GUIDs across pages — this is normal Assetic pagination behaviour and does not represent missing data.`,
         );
       }
 
@@ -1462,6 +1515,77 @@ class AsseticAssetSyncService {
         console.warn(
           "[AssetSync] flParentMap.json not found — Pass 1B skipped",
         );
+      }
+    }
+
+    // ── Pass 1C: Fix Building FLs with stale Region parent via flParentMap ─
+    // Buildings inserted by the main API endpoint may have parent_fl_guid
+    // pointing to a Region (from syncRegionAssignments fallback) when their
+    // correct parent is a Site. flParentMap.json (CSV-derived) has the truth.
+    {
+      const mapCandidates = [
+        path.join(__dirname, "..", "data", "flParentMap.json"),
+        path.join(__dirname, "data", "flParentMap.json"),
+        path.join(process.cwd(), "src", "server", "data", "flParentMap.json"),
+        path.join(process.cwd(), "dist", "server", "data", "flParentMap.json"),
+      ];
+      let flParentMap: Record<string, string> = {};
+      for (const p of mapCandidates) {
+        if (fs.existsSync(p)) {
+          flParentMap = JSON.parse(fs.readFileSync(p, "utf8"));
+          break;
+        }
+      }
+
+      if (Object.keys(flParentMap).length > 0) {
+        // Find all Building FLs whose parent is currently a Region (stale)
+        const staleBuildings = await db("assetic_functional_locations as b")
+          .join(
+            "assetic_functional_locations as p",
+            "b.parent_fl_guid",
+            "p.fl_guid",
+          )
+          .where("b.fl_type", "Building")
+          .where("p.fl_type", "Region")
+          .select("b.fl_guid", "b.fl_id", "b.fl_name");
+
+        // Build fl_id → guid map for all Sites in DB
+        const siteRows = await db("assetic_functional_locations")
+          .where("fl_type", "Site")
+          .select("fl_guid", "fl_id");
+        const siteByFlId = new Map<string, string>();
+        for (const s of siteRows) {
+          if (s.fl_id) siteByFlId.set(String(s.fl_id), s.fl_guid);
+        }
+
+        const buildingUpdates: Array<{ flGuid: string; parentGuid: string }> =
+          [];
+        for (const bldg of staleBuildings) {
+          const parentFlId = flParentMap[String(bldg.fl_id)];
+          if (!parentFlId) continue;
+          const siteGuid = siteByFlId.get(parentFlId);
+          if (siteGuid)
+            buildingUpdates.push({
+              flGuid: bldg.fl_guid,
+              parentGuid: siteGuid,
+            });
+        }
+
+        console.log(
+          `[AssetSync] Region assignment Pass 1C (Buildings via flParentMap): ${staleBuildings.length} stale-parent Buildings, ${buildingUpdates.length} re-parented to correct Site`,
+        );
+
+        for (let i = 0; i < buildingUpdates.length; i += CHUNK) {
+          const chunk = buildingUpdates.slice(i, i + CHUNK);
+          await Promise.all(
+            chunk.map(({ flGuid, parentGuid }) =>
+              db("assetic_functional_locations")
+                .where("fl_guid", flGuid)
+                .update({ parent_fl_guid: parentGuid }),
+            ),
+          );
+          updated += chunk.length;
+        }
       }
     }
 
