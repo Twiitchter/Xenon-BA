@@ -111,6 +111,23 @@ class AdminService {
     return response.data;
   }
 
+  async resyncFlParents(): Promise<
+    AdminHierarchyResponse & {
+      message: string;
+      flsSynced: number;
+      parentLinksFound: number;
+      regionAssignmentsUpdated: number;
+      floorAssignmentsUpdated: number;
+    }
+  > {
+    const response = await axios.post(
+      `${API_URL}/settings/assetic-resync-fl-parents`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
   async flushAndRebuild(): Promise<
     AdminHierarchyResponse & {
       message: string;
