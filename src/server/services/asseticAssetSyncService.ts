@@ -290,8 +290,13 @@ class AsseticAssetSyncService {
           );
         }
 
-        if (rows.length < pageSize) break;
-        if (apiTotal > 0 && totalSynced >= apiTotal) break;
+        // Only stop on truly empty response. A short page mid-sequence (API
+        // hiccup returning <500 rows) must NOT break early — assets on later
+        // pages would be silently missed and counted as "synced" via skips.
+        if (rows.length === 0) {
+          console.log(`[AssetSync] Page ${page}: empty — stopping pagination.`);
+          break;
+        }
         page++;
       }
 
@@ -713,7 +718,6 @@ class AsseticAssetSyncService {
         const rows = this.extractRows(resp);
         if (rows.length === 0) break;
         allRows = allRows.concat(rows);
-        if (rows.length < pageSize) break;
         page++;
       }
 
