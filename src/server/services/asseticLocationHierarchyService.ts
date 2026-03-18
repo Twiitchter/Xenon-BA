@@ -101,6 +101,10 @@ class AsseticLocationHierarchyService {
     return this.cache;
   }
 
+  clearCache(): void {
+    this.cache = null;
+  }
+
   async getOrRefresh(): Promise<AsseticLocationHierarchy> {
     if (this.cache) {
       return this.cache;

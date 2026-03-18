@@ -265,8 +265,10 @@ router.post(
     try {
       const assigned = await asseticAssetSyncService.syncRegionAssignments();
       const floors = await asseticAssetSyncService.syncFloorAssignments();
+      // Clear stale in-memory cache so getOrRefresh() picks up the new DB state
+      asseticLocationHierarchyService.clearCache();
       const hierarchy =
-        await asseticLocationHierarchyService.buildHierarchyFromDb();
+        await asseticLocationHierarchyService.refreshFromAssetic();
       res.json({
         ...hierarchy,
         regionAssignmentsUpdated: assigned,
@@ -368,8 +370,9 @@ router.post(
       );
 
       // 6. Rebuild hierarchy cache
+      asseticLocationHierarchyService.clearCache();
       const hierarchy =
-        await asseticLocationHierarchyService.buildHierarchyFromDb();
+        await asseticLocationHierarchyService.refreshFromAssetic();
       console.log("[FlushRebuild] Hierarchy rebuilt");
 
       // 7. Fire full asset sync in background
