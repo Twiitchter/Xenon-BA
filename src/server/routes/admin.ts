@@ -280,59 +280,6 @@ router.post(
 );
 
 /**
- * POST /api/admin/settings/assetic-resync-fl-parents
- * Re-fetches FL parent-child relationships from the Assetic nested API
- * (Region→Sites, Site→Buildings) and updates parent_fl_guid in the DB,
- * then rebuilds the hierarchy cache. Does NOT touch assets or run enrichment.
- * Use this when the hierarchy shows buildings as sites (stale parent_fl_guid).
- */
-router.post(
-  "/settings/assetic-resync-fl-parents",
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const enabled = await asseticClient.isEnabled();
-      if (!enabled) {
-        return res
-          .status(503)
-          .json({ error: "Assetic integration is not enabled" });
-      }
-
-      const status = await asseticAssetSyncService.getStatus();
-      if (status.isRunning) {
-        return res
-          .status(409)
-          .json({ error: "A sync operation is already running", status });
-      }
-
-      const flResult = await asseticAssetSyncService.syncFunctionalLocations();
-      console.log(
-        `[ResyncFL] FL sync done: ${flResult.synced} FLs, ${flResult.parentsFound} parent links`,
-      );
-
-      const regionCount = await asseticAssetSyncService.syncRegionAssignments();
-      const floorCount = await asseticAssetSyncService.syncFloorAssignments();
-
-      const hierarchy =
-        await asseticLocationHierarchyService.buildHierarchyFromDb();
-
-      res.json({
-        message: "FL parent links re-synced and hierarchy rebuilt.",
-        flsSynced: flResult.synced,
-        parentLinksFound: flResult.parentsFound,
-        regionAssignmentsUpdated: regionCount,
-        floorAssignmentsUpdated: floorCount,
-        ...hierarchy,
-      });
-    } catch (error: any) {
-      console.error("[ResyncFL] Error:", error);
-      res
-        .status(500)
-        .json({ error: "FL parent re-sync failed: " + error.message });
-    }
-  },
-);
-
-/**
  * POST /api/admin/settings/assetic-flush-and-rebuild
  * DESTRUCTIVE: Wipes all synced asset/FL data then runs a full resync from the
  * Assetic API. Used to recover from a corrupted or incomplete sync state.
