@@ -299,335 +299,177 @@ class AsseticLocationHierarchyService {
         "parent_fl_guid",
       );
 
-      // Build type-based classification
-      const classify = (t: string): string => {
+      // ── Structural classification ─────────────────────────────────────────
+      // Do NOT rely on fl_type strings — they can be null, numeric IDs, or
+      // inconsistently named depending on which API endpoint inserted the row.
+      // Instead, classify every FL by where it sits in the parent-child chain:
+      //   • No parent (or parent is an Organisation) AND type contains "region"
+      //     → Region
+      //   • Parent is a Region → Site
+      //   • Parent is a Site   → Building
+      //   • Parent is a Building → Floor
+      //   • Everything else with a parent → resolved recursively; orphans dropped
+
+      const classifyType = (t: string): string => {
         const tl = (t || "").toLowerCase();
         if (tl.includes("region")) return "region";
         if (tl.includes("site") || tl.includes("precinct")) return "site";
         if (tl.includes("building")) return "building";
-        if (tl.includes("floor") || tl.includes("level")) return "floor";
-        if (tl.includes("structure")) return "structure";
+        if (
+          tl.includes("floor") ||
+          tl.includes("level") ||
+          tl.includes("structure")
+        )
+          return "floor";
         return "other";
       };
+
+      // Index all FLs by guid for O(1) parent-chain lookups
+      const byGuid = new Map<string, (typeof allFLs)[0]>();
+      for (const f of allFLs) byGuid.set(f.fl_guid, f);
 
       const regions: AsseticRegion[] = [];
       const regionMap = new Map<string, AsseticRegion>();
       const siteMap = new Map<string, AsseticSite>();
       const buildingMap = new Map<string, AsseticBuilding>();
 
-      const regionFLs = allFLs.filter((f) => classify(f.fl_type) === "region");
-      const siteFLs = allFLs.filter((f) => classify(f.fl_type) === "site");
-      const buildingFLs = allFLs.filter(
-        (f) => classify(f.fl_type) === "building",
-      );
-      const floorFLs = allFLs.filter(
-        (f) =>
-          classify(f.fl_type) === "floor" ||
-          classify(f.fl_type) === "structure",
-      );
-
-      // Create region nodes
-      for (const r of regionFLs) {
-        const region: AsseticRegion = {
-          id: r.fl_guid,
-          name: r.fl_name || "Unknown Region",
-          sites: [],
-        };
-        regions.push(region);
-        regionMap.set(r.fl_guid, region);
+      // Step 1: Identify Regions (type-based — "Region" type is reliably set)
+      for (const f of allFLs) {
+        if (classifyType(f.fl_type) === "region") {
+          const region: AsseticRegion = {
+            id: f.fl_guid,
+            name: f.fl_name || "Unknown Region",
+            sites: [],
+          };
+          regions.push(region);
+          regionMap.set(f.fl_guid, region);
+        }
       }
 
       if (regions.length === 0) return null;
 
-      // Check if parent_fl_guid is populated for structural FLs.
-      // Use buildings specifically since that's what region-assignment populates.
-      // (Equipment-type FLs like "Plant & Equipment" are excluded from the
-      // hierarchy tree, so checking allFLs against a raw percentage is wrong.)
-      const buildingFLsWithParent = allFLs.filter(
-        (f) => classify(f.fl_type) === "building" && f.parent_fl_guid,
-      ).length;
-      const hasParents = buildingFLsWithParent > 0;
+      // Helper: walk parent chain to find the nearest ancestor that is a Region
+      const findRegionAncestor = (
+        fl: (typeof allFLs)[0],
+      ): AsseticRegion | undefined => {
+        let current = fl;
+        for (let depth = 0; depth < 6; depth++) {
+          if (!current.parent_fl_guid) break;
+          const parent = byGuid.get(current.parent_fl_guid);
+          if (!parent) break;
+          const r = regionMap.get(parent.fl_guid);
+          if (r) return r;
+          current = parent;
+        }
+        return undefined;
+      };
 
-      // Diagnostic: log FL classification breakdown
-      const otherFLs = allFLs.filter(
-        (f) =>
-          !["region", "site", "building", "floor", "structure"].includes(
-            classify(f.fl_type),
-          ),
-      );
+      // Step 2: Classify remaining FLs structurally.
+      // Priority: parent-pointer wins over fl_type matching.
+      // We do two passes so that Sites are known before Buildings are processed.
+      const nonRegionFLs = allFLs.filter((f) => !regionMap.has(f.fl_guid));
+
+      // Pass A — Sites: direct children of Regions, OR fl_type = site/precinct
+      for (const f of nonRegionFLs) {
+        const directParentIsRegion = f.parent_fl_guid
+          ? regionMap.has(f.parent_fl_guid)
+          : false;
+        const typeIsSite = classifyType(f.fl_type) === "site";
+        if (!directParentIsRegion && !typeIsSite) continue;
+
+        // Resolve owning region
+        let region: AsseticRegion | undefined;
+        if (f.parent_fl_guid) region = regionMap.get(f.parent_fl_guid);
+        if (!region) region = findRegionAncestor(f);
+        if (!region) {
+          // Last resort: name-match (e.g. "Launceston General Hospital Precinct" contains "North"? No.
+          // Better: the site name itself won't match region names, skip.)
+          console.log(
+            `[AsseticHierarchy] Site "${f.fl_name}" has no resolvable region — skipped`,
+          );
+          continue;
+        }
+
+        const site: AsseticSite = {
+          id: f.fl_guid,
+          name: f.fl_name || "Unknown Site",
+          regionId: region.id,
+          buildings: [],
+        };
+        region.sites.push(site);
+        siteMap.set(f.fl_guid, site);
+      }
+
+      const hasSites = siteMap.size > 0;
       console.log(
-        `[AsseticHierarchy] DB FL breakdown: ${regionFLs.length} regions, ${siteFLs.length} sites, ` +
-          `${buildingFLs.length} buildings, ${floorFLs.length} floors/structures, ${otherFLs.length} other. ` +
-          `Parent links: ${buildingFLsWithParent}/${buildingFLs.length} buildings have parent_fl_guid.`,
+        `[AsseticHierarchy] Structural classification: ${regionMap.size} regions, ${siteMap.size} sites. ` +
+          `${hasSites ? "Using Region→Site→Building→Floor layout." : "No sites found — will promote Building→Site, Floor→Building."}`,
       );
-      if (siteFLs.length === 0) {
-        console.warn(
-          `[AsseticHierarchy] WARNING: No Site-type FLs found in DB. Synthetic fallback sites will be created.`,
-        );
-      }
-      if (otherFLs.length > 0) {
-        const otherTypes = [...new Set(otherFLs.map((f) => f.fl_type))].join(
-          ", ",
-        );
-        console.log(
-          `[AsseticHierarchy] Unclassified FL types (excluded from hierarchy): ${otherTypes}`,
-        );
-      }
 
-      if (hasParents) {
-        // ── Step 1: Place Site FLs under their parent Region ──
-        for (const s of siteFLs) {
-          let region = s.parent_fl_guid
-            ? regionMap.get(s.parent_fl_guid)
+      // Pass B — Buildings: direct children of Sites (or if no sites, children of Regions)
+      for (const f of nonRegionFLs) {
+        if (siteMap.has(f.fl_guid)) continue; // already a Site
+
+        if (hasSites) {
+          // Normal: parent must be a Site
+          const site = f.parent_fl_guid
+            ? siteMap.get(f.parent_fl_guid)
             : undefined;
-
-          // Site's parent may be an Organisation (not a Region).
-          // Fall back to name-matching against regions.
-          if (!region && s.parent_fl_guid) {
-            const sLower = (s.fl_name || "").toLowerCase();
-            const regionsSorted = [...regionFLs].sort(
-              (a, b) => (b.fl_name || "").length - (a.fl_name || "").length,
-            );
-            for (const r of regionsSorted) {
-              if (sLower.includes((r.fl_name || "").toLowerCase())) {
-                region = regionMap.get(r.fl_guid);
-                break;
-              }
-            }
-          }
-
-          // Try walking up the parent chain to find a region ancestor
-          if (!region && s.parent_fl_guid) {
-            const parentFL = allFLs.find((f) => f.fl_guid === s.parent_fl_guid);
-            if (parentFL?.parent_fl_guid) {
-              region = regionMap.get(parentFL.parent_fl_guid);
-            }
-          }
-
-          if (!region) {
-            console.log(
-              `[AsseticHierarchy] Site "${s.fl_name}" (parent=${s.parent_fl_guid}) could not be matched to any region — skipping`,
-            );
-            continue;
-          }
-
+          if (!site) continue; // orphan or floor — handled in Pass C
+          const building: AsseticBuilding = {
+            id: f.fl_guid,
+            name: f.fl_name || "Unknown Building",
+            siteId: site.id,
+            regionId: site.regionId,
+            floors: [],
+          };
+          site.buildings.push(building);
+          buildingMap.set(f.fl_guid, building);
+        } else {
+          // Promotion: Building FLs → Sites, only those whose parent is a Region
+          const region = f.parent_fl_guid
+            ? regionMap.get(f.parent_fl_guid)
+            : undefined;
+          if (!region) continue;
           const site: AsseticSite = {
-            id: s.fl_guid,
-            name: s.fl_name || "Unknown Site",
+            id: f.fl_guid,
+            name: f.fl_name || "Unknown Site",
             regionId: region.id,
             buildings: [],
           };
           region.sites.push(site);
-          siteMap.set(s.fl_guid, site);
+          siteMap.set(f.fl_guid, site);
         }
+      }
 
-        // ── Step 2: Decide if Building FLs are real buildings or promoted sites ──
-        // When no Site-type FLs exist (or none were placed), the Assetic
-        // hierarchy is: Region → Building → Floor/Structure.
-        // In reality Building FLs are *Sites* and Floor/Structure FLs below
-        // them are the actual *Buildings*.
-        const hasSitesPlaced = siteMap.size > 0;
+      // Pass C — Floors: direct children of Buildings (or promoted-Sites when no real sites)
+      for (const f of nonRegionFLs) {
+        if (siteMap.has(f.fl_guid) || buildingMap.has(f.fl_guid)) continue;
+        if (!f.parent_fl_guid) continue;
 
-        if (hasSitesPlaced) {
-          // Normal path: Sites exist, Buildings go under Sites
-          for (const b of buildingFLs) {
-            let site = b.parent_fl_guid
-              ? siteMap.get(b.parent_fl_guid)
-              : undefined;
-
-            // parent_fl_guid may point directly to a Region — find best site
-            if (!site && b.parent_fl_guid) {
-              const directRegion = regionMap.get(b.parent_fl_guid);
-              if (directRegion && directRegion.sites.length > 0) {
-                const bName = (b.fl_name || "").toLowerCase();
-                site =
-                  directRegion.sites.find((s) =>
-                    bName.includes(s.name.toLowerCase()),
-                  ) || directRegion.sites[0];
-              }
-            }
-
-            if (site) {
-              const building: AsseticBuilding = {
-                id: b.fl_guid,
-                name: b.fl_name || "Unknown Building",
-                siteId: site.id,
-                regionId: site.regionId,
-                floors: [],
-              };
-              site.buildings.push(building);
-              buildingMap.set(b.fl_guid, building);
-            }
-          }
-
-          for (const f of floorFLs) {
-            const building = f.parent_fl_guid
-              ? buildingMap.get(f.parent_fl_guid)
-              : undefined;
-            if (building) {
-              building.floors.push({
-                id: f.fl_guid,
-                name: f.fl_name || "Unknown Floor",
-                buildingId: building.id,
-                siteId: building.siteId,
-                regionId: building.regionId,
-              });
-            }
-          }
+        if (hasSites) {
+          const building = buildingMap.get(f.parent_fl_guid);
+          if (!building) continue;
+          building.floors.push({
+            id: f.fl_guid,
+            name: f.fl_name || "Unknown Floor",
+            buildingId: building.id,
+            siteId: building.siteId,
+            regionId: building.regionId,
+          });
         } else {
-          // ── Level promotion: Building FLs → Sites, Floor FLs → Buildings ──
-          // The Assetic instance has no Site-type FLs. What it calls
-          // "Building" is actually a Site, and "Floor/Structure" under it
-          // is the actual Building (each floor represents a building asset).
-          console.log(
-            `[AsseticHierarchy] No Site-level FLs placed. Promoting ${buildingFLs.length} Building FLs → Sites, ` +
-              `${floorFLs.length} Floor/Structure FLs → Buildings.`,
-          );
-
-          for (const b of buildingFLs) {
-            let region: AsseticRegion | undefined;
-
-            // Try direct parent link to region
-            if (b.parent_fl_guid) {
-              region = regionMap.get(b.parent_fl_guid);
-            }
-
-            // Walk up parent chain (parent may be an Organisation)
-            if (!region && b.parent_fl_guid) {
-              const parentFL = allFLs.find(
-                (f) => f.fl_guid === b.parent_fl_guid,
-              );
-              if (parentFL?.parent_fl_guid) {
-                region = regionMap.get(parentFL.parent_fl_guid);
-              }
-            }
-
-            if (!region) {
-              // Name-match fallback
-              const bLower = (b.fl_name || "").toLowerCase();
-              const regionsSorted = [...regionFLs].sort(
-                (a, b) => (b.fl_name || "").length - (a.fl_name || "").length,
-              );
-              for (const r of regionsSorted) {
-                if (bLower.includes((r.fl_name || "").toLowerCase())) {
-                  region = regionMap.get(r.fl_guid);
-                  break;
-                }
-              }
-            }
-
-            if (!region) {
-              region = regions[0]; // last resort
-            }
-
-            const site: AsseticSite = {
-              id: b.fl_guid,
-              name: b.fl_name || "Unknown Site",
-              regionId: region.id,
-              buildings: [],
-            };
-            region.sites.push(site);
-            siteMap.set(b.fl_guid, site);
-          }
-
-          // Floor/Structure FLs become Buildings under their parent (now a Site)
-          for (const f of floorFLs) {
-            const site = f.parent_fl_guid
-              ? siteMap.get(f.parent_fl_guid)
-              : undefined;
-            if (site) {
-              const building: AsseticBuilding = {
-                id: f.fl_guid,
-                name: f.fl_name || "Unknown Building",
-                siteId: site.id,
-                regionId: site.regionId,
-                floors: [],
-              };
-              site.buildings.push(building);
-              buildingMap.set(f.fl_guid, building);
-            }
-          }
-        }
-      } else {
-        // No parent links — use per-asset FL data to infer the hierarchy.
-        // Each asset points to ONE FL (its direct building/floor). By looking
-        // at which assets share the same FL, and matching FL names/types,
-        // we group buildings into sites and sites into regions.
-        // For now, use name-matching similar to the FLTypes approach.
-        const regionsSorted = [...regionFLs].sort(
-          (a, b) => (b.fl_name || "").length - (a.fl_name || "").length,
-        );
-
-        // Sites → Regions
-        for (const s of siteFLs) {
-          const sLower = (s.fl_name || "").toLowerCase();
-          let matched: AsseticRegion | undefined;
-          for (const r of regionsSorted) {
-            if (sLower.includes((r.fl_name || "").toLowerCase())) {
-              matched = regionMap.get(r.fl_guid);
-              break;
-            }
-          }
-          const target = matched || regions[0];
-          const site: AsseticSite = {
-            id: s.fl_guid,
-            name: s.fl_name || "Unknown Site",
-            regionId: target.id,
-            buildings: [],
+          // In promoted layout, "Floor" FLs are actual Buildings under promoted Sites
+          const site = siteMap.get(f.parent_fl_guid);
+          if (!site) continue;
+          const building: AsseticBuilding = {
+            id: f.fl_guid,
+            name: f.fl_name || "Unknown Building",
+            siteId: site.id,
+            regionId: site.regionId,
+            floors: [],
           };
-          target.sites.push(site);
-          siteMap.set(s.fl_guid, site);
-        }
-
-        // Buildings → Sites (abbreviation match)
-        const siteByAbbrev = new Map<string, AsseticSite>();
-        for (const site of siteMap.values()) {
-          const m = site.name.match(/\(([A-Z][A-Za-z0-9]+)\)\s*$/);
-          if (m) siteByAbbrev.set(m[1].toUpperCase(), site);
-        }
-        const allSites = Array.from(siteMap.values());
-
-        for (const b of buildingFLs) {
-          let site: AsseticSite | undefined;
-          const bUpper = (b.fl_name || "").toUpperCase();
-          for (const [abbr, s] of siteByAbbrev) {
-            if (
-              bUpper.startsWith(abbr + " ") ||
-              bUpper.startsWith("(" + abbr + ")")
-            ) {
-              site = s;
-              break;
-            }
-          }
-          if (!site && allSites.length > 0) {
-            site = allSites[0]; // fallback
-          }
-          if (site) {
-            const building: AsseticBuilding = {
-              id: b.fl_guid,
-              name: b.fl_name || "Unknown Building",
-              siteId: site.id,
-              regionId: site.regionId,
-              floors: [],
-            };
-            site.buildings.push(building);
-            buildingMap.set(b.fl_guid, building);
-          }
-        }
-
-        // Floors → Buildings
-        const allBuildings = Array.from(buildingMap.values());
-        for (const f of floorFLs) {
-          if (allBuildings.length > 0) {
-            const building = allBuildings[0]; // fallback
-            building.floors.push({
-              id: f.fl_guid,
-              name: f.fl_name || "Unknown Floor",
-              buildingId: building.id,
-              siteId: building.siteId,
-              regionId: building.regionId,
-            });
-          }
+          site.buildings.push(building);
+          buildingMap.set(f.fl_guid, building);
         }
       }
 
