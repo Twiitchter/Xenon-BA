@@ -299,16 +299,17 @@ class AsseticLocationHierarchyService {
         "parent_fl_guid",
       );
 
-      // ── Structural classification ─────────────────────────────────────────
-      // Do NOT rely on fl_type strings — they can be null, numeric IDs, or
-      // inconsistently named depending on which API endpoint inserted the row.
-      // Instead, classify every FL by where it sits in the parent-child chain:
-      //   • No parent (or parent is an Organisation) AND type contains "region"
-      //     → Region
-      //   • Parent is a Region → Site
-      //   • Parent is a Site   → Building
-      //   • Parent is a Building → Floor
-      //   • Everything else with a parent → resolved recursively; orphans dropped
+      // ── Structural + type-aware classification ────────────────────────────
+      // fl_type is reliable for Region, Building, Floor, Structure (from the
+      // top-level /functionallocations endpoint). It may be null for Site FLs
+      // inserted via the nested children endpoint. So:
+      //   • Region  → fl_type contains "region" (always reliable)
+      //   • Site    → fl_type contains "site"/"precinct" OR
+      //               parent=Region AND fl_type is NOT building/floor/structure
+      //   • Building → fl_type contains "building" (reliable); parent may be
+      //               stale (pointing to Region instead of Site)
+      //   • Floor   → fl_type contains "floor"/"level"/"structure" (reliable)
+      //               parent should be a Building
 
       const classifyType = (t: string): string => {
         const tl = (t || "").toLowerCase();
@@ -364,26 +365,34 @@ class AsseticLocationHierarchyService {
         return undefined;
       };
 
-      // Step 2: Classify remaining FLs structurally.
-      // Priority: parent-pointer wins over fl_type matching.
-      // We do two passes so that Sites are known before Buildings are processed.
       const nonRegionFLs = allFLs.filter((f) => !regionMap.has(f.fl_guid));
 
-      // Pass A — Sites: direct children of Regions, OR fl_type = site/precinct
+      // Pass A — Sites
+      // Include: fl_type=site/precinct, OR parent=Region AND fl_type is NOT
+      // building/floor/structure (handles null-type Site FLs from nested probing).
+      // EXCLUDE: fl_type=building or floor even if parent=Region — those are
+      // stale DB entries where syncRegionAssignments overwrote the correct
+      // Site parent; they will be re-homed in Pass B.
       for (const f of nonRegionFLs) {
+        const tc = classifyType(f.fl_type);
+        const typeIsSite = tc === "site";
+        const typeIsBuilding = tc === "building";
+        const typeIsFloor = tc === "floor";
+
         const directParentIsRegion = f.parent_fl_guid
           ? regionMap.has(f.parent_fl_guid)
           : false;
-        const typeIsSite = classifyType(f.fl_type) === "site";
-        if (!directParentIsRegion && !typeIsSite) continue;
+
+        // Skip if definitely not a site
+        if (!typeIsSite && !directParentIsRegion) continue;
+        // Skip building/floor FLs with stale region parent — handled below
+        if (typeIsBuilding || typeIsFloor) continue;
 
         // Resolve owning region
         let region: AsseticRegion | undefined;
         if (f.parent_fl_guid) region = regionMap.get(f.parent_fl_guid);
         if (!region) region = findRegionAncestor(f);
         if (!region) {
-          // Last resort: name-match (e.g. "Launceston General Hospital Precinct" contains "North"? No.
-          // Better: the site name itself won't match region names, skip.)
           console.log(
             `[AsseticHierarchy] Site "${f.fl_name}" has no resolvable region — skipped`,
           );
@@ -406,16 +415,52 @@ class AsseticLocationHierarchyService {
           `${hasSites ? "Using Region→Site→Building→Floor layout." : "No sites found — will promote Building→Site, Floor→Building."}`,
       );
 
-      // Pass B — Buildings: direct children of Sites (or if no sites, children of Regions)
+      // Pass B — Buildings
+      // fl_type=building is reliable. Parent may be:
+      //   a) Site guid  → correct, direct assignment
+      //   b) Region guid (stale from old syncRegionAssignments) → name-match to site
+      //   c) null → name-match to any site
       for (const f of nonRegionFLs) {
         if (siteMap.has(f.fl_guid)) continue; // already a Site
 
         if (hasSites) {
-          // Normal: parent must be a Site
-          const site = f.parent_fl_guid
+          const tc = classifyType(f.fl_type);
+          // In promoted layout skip — handled after this block
+          // Only process items that fl_type says are buildings, OR whose parent is a known site
+          const parentSite = f.parent_fl_guid
             ? siteMap.get(f.parent_fl_guid)
             : undefined;
-          if (!site) continue; // orphan or floor — handled in Pass C
+          if (!parentSite && tc !== "building") continue;
+
+          let site = parentSite;
+
+          if (!site && f.parent_fl_guid) {
+            // Parent is a Region (stale) — find the correct site via name-matching
+            const staleRegion = regionMap.get(f.parent_fl_guid);
+            if (staleRegion && staleRegion.sites.length > 0) {
+              const bLower = (f.fl_name || "").toLowerCase();
+              // Try: site abbreviation-prefix match (e.g. LGHP prefix in fl_id)
+              const flIdUpper = (f.fl_id || "").toUpperCase();
+              site = staleRegion.sites.find((s) => {
+                const abbr = s.name.match(/\(([A-Z][A-Za-z0-9]+)\)\s*$/)?.[1];
+                return abbr && flIdUpper.startsWith(abbr);
+              });
+              // Try: building name contains site name (without abbreviation)
+              if (!site) {
+                site = staleRegion.sites.find((s) => {
+                  const sName = s.name
+                    .toLowerCase()
+                    .replace(/\s*\([^)]+\)\s*$/, "")
+                    .trim();
+                  return sName.length > 3 && bLower.includes(sName);
+                });
+              }
+              // Fall back to first site in the region
+              if (!site) site = staleRegion.sites[0];
+            }
+          }
+
+          if (!site) continue;
           const building: AsseticBuilding = {
             id: f.fl_guid,
             name: f.fl_name || "Unknown Building",
@@ -442,7 +487,7 @@ class AsseticLocationHierarchyService {
         }
       }
 
-      // Pass C — Floors: direct children of Buildings (or promoted-Sites when no real sites)
+      // Pass C — Floors: parent must be a known Building
       for (const f of nonRegionFLs) {
         if (siteMap.has(f.fl_guid) || buildingMap.has(f.fl_guid)) continue;
         if (!f.parent_fl_guid) continue;
