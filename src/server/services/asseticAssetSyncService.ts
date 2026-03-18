@@ -1352,15 +1352,37 @@ class AsseticAssetSyncService {
       return 0;
     }
 
+    // Filter out FLs that already have a parent set (e.g. correctly linked
+    // to a Site by the nested endpoint probing). Only assign to FLs that are
+    // truly orphaned (parent_fl_guid IS NULL).
+    const orphanGuids = new Set<string>(
+      (
+        await db("assetic_functional_locations")
+          .whereIn(
+            "fl_guid",
+            updates.map((u) => u.flGuid),
+          )
+          .whereNull("parent_fl_guid")
+          .where("fl_type", "!=", "Region")
+          .select("fl_guid")
+      ).map((r: any) => r.fl_guid as string),
+    );
+
+    const orphanUpdates = updates.filter((u) => orphanGuids.has(u.flGuid));
+    console.log(
+      `[AssetSync] Region assignment Pass 1: ${updates.length} candidates, ${orphanUpdates.length} orphans to assign (${updates.length - orphanUpdates.length} already have a parent — skipped).`,
+    );
+
     // Batch-update parent_fl_guid in chunks of 200
     let updated = 0;
     const CHUNK = 200;
-    for (let i = 0; i < updates.length; i += CHUNK) {
-      const chunk = updates.slice(i, i + CHUNK);
+    for (let i = 0; i < orphanUpdates.length; i += CHUNK) {
+      const chunk = orphanUpdates.slice(i, i + CHUNK);
       await Promise.all(
         chunk.map(({ flGuid, parentGuid }) =>
           db("assetic_functional_locations")
             .where("fl_guid", flGuid)
+            .whereNull("parent_fl_guid")
             .where("fl_type", "!=", "Region")
             .update({ parent_fl_guid: parentGuid }),
         ),
