@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { maintenanceService } from "../services/maintenanceService";
+import Modal from "../components/Modal";
 
 const priorityBadgeClass = (p: string) => {
   const map: Record<string, string> = {
@@ -172,9 +173,7 @@ const Maintenance: React.FC = () => {
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <select
             value={filters.status}
-            onChange={(e) =>
-              setFilters({ ...filters, status: e.target.value })
-            }
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
             style={{ width: "140px" }}
           >
             <option value="">All Statuses</option>
@@ -251,9 +250,7 @@ const Maintenance: React.FC = () => {
                         : undefined,
                   }}
                 >
-                  <td
-                    style={{ color: "var(--text-muted)", fontSize: "13px" }}
-                  >
+                  <td style={{ color: "var(--text-muted)", fontSize: "13px" }}>
                     {req.id}
                   </td>
                   <td style={{ fontWeight: 500 }}>{req.title}</td>
@@ -275,9 +272,7 @@ const Maintenance: React.FC = () => {
                     </span>
                   </td>
                   <td>
-                    <span
-                      className={`badge ${statusBadgeClass(req.status)}`}
-                    >
+                    <span className={`badge ${statusBadgeClass(req.status)}`}>
                       {toLabel(req.status || "open")}
                     </span>
                   </td>
@@ -327,20 +322,13 @@ const Maintenance: React.FC = () => {
         )}
       </div>
 
-      {/* ── Detail Panel ── */}
+      {/* ── Detail Modal ── */}
       {selected && (
-        <div className="card">
-          {/* Panel header */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              marginBottom: "16px",
-            }}
-          >
+        <Modal onClose={() => setSelected(null)}>
+          {/* Modal header */}
+          <div className="modal-header">
             <div>
-              <h3 style={{ marginBottom: "4px" }}>{selected.title}</h3>
+              <h3>{selected.title}</h3>
               <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
                 Submitted by{" "}
                 <strong style={{ color: "var(--text-secondary)" }}>
@@ -348,8 +336,7 @@ const Maintenance: React.FC = () => {
                     selected.requested_by_username ||
                     "Unknown"}
                 </strong>
-                {selected.requestor_email &&
-                  ` — ${selected.requestor_email}`}
+                {selected.requestor_email && ` — ${selected.requestor_email}`}
                 {selected.requestor_phone &&
                   ` · Phone: ${selected.requestor_phone}`}
                 {selected.requestor_mobile &&
@@ -367,160 +354,312 @@ const Maintenance: React.FC = () => {
             </button>
           </div>
 
-          {/* Two-column body */}
-          <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
-            {/* Left — reported issue */}
-            <div style={{ flex: "1 1 300px" }}>
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.6px",
-                  marginBottom: "10px",
-                }}
-              >
-                Reported Issue
+          <div className="modal-body">
+            {/* ── Next-step guidance banner ── */}
+            {selected.status !== "completed" &&
+              selected.status !== "cancelled" && (
+                <div
+                  className={`next-step-banner ${
+                    selected.work_order_id
+                      ? selected.work_order_status === "completed"
+                        ? "next-step-done"
+                        : "next-step-action"
+                      : "next-step-new"
+                  }`}
+                >
+                  {!selected.work_order_id &&
+                    (selected.status === "in_progress"
+                      ? "▶ In progress but no work order yet — create a Work Order below to formally assign a craft/trade."
+                      : "◎ New report — review the issue, set priority and category, then create a Work Order when ready.")}
+                  {selected.work_order_id &&
+                    selected.work_order_status === "pending" &&
+                    "⏳ Work order raised — assign a craft/trade, schedule the work, then update the status when it starts."}
+                  {selected.work_order_id &&
+                    selected.work_order_status === "in_progress" &&
+                    "🔧 Work is underway — use the messages thread below to communicate updates and notes."}
+                  {selected.work_order_id &&
+                    selected.work_order_status === "completed" &&
+                    "✓ Work complete — review and close this request, or add a final note."}
+                </div>
+              )}
+
+            {/* Two-column body */}
+            <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+              {/* Left — reported issue */}
+              <div style={{ flex: "1 1 300px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Reported Issue
+                </div>
+
+                {selected.location && (
+                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      Location:{" "}
+                    </span>
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      {selected.location}
+                    </span>
+                  </div>
+                )}
+
+                {selected.category && (
+                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      Category:{" "}
+                    </span>
+                    <span>{selected.category}</span>
+                  </div>
+                )}
+
+                {selected.description ? (
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      color: "var(--text-secondary)",
+                      lineHeight: "1.6",
+                      padding: "12px",
+                      background: "var(--bg-secondary)",
+                      borderRadius: "var(--radius)",
+                      border: "1px solid var(--border)",
+                      marginBottom: "8px",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {selected.description}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--text-muted)",
+                      fontStyle: "italic",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    No description provided.
+                  </div>
+                )}
+
+                {selected.supporting_information && (
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--text-muted)",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    {selected.supporting_information}
+                  </div>
+                )}
               </div>
 
-              {selected.location && (
-                <div style={{ marginBottom: "8px", fontSize: "14px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>
-                    Location:{" "}
-                  </span>
-                  <span style={{ color: "var(--text-secondary)" }}>
-                    {selected.location}
-                  </span>
-                </div>
-              )}
-
-              {selected.category && (
-                <div style={{ marginBottom: "8px", fontSize: "14px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>
-                    Category:{" "}
-                  </span>
-                  <span>{selected.category}</span>
-                </div>
-              )}
-
-              {selected.description ? (
+              {/* Right — triage + work order */}
+              <div style={{ flex: "1 1 300px" }}>
                 <div
                   style={{
-                    fontSize: "14px",
-                    color: "var(--text-secondary)",
-                    lineHeight: "1.6",
-                    padding: "12px",
-                    background: "var(--bg-secondary)",
-                    borderRadius: "var(--radius)",
-                    border: "1px solid var(--border)",
-                    marginBottom: "8px",
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {selected.description}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    fontSize: "13px",
+                    fontSize: "11px",
+                    fontWeight: 700,
                     color: "var(--text-muted)",
-                    fontStyle: "italic",
-                    marginBottom: "8px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "10px",
                   }}
                 >
-                  No description provided.
+                  Triage
                 </div>
-              )}
 
-              {selected.supporting_information && (
                 <div
                   style={{
-                    fontSize: "13px",
-                    color: "var(--text-muted)",
-                    fontStyle: "italic",
+                    display: "flex",
+                    gap: "10px",
+                    marginBottom: "10px",
                   }}
                 >
-                  {selected.supporting_information}
+                  <div
+                    className="form-group"
+                    style={{ flex: 1, marginBottom: 0 }}
+                  >
+                    <label style={{ fontSize: "12px" }}>Priority</label>
+                    <select
+                      value={editPriority}
+                      onChange={(e) => setEditPriority(e.target.value)}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                  <div
+                    className="form-group"
+                    style={{ flex: 1, marginBottom: 0 }}
+                  >
+                    <label style={{ fontSize: "12px" }}>Status</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                    >
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
                 </div>
-              )}
+
+                <div className="form-group" style={{ marginBottom: "10px" }}>
+                  <label style={{ fontSize: "12px" }}>Category</label>
+                  <input
+                    type="text"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    placeholder="e.g. Plumbing, Electrical, HVAC"
+                  />
+                </div>
+
+                <button
+                  onClick={handleUpdate}
+                  disabled={updating}
+                  style={{ width: "100%", marginBottom: "20px" }}
+                >
+                  {updating ? "Saving…" : "Update Request"}
+                </button>
+
+                {/* Work Order section */}
+                <div
+                  style={{
+                    paddingTop: "16px",
+                    borderTop: "1px solid var(--border)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.6px",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    Work Order
+                  </div>
+
+                  {selected.work_order_id ? (
+                    <div
+                      style={{
+                        padding: "12px",
+                        background: "var(--bg-secondary)",
+                        borderRadius: "var(--radius)",
+                        border: "1px solid var(--border)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "6px",
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>
+                          WO #{selected.work_order_id}
+                        </span>
+                        <span
+                          className={`badge ${statusBadgeClass(selected.work_order_status || "pending")}`}
+                        >
+                          {toLabel(selected.work_order_status || "pending")}
+                        </span>
+                      </div>
+                      {selected.work_order_craft && (
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          Craft: {selected.work_order_craft}
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-muted)",
+                          marginTop: "6px",
+                        }}
+                      >
+                        Manage this work order from the Work Orders list.
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <div
+                          className="form-group"
+                          style={{ flex: 1, marginBottom: 0 }}
+                        >
+                          <label style={{ fontSize: "12px" }}>
+                            Craft / Trade
+                          </label>
+                          <input
+                            type="text"
+                            value={woCraft}
+                            onChange={(e) => setWoCraft(e.target.value)}
+                            placeholder="e.g. Plumbing, HVAC"
+                          />
+                        </div>
+                        <div
+                          className="form-group"
+                          style={{ flex: 1, marginBottom: 0 }}
+                        >
+                          <label style={{ fontSize: "12px" }}>
+                            Scheduled Date
+                          </label>
+                          <input
+                            type="date"
+                            value={woScheduled}
+                            onChange={(e) => setWoScheduled(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleCreateWorkOrder}
+                        disabled={creatingWo}
+                        style={{
+                          width: "100%",
+                          background: "rgba(34,197,94,0.15)",
+                          color: "#4ade80",
+                          border: "1px solid rgba(34,197,94,0.3)",
+                        }}
+                      >
+                        {creatingWo ? "Creating…" : "↑ Create Work Order"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Right — triage + work order */}
-            <div style={{ flex: "1 1 300px" }}>
+            {/* Messages — shown once a work order exists */}
+            {selected.work_order_id && (
               <div
                 style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.6px",
-                  marginBottom: "10px",
-                }}
-              >
-                Triage
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  marginBottom: "10px",
-                }}
-              >
-                <div
-                  className="form-group"
-                  style={{ flex: 1, marginBottom: 0 }}
-                >
-                  <label style={{ fontSize: "12px" }}>Priority</label>
-                  <select
-                    value={editPriority}
-                    onChange={(e) => setEditPriority(e.target.value)}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
-                </div>
-                <div
-                  className="form-group"
-                  style={{ flex: 1, marginBottom: 0 }}
-                >
-                  <label style={{ fontSize: "12px" }}>Status</label>
-                  <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value)}
-                  >
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: "10px" }}>
-                <label style={{ fontSize: "12px" }}>Category</label>
-                <input
-                  type="text"
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  placeholder="e.g. Plumbing, Electrical, HVAC"
-                />
-              </div>
-
-              <button
-                onClick={handleUpdate}
-                disabled={updating}
-                style={{ width: "100%", marginBottom: "20px" }}
-              >
-                {updating ? "Saving…" : "Update Request"}
-              </button>
-
-              {/* Work Order section */}
-              <div
-                style={{
+                  marginTop: "4px",
                   paddingTop: "16px",
                   borderTop: "1px solid var(--border)",
                 }}
@@ -535,181 +674,51 @@ const Maintenance: React.FC = () => {
                     marginBottom: "10px",
                   }}
                 >
-                  Work Order
+                  Work Order Messages
                 </div>
-
-                {selected.work_order_id ? (
-                  <div
-                    style={{
-                      padding: "12px",
-                      background: "var(--bg-secondary)",
-                      borderRadius: "var(--radius)",
-                      border: "1px solid var(--border)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      <span style={{ fontWeight: 600 }}>
-                        WO #{selected.work_order_id}
-                      </span>
-                      <span
-                        className={`badge ${statusBadgeClass(selected.work_order_status || "pending")}`}
-                      >
-                        {toLabel(
-                          selected.work_order_status || "pending",
-                        )}
-                      </span>
-                    </div>
-                    {selected.work_order_craft && (
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
-                        Craft: {selected.work_order_craft}
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--text-muted)",
-                        marginTop: "6px",
-                      }}
-                    >
-                      Manage this work order from the Work Orders list.
-                    </div>
+                {messagesLoading ? (
+                  <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+                    Loading messages…
                   </div>
                 ) : (
                   <>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "10px",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      <div
-                        className="form-group"
-                        style={{ flex: 1, marginBottom: 0 }}
-                      >
-                        <label style={{ fontSize: "12px" }}>
-                          Craft / Trade
-                        </label>
-                        <input
-                          type="text"
-                          value={woCraft}
-                          onChange={(e) => setWoCraft(e.target.value)}
-                          placeholder="e.g. Plumbing, HVAC"
-                        />
-                      </div>
-                      <div
-                        className="form-group"
-                        style={{ flex: 1, marginBottom: 0 }}
-                      >
-                        <label style={{ fontSize: "12px" }}>
-                          Scheduled Date
-                        </label>
-                        <input
-                          type="date"
-                          value={woScheduled}
-                          onChange={(e) => setWoScheduled(e.target.value)}
-                        />
-                      </div>
+                    <div className="messages-box">
+                      {messages.length === 0 ? (
+                        <p style={{ color: "var(--text-muted)" }}>
+                          No messages yet.
+                        </p>
+                      ) : (
+                        messages.map((msg) => (
+                          <div key={msg.id} className="message-bubble">
+                            <strong>{msg.sender_username || "Unknown"}</strong>
+                            <span className="message-meta">
+                              {new Date(msg.created_at).toLocaleString()}
+                            </span>
+                            <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
-                    <button
-                      onClick={handleCreateWorkOrder}
-                      disabled={creatingWo}
-                      style={{
-                        width: "100%",
-                        background: "rgba(34,197,94,0.15)",
-                        color: "#4ade80",
-                        border: "1px solid rgba(34,197,94,0.3)",
-                      }}
+                    <form
+                      onSubmit={handleSendMessage}
+                      style={{ display: "flex", gap: "10px" }}
                     >
-                      {creatingWo ? "Creating…" : "↑ Create Work Order"}
-                    </button>
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Add a note or message…"
+                        style={{ flex: 1 }}
+                        required
+                      />
+                      <button type="submit">Send</button>
+                    </form>
                   </>
                 )}
               </div>
-            </div>
+            )}
           </div>
-
-          {/* Messages — shown once a work order exists */}
-          {selected.work_order_id && (
-            <div
-              style={{
-                marginTop: "20px",
-                paddingTop: "16px",
-                borderTop: "1px solid var(--border)",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.6px",
-                  marginBottom: "10px",
-                }}
-              >
-                Work Order Messages
-              </div>
-              {messagesLoading ? (
-                <div
-                  style={{ color: "var(--text-muted)", fontSize: "14px" }}
-                >
-                  Loading messages…
-                </div>
-              ) : (
-                <>
-                  <div className="messages-box">
-                    {messages.length === 0 ? (
-                      <p style={{ color: "var(--text-muted)" }}>
-                        No messages yet.
-                      </p>
-                    ) : (
-                      messages.map((msg) => (
-                        <div key={msg.id} className="message-bubble">
-                          <strong>
-                            {msg.sender_username || "Unknown"}
-                          </strong>
-                          <span className="message-meta">
-                            {new Date(msg.created_at).toLocaleString()}
-                          </span>
-                          <p style={{ margin: "4px 0 0 0" }}>
-                            {msg.message}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <form
-                    onSubmit={handleSendMessage}
-                    style={{ display: "flex", gap: "10px" }}
-                  >
-                    <input
-                      type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Add a note or message…"
-                      style={{ flex: 1 }}
-                      required
-                    />
-                    <button type="submit">Send</button>
-                  </form>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        </Modal>
       )}
     </div>
   );

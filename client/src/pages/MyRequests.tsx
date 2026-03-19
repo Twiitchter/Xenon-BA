@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { maintenanceService } from "../services/maintenanceService";
 import { authService } from "../services/authService";
+import Modal from "../components/Modal";
 import LocationHierarchyPicker, {
   EMPTY_LOCATION_SELECTION,
   LocationSelection,
@@ -512,157 +513,211 @@ const MyRequests: React.FC = () => {
         )}
       </div>
 
-      {/* Detail panel */}
+      {/* Detail modal */}
       {selectedItem && (
-        <div className="card">
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "16px",
-            }}
-          >
-            <h3>
-              {selectedItem.display_type === "work_order" &&
-              selectedItem.work_order_id
-                ? `Work Order #${selectedItem.work_order_id}`
-                : `Work Request #${selectedItem.id}`}
-              : {selectedItem.title}
-            </h3>
-            <button onClick={() => setSelectedItem(null)}>Close</button>
-          </div>
-
-          <div style={{ marginBottom: "20px" }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "16px",
-              }}
-            >
-              <div>
-                <strong>Description:</strong>
-                <p style={{ marginTop: "4px" }}>
-                  {selectedItem.description || "No description provided"}
-                </p>
-              </div>
-              <div>
-                <strong>Priority:</strong>
-                <p style={{ marginTop: "4px" }}>
-                  <span
-                    className={`badge ${getPriorityBadgeClass(selectedItem.priority)}`}
-                  >
-                    {selectedItem.priority}
-                  </span>
-                </p>
-              </div>
-              <div>
-                <strong>Status:</strong>
-                <p style={{ marginTop: "4px" }}>
-                  <span
-                    className={`badge ${getStatusBadgeClass(selectedItem.display_status)}`}
-                  >
-                    {selectedItem.display_status}
-                  </span>
-                </p>
-              </div>
-              <div>
-                <strong>Category/Craft:</strong>
-                <p style={{ marginTop: "4px" }}>
-                  {selectedItem.work_order_craft ||
-                    selectedItem.category ||
-                    "N/A"}
-                </p>
-              </div>
-              {selectedItem.location && (
-                <div>
-                  <strong>Location:</strong>
-                  <p style={{ marginTop: "4px" }}>{selectedItem.location}</p>
-                </div>
-              )}
-              {selectedItem.assigned_to_username && (
-                <div>
-                  <strong>Assigned To:</strong>
-                  <p style={{ marginTop: "4px" }}>
-                    {selectedItem.assigned_to_username}
-                  </p>
-                </div>
-              )}
-              {selectedItem.scheduled_date && (
-                <div>
-                  <strong>Scheduled Date:</strong>
-                  <p style={{ marginTop: "4px" }}>
-                    {new Date(selectedItem.scheduled_date).toLocaleDateString()}
-                  </p>
-                </div>
-              )}
-              <div>
-                <strong>Created:</strong>
-                <p style={{ marginTop: "4px" }}>
-                  {new Date(selectedItem.created_at).toLocaleString()}
-                </p>
+        <Modal onClose={() => setSelectedItem(null)}>
+          {/* Modal header */}
+          <div className="modal-header">
+            <div>
+              <h3>
+                {selectedItem.display_type === "work_order" &&
+                selectedItem.work_order_id
+                  ? `Work Order #${selectedItem.work_order_id}`
+                  : `Work Request #${selectedItem.id}`}
+                : {selectedItem.title}
+              </h3>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "var(--text-muted)",
+                  marginTop: "4px",
+                }}
+              >
+                Submitted{" "}
+                {new Date(selectedItem.created_at).toLocaleDateString()}
+                {selectedItem.location && ` · ${selectedItem.location}`}
               </div>
             </div>
+            <button
+              className="btn-ghost"
+              onClick={() => setSelectedItem(null)}
+              style={{ flexShrink: 0 }}
+            >
+              ✕
+            </button>
           </div>
 
-          {/* Messages section */}
-          <div
-            style={{ borderTop: "1px solid var(--border)", paddingTop: "20px" }}
-          >
-            <h4>Updates & Comments</h4>
-            {selectedItem.work_order_id ||
-            selectedItem.item_type === "work_order" ? (
-              <>
-                {messagesLoading ? (
-                  <div className="loading">Loading messages...</div>
-                ) : (
-                  <>
-                    <div
-                      className="messages-box"
-                      style={{ marginBottom: "16px" }}
+          <div className="modal-body">
+            {/* User-facing next-step banner */}
+            <div
+              className={`next-step-banner ${
+                selectedItem.display_status === "completed"
+                  ? "next-step-done"
+                  : selectedItem.display_status === "cancelled"
+                    ? "next-step-action"
+                    : selectedItem.work_order_id &&
+                        selectedItem.work_order_status === "in_progress"
+                      ? "next-step-action"
+                      : selectedItem.work_order_id
+                        ? "next-step-action"
+                        : "next-step-new"
+              }`}
+            >
+              {!selectedItem.work_order_id &&
+                selectedItem.display_status !== "completed" &&
+                selectedItem.display_status !== "cancelled" &&
+                "◎ Your request is awaiting review — we’ll notify you when a work order is raised and work begins."}
+              {selectedItem.work_order_id &&
+                selectedItem.work_order_status === "pending" &&
+                "⏳ A work order has been created for your request — our team will schedule the work shortly."}
+              {selectedItem.work_order_id &&
+                selectedItem.work_order_status === "in_progress" &&
+                "🔧 Work is currently underway — add a comment below if you have any updates or questions."}
+              {(selectedItem.display_status === "completed" ||
+                selectedItem.work_order_status === "completed") &&
+                "✓ This work has been completed — thank you for reporting. Contact us if anything else is needed."}
+              {selectedItem.display_status === "cancelled" &&
+                "This request has been cancelled."}
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "16px",
+                }}
+              >
+                <div>
+                  <strong>Description:</strong>
+                  <p style={{ marginTop: "4px" }}>
+                    {selectedItem.description || "No description provided"}
+                  </p>
+                </div>
+                <div>
+                  <strong>Priority:</strong>
+                  <p style={{ marginTop: "4px" }}>
+                    <span
+                      className={`badge ${getPriorityBadgeClass(selectedItem.priority)}`}
                     >
-                      {messages.length === 0 ? (
-                        <p style={{ color: "var(--text-muted)" }}>
-                          No updates yet.
-                        </p>
-                      ) : (
-                        messages.map((msg) => (
-                          <div key={msg.id} className="message-bubble">
-                            <strong>{msg.sender_username || "System"}</strong>
-                            <span className="message-meta">
-                              {new Date(msg.created_at).toLocaleString()}
-                            </span>
-                            <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    <form
-                      onSubmit={handleSendMessage}
-                      style={{ display: "flex", gap: "10px" }}
+                      {selectedItem.priority}
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <strong>Status:</strong>
+                  <p style={{ marginTop: "4px" }}>
+                    <span
+                      className={`badge ${getStatusBadgeClass(selectedItem.display_status)}`}
                     >
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Add a comment or update..."
-                        style={{ flex: 1 }}
-                        required
-                      />
-                      <button type="submit">Send</button>
-                    </form>
-                  </>
+                      {selectedItem.display_status}
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <strong>Category/Craft:</strong>
+                  <p style={{ marginTop: "4px" }}>
+                    {selectedItem.work_order_craft ||
+                      selectedItem.category ||
+                      "N/A"}
+                  </p>
+                </div>
+                {selectedItem.location && (
+                  <div>
+                    <strong>Location:</strong>
+                    <p style={{ marginTop: "4px" }}>{selectedItem.location}</p>
+                  </div>
                 )}
-              </>
-            ) : (
-              <p style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
-                Comments will be available once a work order is created for this
-                request.
-              </p>
-            )}
+                {selectedItem.assigned_to_username && (
+                  <div>
+                    <strong>Assigned To:</strong>
+                    <p style={{ marginTop: "4px" }}>
+                      {selectedItem.assigned_to_username}
+                    </p>
+                  </div>
+                )}
+                {selectedItem.scheduled_date && (
+                  <div>
+                    <strong>Scheduled Date:</strong>
+                    <p style={{ marginTop: "4px" }}>
+                      {new Date(
+                        selectedItem.scheduled_date,
+                      ).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <strong>Created:</strong>
+                  <p style={{ marginTop: "4px" }}>
+                    {new Date(selectedItem.created_at).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Messages section */}
+            <div
+              style={{
+                borderTop: "1px solid var(--border)",
+                paddingTop: "20px",
+              }}
+            >
+              <h4>Updates & Comments</h4>
+              {selectedItem.work_order_id ||
+              selectedItem.item_type === "work_order" ? (
+                <>
+                  {messagesLoading ? (
+                    <div className="loading">Loading messages...</div>
+                  ) : (
+                    <>
+                      <div
+                        className="messages-box"
+                        style={{ marginBottom: "16px" }}
+                      >
+                        {messages.length === 0 ? (
+                          <p style={{ color: "var(--text-muted)" }}>
+                            No updates yet.
+                          </p>
+                        ) : (
+                          messages.map((msg) => (
+                            <div key={msg.id} className="message-bubble">
+                              <strong>{msg.sender_username || "System"}</strong>
+                              <span className="message-meta">
+                                {new Date(msg.created_at).toLocaleString()}
+                              </span>
+                              <p style={{ margin: "4px 0 0 0" }}>
+                                {msg.message}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <form
+                        onSubmit={handleSendMessage}
+                        style={{ display: "flex", gap: "10px" }}
+                      >
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          placeholder="Add a comment or update..."
+                          style={{ flex: 1 }}
+                          required
+                        />
+                        <button type="submit">Send</button>
+                      </form>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+                  Comments will be available once a work order is created for
+                  this request.
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

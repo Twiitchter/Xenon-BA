@@ -1,23 +1,49 @@
-import React, { useState, useEffect } from 'react';
-import { maintenanceService } from '../services/maintenanceService';
+import React, { useState, useEffect } from "react";
+import { maintenanceService } from "../services/maintenanceService";
+import Modal from "../components/Modal";
+
+const priorityBadgeClass = (p: string) => {
+  const map: Record<string, string> = {
+    critical: "badge-error",
+    high: "badge-warning",
+    medium: "badge-info",
+    low: "badge-muted",
+  };
+  return map[p] || "badge-muted";
+};
+
+const statusBadgeClass = (s: string) => {
+  const map: Record<string, string> = {
+    pending: "badge-secondary",
+    in_progress: "badge-warning",
+    completed: "badge-success",
+    cancelled: "badge-muted",
+    open: "badge-info",
+  };
+  return map[s] || "badge-muted";
+};
+
+const toLabel = (s: string) =>
+  (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 const WorkOrders: React.FC = () => {
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [filters, setFilters] = useState({ status: '', craft: '' });
+  const [error, setError] = useState("");
+  const [filters, setFilters] = useState({ status: "", craft: "" });
   const [crafts, setCrafts] = useState<string[]>([]);
 
-  // Detail / messages state
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  // Selected WO for modal
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
 
-  // Assignment state
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editCraft, setEditCraft] = useState('');
-  const [editStatus, setEditStatus] = useState('');
+  // Edit state (inside modal)
+  const [editCraft, setEditCraft] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [editScheduled, setEditScheduled] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -26,12 +52,12 @@ const WorkOrders: React.FC = () => {
 
   const fetchWorkOrders = async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const data = await maintenanceService.getWorkOrders(filters);
       setWorkOrders(data.workOrders || []);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch work orders');
+      setError(err.response?.data?.error || "Failed to fetch work orders");
     } finally {
       setLoading(false);
     }
@@ -42,24 +68,52 @@ const WorkOrders: React.FC = () => {
       const data = await maintenanceService.getCrafts();
       setCrafts(data.crafts || []);
     } catch {
-      // Silently fail – crafts list is non-critical
+      // non-critical
     }
   };
 
-  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+  const handleFilterChange = (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>,
+  ) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };
 
-  const openDetail = async (workOrder: any) => {
-    setSelectedOrder(workOrder);
+  const openDetail = async (wo: any) => {
+    setSelectedOrder(wo);
+    setEditCraft(wo.craft || "");
+    setEditStatus(wo.status || "pending");
+    setEditScheduled(wo.scheduled_date ? wo.scheduled_date.split("T")[0] : "");
+    setMessages([]);
     setMessagesLoading(true);
     try {
-      const data = await maintenanceService.getMessages(workOrder.id);
+      const data = await maintenanceService.getMessages(wo.id);
       setMessages(data.messages || []);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch messages');
+    } catch {
+      // non-critical
     } finally {
       setMessagesLoading(false);
+    }
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!selectedOrder) return;
+    setUpdating(true);
+    try {
+      await maintenanceService.updateWorkOrder(selectedOrder.id, {
+        craft: editCraft || undefined,
+        status: editStatus || undefined,
+        scheduledDate: editScheduled || undefined,
+      });
+      const data = await maintenanceService.getWorkOrders(filters);
+      setWorkOrders(data.workOrders || []);
+      const updated = (data.workOrders || []).find(
+        (w: any) => w.id === selectedOrder.id,
+      );
+      if (updated) setSelectedOrder(updated);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to update work order");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -68,136 +122,136 @@ const WorkOrders: React.FC = () => {
     if (!selectedOrder || !newMessage.trim()) return;
     try {
       await maintenanceService.sendMessage(selectedOrder.id, newMessage);
-      setNewMessage('');
+      setNewMessage("");
       const data = await maintenanceService.getMessages(selectedOrder.id);
       setMessages(data.messages || []);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send message');
-    }
-  };
-
-  const startEdit = (order: any) => {
-    setEditingId(order.id);
-    setEditCraft(order.craft || '');
-    setEditStatus(order.status || 'pending');
-  };
-
-  const saveEdit = async () => {
-    if (editingId === null) return;
-    try {
-      await maintenanceService.updateWorkOrder(editingId, {
-        craft: editCraft || undefined,
-        status: editStatus || undefined,
-      });
-      setEditingId(null);
-      fetchWorkOrders();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update work order');
+      setError(err.response?.data?.error || "Failed to send message");
     }
   };
 
   return (
-    <div className="container">
+    <div className="container" style={{ maxWidth: "1300px" }}>
+      {/* ── Header ── */}
       <div className="page-header">
         <h2>Work Orders</h2>
-      </div>
-
-      <div className="card">
-        <h3>Filters</h3>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label>Status</label>
-            <select name="status" value={filters.status} onChange={handleFilterChange}>
-              <option value="">All</option>
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label>Craft / Trade</label>
-            <input
-              type="text"
-              name="craft"
-              value={filters.craft}
-              onChange={handleFilterChange}
-              placeholder="Filter by craft"
-            />
-          </div>
-          <button onClick={fetchWorkOrders}>Apply Filters</button>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            style={{ width: "140px" }}
+          >
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <input
+            type="text"
+            name="craft"
+            value={filters.craft}
+            onChange={handleFilterChange}
+            placeholder="Filter by craft"
+            style={{ width: "140px" }}
+          />
+          <button onClick={fetchWorkOrders}>Refresh</button>
         </div>
       </div>
 
       {error && <div className="error card">{error}</div>}
 
-      <div className="card">
+      {/* ── Work Order List ── */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
-          <div className="loading">Loading work orders...</div>
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: "var(--text-muted)",
+            }}
+          >
+            Loading work orders…
+          </div>
         ) : workOrders.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px",
+              color: "var(--text-muted)",
+            }}
+          >
             No work orders found.
           </div>
         ) : (
-          <table>
+          <table className="data-table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th style={{ width: "40px" }}>#</th>
                 <th>Title</th>
-                <th>Craft</th>
-                <th>Priority</th>
-                <th>Status</th>
+                <th style={{ width: "90px" }}>Priority</th>
+                <th style={{ width: "120px" }}>Status</th>
+                <th>Craft / Trade</th>
                 <th>Assigned To</th>
-                <th>Scheduled</th>
-                <th>Actions</th>
+                <th style={{ width: "100px" }}>Scheduled</th>
               </tr>
             </thead>
             <tbody>
               {workOrders.map((wo) => (
-                <tr key={wo.id}>
-                  <td>{wo.id}</td>
-                  <td>{wo.title}</td>
+                <tr
+                  key={wo.id}
+                  onClick={() => openDetail(wo)}
+                  style={{
+                    cursor: "pointer",
+                    background:
+                      selectedOrder?.id === wo.id
+                        ? "rgba(14,165,233,0.08)"
+                        : undefined,
+                  }}
+                >
+                  <td style={{ color: "var(--text-muted)", fontSize: "13px" }}>
+                    {wo.id}
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{wo.title}</td>
                   <td>
-                    {editingId === wo.id ? (
-                      <input
-                        type="text"
-                        value={editCraft}
-                        onChange={(e) => setEditCraft(e.target.value)}
-                        placeholder="e.g. Plumbing"
-                        style={{ width: '100px' }}
-                        list="craft-options"
-                      />
-                    ) : (
-                      wo.craft || 'N/A'
+                    <span
+                      className={`badge ${priorityBadgeClass(wo.priority)}`}
+                    >
+                      {wo.priority || "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`badge ${statusBadgeClass(wo.status)}`}>
+                      {toLabel(wo.status || "pending")}
+                    </span>
+                  </td>
+                  <td
+                    style={{ color: "var(--text-secondary)", fontSize: "13px" }}
+                  >
+                    {wo.craft || (
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Unassigned
+                      </span>
                     )}
                   </td>
-                  <td>{wo.priority}</td>
-                  <td>
-                    {editingId === wo.id ? (
-                      <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    ) : (
-                      wo.status
+                  <td
+                    style={{ color: "var(--text-secondary)", fontSize: "13px" }}
+                  >
+                    {wo.assigned_to_username || (
+                      <span style={{ color: "var(--text-muted)" }}>—</span>
                     )}
                   </td>
-                  <td>{wo.assigned_to_username || 'Unassigned'}</td>
-                  <td>{wo.scheduled_date ? new Date(wo.scheduled_date).toLocaleDateString() : 'N/A'}</td>
-                  <td>
-                    {editingId === wo.id ? (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button className="btn-ghost" onClick={saveEdit}>Save</button>
-                        <button className="btn-ghost" onClick={() => setEditingId(null)}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button className="btn-ghost" onClick={() => startEdit(wo)}>Edit</button>
-                        <button className="btn-ghost" onClick={() => openDetail(wo)}>Messages</button>
-                      </div>
-                    )}
+                  <td
+                    style={{
+                      color: "var(--text-muted)",
+                      fontSize: "13px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {wo.scheduled_date
+                      ? new Date(wo.scheduled_date).toLocaleDateString()
+                      : "—"}
                   </td>
                 </tr>
               ))}
@@ -213,46 +267,247 @@ const WorkOrders: React.FC = () => {
         ))}
       </datalist>
 
-      {/* Messages panel */}
+      {/* ── Work Order Modal ── */}
       {selectedOrder && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>Messages – Work Order #{selectedOrder.id}: {selectedOrder.title}</h3>
-            <button onClick={() => setSelectedOrder(null)}>Close</button>
-          </div>
-          {messagesLoading ? (
-            <div className="loading">Loading messages...</div>
-          ) : (
-            <>
-              <div className="messages-box">
-                {messages.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)' }}>No messages yet.</p>
-                ) : (
-                  messages.map((msg) => (
-                    <div key={msg.id} className="message-bubble">
-                      <strong>{msg.sender_username || 'Unknown'}</strong>
-                      <span className="message-meta">
-                        {new Date(msg.created_at).toLocaleString()}
-                      </span>
-                      <p style={{ margin: '4px 0 0 0' }}>{msg.message}</p>
-                    </div>
-                  ))
+        <Modal onClose={() => setSelectedOrder(null)}>
+          {/* Header */}
+          <div className="modal-header">
+            <div>
+              <h3>
+                WO #{selectedOrder.id}: {selectedOrder.title}
+              </h3>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "var(--text-muted)",
+                  marginTop: "4px",
+                }}
+              >
+                Priority:{" "}
+                <span
+                  className={`badge ${priorityBadgeClass(selectedOrder.priority)}`}
+                >
+                  {selectedOrder.priority || "—"}
+                </span>
+                {selectedOrder.description && (
+                  <span style={{ marginLeft: "12px" }}>
+                    {selectedOrder.description}
+                  </span>
                 )}
               </div>
-              <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px' }}>
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a response..."
-                  style={{ flex: 1 }}
-                  required
-                />
-                <button type="submit">Send</button>
-              </form>
-            </>
-          )}
-        </div>
+            </div>
+            <button
+              className="btn-ghost"
+              onClick={() => setSelectedOrder(null)}
+              style={{ flexShrink: 0 }}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="modal-body">
+            {/* Next-step banner */}
+            {selectedOrder.status !== "cancelled" && (
+              <div
+                className={`next-step-banner ${
+                  selectedOrder.status === "completed"
+                    ? "next-step-done"
+                    : selectedOrder.status === "pending"
+                      ? "next-step-new"
+                      : "next-step-action"
+                }`}
+              >
+                {selectedOrder.status === "pending" &&
+                  "◎ Pending — assign a craft/trade and schedule the work, then set status to In Progress when it begins."}
+                {selectedOrder.status === "in_progress" &&
+                  "🔧 Work in progress — communicate updates via the messages thread and mark complete when done."}
+                {selectedOrder.status === "completed" &&
+                  "✓ Work complete — verify with the requester and close if satisfied."}
+              </div>
+            )}
+
+            {/* Two-column: details + edit */}
+            <div
+              style={{
+                display: "flex",
+                gap: "24px",
+                flexWrap: "wrap",
+                marginBottom: "24px",
+              }}
+            >
+              {/* Left — summary */}
+              <div style={{ flex: "1 1 220px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Details
+                </div>
+                {selectedOrder.craft && (
+                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Craft: </span>
+                    <span>{selectedOrder.craft}</span>
+                  </div>
+                )}
+                {selectedOrder.assigned_to_username && (
+                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      Assigned:{" "}
+                    </span>
+                    <span>{selectedOrder.assigned_to_username}</span>
+                  </div>
+                )}
+                {selectedOrder.scheduled_date && (
+                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      Scheduled:{" "}
+                    </span>
+                    <span>
+                      {new Date(
+                        selectedOrder.scheduled_date,
+                      ).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+                <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                  <span style={{ color: "var(--text-muted)" }}>Created: </span>
+                  <span>
+                    {new Date(selectedOrder.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right — edit */}
+              <div style={{ flex: "1 1 280px" }}>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Update
+                </div>
+                <div
+                  style={{ display: "flex", gap: "10px", marginBottom: "10px" }}
+                >
+                  <div
+                    className="form-group"
+                    style={{ flex: 1, marginBottom: 0 }}
+                  >
+                    <label style={{ fontSize: "12px" }}>Status</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                  <div
+                    className="form-group"
+                    style={{ flex: 1, marginBottom: 0 }}
+                  >
+                    <label style={{ fontSize: "12px" }}>Scheduled Date</label>
+                    <input
+                      type="date"
+                      value={editScheduled}
+                      onChange={(e) => setEditScheduled(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: "10px" }}>
+                  <label style={{ fontSize: "12px" }}>Craft / Trade</label>
+                  <input
+                    type="text"
+                    value={editCraft}
+                    onChange={(e) => setEditCraft(e.target.value)}
+                    placeholder="e.g. Plumbing, HVAC"
+                    list="craft-options"
+                  />
+                </div>
+                <button
+                  onClick={handleUpdateOrder}
+                  disabled={updating}
+                  style={{ width: "100%" }}
+                >
+                  {updating ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div
+              style={{
+                borderTop: "1px solid var(--border)",
+                paddingTop: "16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.6px",
+                  marginBottom: "10px",
+                }}
+              >
+                Messages
+              </div>
+              {messagesLoading ? (
+                <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+                  Loading messages…
+                </div>
+              ) : (
+                <>
+                  <div className="messages-box">
+                    {messages.length === 0 ? (
+                      <p style={{ color: "var(--text-muted)" }}>
+                        No messages yet.
+                      </p>
+                    ) : (
+                      messages.map((msg) => (
+                        <div key={msg.id} className="message-bubble">
+                          <strong>{msg.sender_username || "Unknown"}</strong>
+                          <span className="message-meta">
+                            {new Date(msg.created_at).toLocaleString()}
+                          </span>
+                          <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <form
+                    onSubmit={handleSendMessage}
+                    style={{ display: "flex", gap: "10px" }}
+                  >
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Add a note or update…"
+                      style={{ flex: 1 }}
+                      required
+                    />
+                    <button type="submit">Send</button>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
