@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LocationHierarchyResponse,
   maintenanceService,
 } from "../services/maintenanceService";
 import { authService } from "../services/authService";
+import { assetService } from "../services/assetService";
 import LocationHierarchyPicker, {
   EMPTY_LOCATION_SELECTION,
   LocationSelection,
@@ -40,6 +41,13 @@ const NewWorkRequest: React.FC = () => {
     workRequestSubtypeId: "",
   });
 
+  // Asset picker state
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetResults, setAssetResults] = useState<any[]>([]);
+  const [assetSearchLoading, setAssetSearchLoading] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
+  const assetDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Assetic integration state
   const [workRequestSources, setWorkRequestSources] = useState<
     WorkRequestSource[]
@@ -58,6 +66,38 @@ const NewWorkRequest: React.FC = () => {
     prefillFromUser();
     fetchAsseticData();
   }, []);
+
+  const handleAssetSearchChange = (value: string) => {
+    setAssetSearch(value);
+    if (!value || value.length < 2) {
+      setAssetResults([]);
+      return;
+    }
+    if (assetDebounce.current) clearTimeout(assetDebounce.current);
+    assetDebounce.current = setTimeout(async () => {
+      setAssetSearchLoading(true);
+      try {
+        const data = await assetService.searchAssets(value);
+        setAssetResults(data.assets || []);
+      } catch {
+        setAssetResults([]);
+      } finally {
+        setAssetSearchLoading(false);
+      }
+    }, 300);
+  };
+
+  const selectAsset = (asset: any) => {
+    setSelectedAsset(asset);
+    setAssetSearch(asset.asset_name || asset.asset_id || "");
+    setAssetResults([]);
+  };
+
+  const clearAsset = () => {
+    setSelectedAsset(null);
+    setAssetSearch("");
+    setAssetResults([]);
+  };
 
   const prefillFromUser = async () => {
     const user = await authService.getCurrentUser();
@@ -126,6 +166,7 @@ const NewWorkRequest: React.FC = () => {
       await maintenanceService.createRequest({
         ...formData,
         location: combinedLocation,
+        asseticAssetGuid: selectedAsset?.assetic_guid || undefined,
       });
       navigate("/my-requests");
     } catch (err: any) {
@@ -244,6 +285,141 @@ const NewWorkRequest: React.FC = () => {
           >
             Request Details
           </h4>
+
+          {/* ── Asset picker ── */}
+          <div className="form-group">
+            <label>
+              Asset{" "}
+              {asseticEnabled && (
+                <span style={{ color: "var(--accent)", fontWeight: 700 }}>
+                  *
+                </span>
+              )}
+            </label>
+            {selectedAsset ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "8px 12px",
+                  background: "rgba(14,165,233,0.08)",
+                  border: "1px solid var(--accent)",
+                  borderRadius: "var(--radius)",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: "14px" }}>
+                    {selectedAsset.asset_name}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                    {selectedAsset.asset_id}
+                    {selectedAsset.asset_type
+                      ? ` · ${selectedAsset.asset_type}`
+                      : ""}
+                    {selectedAsset.asset_category
+                      ? ` · ${selectedAsset.asset_category}`
+                      : ""}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={clearAsset}
+                  style={{ fontSize: "12px" }}
+                >
+                  ✕ Change
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  value={assetSearch}
+                  onChange={(e) => handleAssetSearchChange(e.target.value)}
+                  placeholder="Search by asset name or code…"
+                  autoComplete="off"
+                />
+                {asseticEnabled && !selectedAsset && (
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--text-muted)",
+                      marginTop: "3px",
+                    }}
+                  >
+                    Required — type at least 2 characters to search synced
+                    assets.
+                  </div>
+                )}
+                {assetSearchLoading && (
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--text-muted)",
+                      marginTop: "4px",
+                    }}
+                  >
+                    Searching…
+                  </div>
+                )}
+                {assetResults.length > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      zIndex: 100,
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      background: "var(--bg-card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius)",
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    {assetResults.map((a) => (
+                      <div
+                        key={a.assetic_guid || a.id}
+                        onClick={() => selectAsset(a)}
+                        style={{
+                          padding: "9px 14px",
+                          cursor: "pointer",
+                          borderBottom: "1px solid var(--border)",
+                        }}
+                        onMouseEnter={(e) =>
+                          ((
+                            e.currentTarget as HTMLDivElement
+                          ).style.background = "rgba(14,165,233,0.1)")
+                        }
+                        onMouseLeave={(e) =>
+                          ((
+                            e.currentTarget as HTMLDivElement
+                          ).style.background = "")
+                        }
+                      >
+                        <div style={{ fontWeight: 500, fontSize: "14px" }}>
+                          {a.asset_name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          {a.asset_id}
+                          {a.asset_type ? ` · ${a.asset_type}` : ""}
+                          {a.asset_category ? ` · ${a.asset_category}` : ""}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: "flex", gap: "10px" }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label>Priority</label>

@@ -1,13 +1,27 @@
-import axios from 'axios';
-import { authService } from './authService';
+import axios from "axios";
+import { authService } from "./authService";
 
-const API_URL = '/api';
+const API_URL = "/api";
 
 class AssetService {
-  async getAssets(params?: { status?: string; category?: string; limit?: number; offset?: number }) {
+  async getAssets(params?: {
+    status?: string;
+    category?: string;
+    limit?: number;
+    offset?: number;
+  }) {
     const response = await axios.get(`${API_URL}/assets`, {
       headers: authService.getAuthHeader(),
       params,
+    });
+    return response.data;
+  }
+
+  /** Search the synced Assetic asset cache by name or asset code. */
+  async searchAssets(q: string, limit = 20): Promise<{ assets: any[] }> {
+    const response = await axios.get(`${API_URL}/assets/search`, {
+      headers: authService.getAuthHeader(),
+      params: { q, limit },
     });
     return response.data;
   }
@@ -19,7 +33,10 @@ class AssetService {
     return response.data;
   }
 
-  async getAssetChanges(id: number, params?: { limit?: number; offset?: number }) {
+  async getAssetChanges(
+    id: number,
+    params?: { limit?: number; offset?: number },
+  ) {
     const response = await axios.get(`${API_URL}/assets/${id}/changes`, {
       headers: authService.getAuthHeader(),
       params,
@@ -33,7 +50,7 @@ class AssetService {
       {},
       {
         headers: authService.getAuthHeader(),
-      }
+      },
     );
     return response.data;
   }

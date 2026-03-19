@@ -54,6 +54,8 @@ interface CreateRequestParams {
   category?: string;
   location?: string;
   assetId?: number;
+  // Assetic asset GUID (assetic_assets.assetic_guid) — passed as AssetId to Assetic
+  asseticAssetGuid?: string;
 
   // Assetic required fields
   workRequestSourceId?: string;

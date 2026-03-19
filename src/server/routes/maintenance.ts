@@ -206,6 +206,8 @@ router.post(
     body("category").optional().trim(),
     body("location").optional().trim(),
     body("assetId").optional().isInt(),
+    // Assetic asset GUID (assetic_assets.assetic_guid) for linking the request to a physical asset
+    body("asseticAssetGuid").optional().trim(),
     // Assetic required fields
     body("workRequestSourceId").optional().trim(),
     // Requestor fields
@@ -277,14 +279,126 @@ router.post(
 
       const [inserted] = await db("maintenance_requests")
         .insert({
+      // ── Resolve asset GUID from the synced Assetic asset cache ─────────────
+      let resolvedAssetGuid: string | null = null;
+      let resolvedAssetName: string | null = null;
+
+      const { asseticAssetGuid } = req.body;
+      if (asseticAssetGuid) {
+        const cachedAsset = await db("assetic_assets")
+          .where("assetic_guid", asseticAssetGuid)
+          .select("assetic_guid", "asset_name")
+          .first();
+        if (cachedAsset) {
+          resolvedAssetGuid = cachedAsset.assetic_guid;
+          resolvedAssetName = cachedAsset.asset_name || null;
+        }
+      }
+
+      // ── Push to Assetic first (if integration is enabled) ─────────────────
+      // The work request must exist in Assetic before it appears in the portal.
+      // If Assetic creation fails we block the local save so the lists stay in sync.
+      let asseticWorkRequestId: string | null = null;
+      const asseticEnabled = await asseticClient.isEnabled();
+
+      if (asseticEnabled) {
+        if (!workRequestSourceId) {
+          return res.status(400).json({
+            error:
+              "Request Source is required when Assetic integration is enabled.",
+          });
+        }
+
+        const asseticPayload: any = {
+          Description: title + (description ? `\n\n${description}` : ""),
+          WorkRequestSourceId: workRequestSourceId,
+          Location: location || null,
+          SupportingInformation: supportingInformation || null,
+          ExternalIdentifier: externalIdentifier || null,
+          WorkRequestPriorityId: workRequestPriorityId || null,
+          WorkRequestSubTypeId: workRequestSubtypeId || null,
+        };
+
+        if (resolvedAssetGuid) {
+          asseticPayload.AssetId = resolvedAssetGuid;
+        }
+
+        const requestor: any = {};
+        if (requestorDisplayName) requestor.DisplayName = requestorDisplayName;
+        if (requestorFirstName) requestor.FirstName = requestorFirstName;
+        if (requestorSurname) requestor.Surname = requestorSurname;
+        if (requestorEmail) requestor.Email = requestorEmail;
+        if (requestorPhone) requestor.Phone = requestorPhone;
+        if (requestorMobile) requestor.Mobile = requestorMobile;
+        if (requestorTypeId) requestor.Types = [{ Id: requestorTypeId }];
+        if (Object.keys(requestor).length > 0) {
+          asseticPayload.Requestor = requestor;
+        }
+
+        if (streetAddress || citySuburb || state) {
+          asseticPayload.WorkRequestPhysicalLocation = {
+            Address: {
+              StreetNumber: streetNumber || null,
+              StreetAddress: streetAddress || null,
+              CitySuburb: citySuburb || null,
+              State: state || null,
+              ZipPostcode: zipPostcode || null,
+              Country: country || null,
+            },
+            OtherLocation: otherLocation || null,
+            WhereLocation: whereLocation || null,
+          };
+        }
+
+        if (spatialLocation) {
+          asseticPayload.WorkRequestSpatialLocation = {
+            PointString: spatialLocation,
+          };
+        }
+
+        if (reactiveInspectorName) {
+          asseticPayload.ReactiveInspector = {
+            DisplayName: reactiveInspectorName,
+          };
+        }
+        if (reactiveInspectionDate) {
+          asseticPayload.ReactiveInspectionDate = reactiveInspectionDate;
+        }
+
+        try {
+          const asseticResult = await asseticClient.createWorkRequest(asseticPayload);
+          asseticWorkRequestId =
+            asseticResult?.Id ||
+            asseticResult?.id ||
+            asseticResult?.data?.Id ||
+            asseticResult?.data?.id ||
+            null;
+        } catch (asseticErr: any) {
+          const msg =
+            asseticErr?.response?.data?.Message ||
+            asseticErr?.response?.data?.message ||
+            "Failed to create work request in Assetic.";
+          console.error("Assetic WR creation failed:", msg);
+          return res.status(502).json({
+            error: `Assetic rejected the work request: ${msg}`,
+          });
+        }
+      }
+
+      // ── Save to local database ────────────────────────────────────────────
+      const [inserted] = await db("maintenance_requests")
+        .insert({
           asset_id: assetId || null,
+          assetic_asset_guid: resolvedAssetGuid,
+          asset_display_name: resolvedAssetName,
           requested_by: req.user.id,
           title,
           description: description || null,
           priority: priority || "medium",
           category: category || null,
           location: location || null,
-          // Assetic fields
+          // Assetic sync fields
+          assetic_work_request_id: asseticWorkRequestId,
           work_request_source_id: workRequestSourceId || null,
           requestor_display_name: requestorDisplayName || null,
           requestor_first_name: requestorFirstName || null,
@@ -495,6 +609,13 @@ router.post(
         return res.status(404).json({ error: "Maintenance request not found" });
       }
 
+      // Carry asset info and priority from the parent request so nothing is lost
+      // when transitioning from work request → work order.
+      const inheritedPriority = priority || reqCheck.priority || "medium";
+      const inheritedAssetGuid = reqCheck.assetic_asset_guid || null;
+      const inheritedAssetName = reqCheck.asset_display_name || reqCheck.asset_name || null;
+      const inheritedAssetLocation = reqCheck.location || null;
+
       const [inserted] = await db("work_orders")
         .insert({
           request_id: requestId,
@@ -503,8 +624,12 @@ router.post(
           work_group: workGroup || null,
           title,
           description: description || null,
-          priority: priority || "medium",
+          priority: inheritedPriority,
           scheduled_date: scheduledDate || null,
+          // Asset fields carried from the maintenance request
+          assetic_asset_guid: inheritedAssetGuid,
+          asset_name: inheritedAssetName,
+          asset_location: inheritedAssetLocation,
         })
         .returning("*");
 
@@ -790,7 +915,10 @@ router.get("/assetic/work-groups", async (_req: AuthRequest, res: Response) => {
         .json({ error: "Assetic integration is not enabled" });
     }
 
-    const data = await asseticClient.getWorkgroups();
+    // Use pageSize=500 to match the Assetic API collection recommendation and
+    // ensure all work groups (including South, North, North West, etc.) are returned
+    // in a single request rather than being silently truncated by the default page size.
+    const data = await asseticClient.getWorkgroups({ page: 1, pageSize: 500 });
     const groups = Array.isArray(data)
       ? data
       : data?.ResourceList || data?.Results || data?.results || [];
