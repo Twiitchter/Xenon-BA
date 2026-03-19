@@ -496,7 +496,9 @@ const MyRequests: React.FC = () => {
                     </span>
                   </td>
                   <td>{item.work_order_craft || item.category || "N/A"}</td>
-                  <td>{item.location || "N/A"}</td>
+                  <td title={item.location || undefined}>
+                    {item.location ? item.location.split(" > ").pop() : "N/A"}
+                  </td>
                   <td>{new Date(item.created_at).toLocaleDateString()}</td>
                   <td>
                     <button
