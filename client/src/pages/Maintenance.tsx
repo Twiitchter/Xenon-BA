@@ -33,6 +33,10 @@ const deriveCraftFromWorkGroup = (name: string): string => {
   return idx >= 0 ? name.slice(idx + 3).trim() : "";
 };
 
+// Extracts the region from a location string like "North > Hospital > ..."
+const regionFromLocation = (location: string): string =>
+  location ? location.split(" > ")[0].trim() : "";
+
 const Maintenance: React.FC = () => {
   const [allRequests, setAllRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -797,15 +801,43 @@ const Maintenance: React.FC = () => {
                           }}
                         >
                           <option value="">— Select work group —</option>
-                          {workGroups.map((g) => (
-                            <option
-                              key={g.Id || g.id || g.Name || g.name}
-                              value={g.Name || g.name || ""}
-                            >
-                              {g.Name || g.name}
-                            </option>
-                          ))}
+                          {(() => {
+                            const region = regionFromLocation(
+                              selected?.location || "",
+                            );
+                            const filtered = region
+                              ? workGroups.filter((g) => {
+                                  const name: string = g.Name || g.name || "";
+                                  return name
+                                    .toLowerCase()
+                                    .startsWith(region.toLowerCase());
+                                })
+                              : workGroups;
+                            return (
+                              filtered.length > 0 ? filtered : workGroups
+                            ).map((g) => (
+                              <option
+                                key={g.Id || g.id || g.Name || g.name}
+                                value={g.Name || g.name || ""}
+                              >
+                                {g.Name || g.name}
+                              </option>
+                            ));
+                          })()}
                         </select>
+                        {selected?.location &&
+                          regionFromLocation(selected.location) && (
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "var(--text-muted)",
+                                marginTop: "3px",
+                              }}
+                            >
+                              Showing {regionFromLocation(selected.location)}{" "}
+                              work groups
+                            </div>
+                          )}
                         {woWorkGroup &&
                           deriveCraftFromWorkGroup(woWorkGroup) && (
                             <div

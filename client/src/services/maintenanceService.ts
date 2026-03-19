@@ -8,11 +8,6 @@ export interface WorkRequestSource {
   name: string;
 }
 
-export interface WorkRequestType {
-  Id: string;
-  Name: string;
-}
-
 export interface LocationHierarchyBuilding {
   id: string;
   name: string;
@@ -282,16 +277,6 @@ class MaintenanceService {
   }
 
   // ─── Assetic Integration ──────────────────────────────────────────
-
-  async getWorkRequestTypes() {
-    const response = await axios.get(
-      `${API_URL}/maintenance/assetic/work-request-types`,
-      {
-        headers: authService.getAuthHeader(),
-      },
-    );
-    return response.data;
-  }
 
   async getWorkRequestSources() {
     const response = await axios.get(

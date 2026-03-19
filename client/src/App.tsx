@@ -82,7 +82,7 @@ function AppContent() {
   const landingPath = isAuthenticated
     ? isAdmin && adminViewMode === "back-end"
       ? "/requests"
-      : "/my-requests"
+      : "/new-request"
     : "/login";
 
   const toggleAdminView = () => {
@@ -174,6 +174,21 @@ function AppContent() {
                 </>
               ) : (
                 <>
+                  <NavLink to="/new-request">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="16" />
+                      <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                    New Work Request
+                  </NavLink>
                   <NavLink to="/my-requests">
                     <svg
                       width="16"
@@ -189,21 +204,6 @@ function AppContent() {
                       <line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
                     My Requests
-                  </NavLink>
-                  <NavLink to="/new-request">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="16" />
-                      <line x1="8" y1="12" x2="16" y2="12" />
-                    </svg>
-                    New Work Request
                   </NavLink>
                   <NavLink to="/my-profile">
                     <svg

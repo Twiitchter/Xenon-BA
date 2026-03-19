@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { maintenanceService } from "../services/maintenanceService";
-import { authService } from "../services/authService";
 import Modal from "../components/Modal";
-import LocationHierarchyPicker, {
-  EMPTY_LOCATION_SELECTION,
-  LocationSelection,
-  buildLocationPath,
-} from "../components/LocationHierarchyPicker";
 
 interface MyItem {
   id: number;
@@ -38,25 +32,10 @@ interface Message {
 
 const MyRequests: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [items, setItems] = useState<MyItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({ status: "", priority: "" });
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [locationHierarchy, setLocationHierarchy] = useState<any | null>(null);
-  const [locationSelection, setLocationSelection] = useState<LocationSelection>(
-    EMPTY_LOCATION_SELECTION,
-  );
-  const [locationPrefilled, setLocationPrefilled] = useState(false);
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    priority: "medium",
-    category: "",
-    location: "",
-  });
 
   // Detail view state
   const [selectedItem, setSelectedItem] = useState<MyItem | null>(null);
@@ -66,34 +45,7 @@ const MyRequests: React.FC = () => {
 
   useEffect(() => {
     fetchMyItems();
-    void fetchHierarchy();
   }, []);
-
-  const fetchHierarchy = async () => {
-    try {
-      const data = await maintenanceService.getLocationHierarchy();
-      setLocationHierarchy(data);
-    } catch {
-      // Hierarchy is optional for non-Assetic environments.
-    }
-  };
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get("new") === "1") {
-      setShowCreateForm(true);
-      const user = authService.getUser();
-      if (user?.prefRegionId) {
-        setLocationSelection({
-          regionId: user.prefRegionId || "",
-          siteId: user.prefSiteId || "",
-          buildingId: user.prefBuildingId || "",
-          floorId: user.prefFloorId || "",
-        });
-        setLocationPrefilled(true);
-      }
-    }
-  }, [location.search]);
 
   const fetchMyItems = async () => {
     setLoading(true);
@@ -110,92 +62,6 @@ const MyRequests: React.FC = () => {
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setCreating(true);
-
-    try {
-      const selectedPath = buildLocationPath(
-        locationHierarchy,
-        locationSelection,
-      );
-      const freeTextLocation = formData.location.trim();
-      const combinedLocation = selectedPath
-        ? freeTextLocation
-          ? `${selectedPath} - ${freeTextLocation}`
-          : selectedPath
-        : freeTextLocation;
-
-      await maintenanceService.createRequest({
-        ...formData,
-        location: combinedLocation,
-      });
-      setFormData({
-        title: "",
-        description: "",
-        priority: "medium",
-        category: "",
-        location: "",
-      });
-      // Restore user's preferred location (not empty) so next request is pre-filled too
-      const user = authService.getUser();
-      if (user?.prefRegionId) {
-        setLocationSelection({
-          regionId: user.prefRegionId || "",
-          siteId: user.prefSiteId || "",
-          buildingId: user.prefBuildingId || "",
-          floorId: user.prefFloorId || "",
-        });
-        setLocationPrefilled(true);
-      } else {
-        setLocationSelection(EMPTY_LOCATION_SELECTION);
-        setLocationPrefilled(false);
-      }
-      setShowCreateForm(false);
-      setLocationPrefilled(false);
-
-      // Remove deep-link flag after successful create.
-      if (location.search) {
-        navigate("/my-requests", { replace: true });
-      }
-
-      await fetchMyItems();
-    } catch (err: any) {
-      setError(
-        err.response?.data?.error || "Failed to create maintenance request",
-      );
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleToggleCreate = () => {
-    const next = !showCreateForm;
-    setShowCreateForm(next);
-
-    // Pre-fill location from user's preferred location when opening the form
-    if (next) {
-      const user = authService.getUser();
-      if (user?.prefRegionId) {
-        setLocationSelection({
-          regionId: user.prefRegionId || "",
-          siteId: user.prefSiteId || "",
-          buildingId: user.prefBuildingId || "",
-          floorId: user.prefFloorId || "",
-        });
-        setLocationPrefilled(true);
-      } else {
-        setLocationPrefilled(false);
-      }
-    } else {
-      setLocationPrefilled(false);
-      if (location.search) {
-        navigate("/my-requests", { replace: true });
-      }
-    }
   };
 
   const openDetail = async (item: MyItem) => {
@@ -278,121 +144,10 @@ const MyRequests: React.FC = () => {
     <div className="container">
       <div className="page-header">
         <h2>My Requests & Work Orders</h2>
-        <button onClick={handleToggleCreate}>
-          {showCreateForm ? "Cancel" : "+ New Request"}
-        </button>
+        <Link to="/new-request" className="button">
+          + New Request
+        </Link>
       </div>
-
-      {showCreateForm && (
-        <div className="card">
-          <h3>Log a Maintenance Request</h3>
-          <form onSubmit={handleCreate}>
-            <div className="form-group">
-              <label>Title *</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
-                required
-                aria-required="true"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                rows={3}
-                placeholder="Describe the issue"
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Priority</label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) =>
-                    setFormData({ ...formData, priority: e.target.value })
-                  }
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
-
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Category</label>
-                <input
-                  type="text"
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                  placeholder="e.g. Electrical"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Location</label>
-              {locationHierarchy && (
-                <>
-                  {locationPrefilled && (
-                    <div
-                      className="settings-muted"
-                      style={{ marginBottom: "6px", fontStyle: "italic" }}
-                    >
-                      Pre-filled from your account's default location
-                    </div>
-                  )}
-                  <LocationHierarchyPicker
-                    hierarchy={locationHierarchy}
-                    selection={locationSelection}
-                    onChange={(sel) => {
-                      setLocationSelection(sel);
-                      setLocationPrefilled(false);
-                    }}
-                  />
-                  {buildLocationPath(locationHierarchy, locationSelection) && (
-                    <div
-                      className="settings-muted"
-                      style={{ marginBottom: "8px" }}
-                    >
-                      Selected hierarchy path:{" "}
-                      <strong>
-                        {buildLocationPath(
-                          locationHierarchy,
-                          locationSelection,
-                        )}
-                      </strong>
-                    </div>
-                  )}
-                </>
-              )}
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
-                }
-                placeholder="Additional location notes"
-              />
-            </div>
-
-            <button type="submit" disabled={creating}>
-              {creating ? "Submitting..." : "Submit Request"}
-            </button>
-          </form>
-        </div>
-      )}
 
       <div className="card">
         <h3>Filters</h3>

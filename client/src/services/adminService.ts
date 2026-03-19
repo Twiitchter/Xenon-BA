@@ -244,15 +244,6 @@ class AdminService {
     );
     return response.data;
   }
-
-  async refreshWorkRequestTypes() {
-    const response = await axios.post(
-      `${API_URL}/settings/refresh-work-request-types`,
-      {},
-      { headers: authService.getAuthHeader() },
-    );
-    return response.data;
-  }
 }
 
 export const adminService = new AdminService();

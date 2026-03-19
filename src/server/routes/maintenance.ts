@@ -219,7 +219,6 @@ router.post(
     body("requestorMobile").optional().trim(),
     body("requestorTypeId").optional().trim(),
     // Optional Assetic fields
-    body("workRequestSubtypeId").optional().trim(),
     body("workRequestPriorityId").optional().trim(),
     body("externalIdentifier").optional().trim(),
     body("supportingInformation").optional().trim(),
@@ -260,7 +259,6 @@ router.post(
         requestorPhone,
         requestorMobile,
         requestorTypeId,
-        workRequestSubtypeId,
         workRequestPriorityId,
         externalIdentifier,
         supportingInformation,
@@ -314,7 +312,7 @@ router.post(
           SupportingInformation: supportingInformation || null,
           ExternalIdentifier: externalIdentifier || null,
           WorkRequestPriorityId: workRequestPriorityId || null,
-          WorkRequestSubTypeId: workRequestSubtypeId || null,
+          WorkRequestSubTypeId: "",
         };
 
         if (resolvedAssetGuid) {
@@ -406,7 +404,7 @@ router.post(
           requestor_phone: requestorPhone || null,
           requestor_mobile: requestorMobile || null,
           requestor_type_id: requestorTypeId || null,
-          work_request_subtype_id: workRequestSubtypeId || null,
+          work_request_subtype_id: null,
           work_request_priority_id: workRequestPriorityId || null,
           external_identifier: externalIdentifier || null,
           supporting_information: supportingInformation || null,
@@ -928,84 +926,6 @@ router.get("/assetic/work-groups", async (_req: AuthRequest, res: Response) => {
     res.status(502).json({ error: "Failed to fetch work groups from Assetic" });
   }
 });
-
-/**
- * Fetches work request sub-types from Assetic, flattens, stores in DB cache,
- * and returns the list. Exported so the admin refresh endpoint can reuse it.
- */
-export async function fetchAndCacheWorkRequestTypes(): Promise<
-  { Id: number; Name: string; TypeName: string }[]
-> {
-  const types = await asseticClient.getWorkRequestTypes();
-  const subtypes = (types?.ResourceList || []).flatMap((t: any) => {
-    const typeName: string = t.WorkRequestActivityType || t.Description || "";
-    const subs: any[] = Array.isArray(t.WorkRequestSubType)
-      ? t.WorkRequestSubType
-      : [];
-    return subs.map((st: any) => ({
-      Id: st.Id,
-      Name:
-        st.WorkRequestActivitySubType ||
-        st.SubCodeText ||
-        st.Description ||
-        `${typeName} ${st.Id}`,
-      TypeName: typeName,
-    }));
-  });
-
-  // Replace existing cache
-  await db("assetic_work_request_types").delete();
-  if (subtypes.length > 0) {
-    const now = new Date();
-    await db("assetic_work_request_types").insert(
-      subtypes.map((st: { Id: number; Name: string; TypeName: string }) => ({
-        assetic_id: st.Id,
-        name: st.Name,
-        type_name: st.TypeName,
-        cached_at: now,
-      })),
-    );
-  }
-
-  return subtypes;
-}
-
-/**
- * GET /api/maintenance/assetic/work-request-types
- * Returns the cached work request sub-types. On first call (or if the cache
- * is empty) it fetches from Assetic, stores the results, and returns them.
- */
-router.get(
-  "/assetic/work-request-types",
-  async (_req: AuthRequest, res: Response) => {
-    try {
-      const enabled = await asseticClient.isEnabled();
-      if (!enabled) {
-        return res
-          .status(503)
-          .json({ error: "Assetic integration is not enabled" });
-      }
-
-      // Serve from cache if available
-      const cached = await db("assetic_work_request_types")
-        .orderBy("assetic_id", "asc")
-        .select("assetic_id as Id", "name as Name", "type_name as TypeName");
-
-      if (cached.length > 0) {
-        return res.json({ ResourceList: cached });
-      }
-
-      // Cache is empty — fetch from Assetic and store
-      const subtypes = await fetchAndCacheWorkRequestTypes();
-      res.json({ ResourceList: subtypes });
-    } catch (error) {
-      console.error("Error fetching work request types:", error);
-      res
-        .status(500)
-        .json({ error: "Failed to fetch work request types from Assetic" });
-    }
-  },
-);
 
 /**
  * GET /api/maintenance/assetic/work-request-sources

@@ -12,11 +12,6 @@ import LocationHierarchyPicker, {
   buildLocationPath,
 } from "../components/LocationHierarchyPicker";
 
-interface WorkRequestType {
-  Id: string;
-  Name: string;
-}
-
 const NewWorkRequest: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -33,16 +28,12 @@ const NewWorkRequest: React.FC = () => {
     requestorMobile: "",
     supportingInformation: "",
     workRequestSourceId: "3",
-    workRequestSubtypeId: "",
   });
 
   // Asset is resolved automatically from the selected building — not shown in UI
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
 
   // Assetic integration state
-  const [workRequestTypes, setWorkRequestTypes] = useState<WorkRequestType[]>(
-    [],
-  );
   const [asseticEnabled, setAsseticEnabled] = useState(false);
   const [locationHierarchy, setLocationHierarchy] =
     useState<LocationHierarchyResponse | null>(null);
@@ -91,17 +82,9 @@ const NewWorkRequest: React.FC = () => {
 
   const fetchAsseticData = async () => {
     try {
-      const [typesRes, hierarchyRes] = await Promise.allSettled([
-        maintenanceService.getWorkRequestTypes(),
-        maintenanceService.getLocationHierarchy(),
-      ]);
-
-      if (typesRes.status === "fulfilled" && typesRes.value?.ResourceList) {
-        setWorkRequestTypes(typesRes.value.ResourceList);
-      }
-
-      if (hierarchyRes.status === "fulfilled" && hierarchyRes.value?.regions) {
-        setLocationHierarchy(hierarchyRes.value);
+      const hierarchyRes = await maintenanceService.getLocationHierarchy();
+      if (hierarchyRes?.regions) {
+        setLocationHierarchy(hierarchyRes);
         setAsseticEnabled(true);
       }
     } catch (err) {
@@ -127,6 +110,7 @@ const NewWorkRequest: React.FC = () => {
 
       await maintenanceService.createRequest({
         ...formData,
+        workRequestSubtypeId: "",
         location: combinedLocation,
         asseticAssetGuid: selectedAsset?.assetic_guid || undefined,
       });
@@ -275,28 +259,6 @@ const NewWorkRequest: React.FC = () => {
               />
             </div>
           </div>
-
-          {asseticEnabled && workRequestTypes.length > 0 && (
-            <div className="form-group">
-              <label>Request Type</label>
-              <select
-                value={formData.workRequestSubtypeId}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    workRequestSubtypeId: e.target.value,
-                  })
-                }
-              >
-                <option value="">Select a type...</option>
-                {workRequestTypes.map((type: any) => (
-                  <option key={type.Id} value={type.Id}>
-                    {type.Name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <h4
             style={{
