@@ -273,26 +273,6 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleRefreshTypes = async () => {
-    setTypesRefreshing(true);
-    setTypesRefreshMsg(null);
-    try {
-      const result = await adminService.refreshWorkRequestTypes();
-      setTypesRefreshMsg({
-        type: "success",
-        text: result.message || `${result.count} types refreshed.`,
-      });
-    } catch (err: any) {
-      setTypesRefreshMsg({
-        type: "error",
-        text:
-          err?.response?.data?.error || "Failed to refresh work request types.",
-      });
-    } finally {
-      setTypesRefreshing(false);
-    }
-  };
-
   const formatKey = (key: string) =>
     key
       .replace(/^(assetic_|sso_|email_|app_)/, "")

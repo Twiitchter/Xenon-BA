@@ -376,6 +376,36 @@ router.post(
             asseticErr?.response?.data?.message ||
             "Failed to create work request in Assetic.";
           console.error("Assetic WR creation failed:", msg);
+
+          // Persist the failed submission so an admin can edit and retry it
+          try {
+            await db("failed_work_requests").insert({
+              requested_by: req.user?.id ?? null,
+              title: title || "",
+              description: description || null,
+              priority: priority || "medium",
+              category: category || null,
+              location: location || null,
+              assetic_asset_guid: resolvedAssetGuid,
+              work_request_source_id: workRequestSourceId || null,
+              requestor_display_name: requestorDisplayName || null,
+              requestor_first_name: requestorFirstName || null,
+              requestor_surname: requestorSurname || null,
+              requestor_email: requestorEmail || null,
+              requestor_phone: requestorPhone || null,
+              requestor_mobile: requestorMobile || null,
+              supporting_information: supportingInformation || null,
+              external_identifier: externalIdentifier || null,
+              assetic_payload: JSON.stringify(asseticPayload),
+              error_message: msg,
+              status: "pending",
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+          } catch (dbErr) {
+            console.error("Failed to log failed work request to DB:", dbErr);
+          }
+
           return res.status(502).json({
             error: `Assetic rejected the work request: ${msg}`,
           });

@@ -16,6 +16,7 @@ import NewWorkRequest from "./pages/NewWorkRequest";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
 import MyProfile from "./pages/MyProfile";
+import FailedRequests from "./pages/FailedRequests";
 import { authService } from "./services/authService";
 import { ToastProvider } from "./contexts/ToastContext";
 import ToastContainer from "./components/ToastContainer";
@@ -316,6 +317,21 @@ function AppContent() {
                     </svg>
                     Settings
                   </NavLink>
+                  <NavLink to="/admin/failed-requests">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    Failed Requests
+                  </NavLink>
                 </div>
               </>
             )}
@@ -426,6 +442,19 @@ function AppContent() {
             }
           />
           {/* Admin routes */}
+          <Route
+            path="/admin/failed-requests"
+            element={
+              isAuthenticated && isAdmin ? (
+                <FailedRequests />
+              ) : (
+                <Navigate
+                  to={isAuthenticated ? "/my-requests" : "/login"}
+                  replace
+                />
+              )
+            }
+          />
           <Route
             path="/admin/settings"
             element={

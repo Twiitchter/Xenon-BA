@@ -244,6 +244,48 @@ class AdminService {
     );
     return response.data;
   }
+
+  async getFailedRequests(params?: { status?: string; limit?: number }) {
+    const response = await axios.get(`${API_URL}/failed-requests`, {
+      headers: authService.getAuthHeader(),
+      params,
+    });
+    return response.data as { failed_requests: any[] };
+  }
+
+  async getFailedRequest(id: number) {
+    const response = await axios.get(`${API_URL}/failed-requests/${id}`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { failed_request: any };
+  }
+
+  async updateFailedRequest(id: number, data: Record<string, any>) {
+    const response = await axios.put(`${API_URL}/failed-requests/${id}`, data, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { failed_request: any };
+  }
+
+  async retryFailedRequest(id: number) {
+    const response = await axios.post(
+      `${API_URL}/failed-requests/${id}/retry`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data as {
+      message: string;
+      maintenance_request_id: number;
+      assetic_work_request_id: string | null;
+    };
+  }
+
+  async deleteFailedRequest(id: number) {
+    const response = await axios.delete(`${API_URL}/failed-requests/${id}`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { message: string };
+  }
 }
 
 export const adminService = new AdminService();

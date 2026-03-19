@@ -1068,4 +1068,277 @@ router.delete("/api-logs/purge", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Failed Work Requests
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/failed-requests
+ * List failed work requests, optionally filtered by status.
+ */
+router.get(
+  "/failed-requests",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { status, limit = "100" } = req.query as Record<string, string>;
+      const query = db("failed_work_requests as fwr")
+        .leftJoin("users as u", "fwr.requested_by", "u.id")
+        .select(
+          "fwr.*",
+          db.raw("u.first_name + ' ' + u.last_name as submitter_name"),
+          "u.email as submitter_email",
+        )
+        .orderBy("fwr.created_at", "desc")
+        .limit(Number(limit) || 100);
+
+      if (status) {
+        query.where("fwr.status", status);
+      }
+
+      const rows = await query;
+      res.json({ failed_requests: rows });
+    } catch (error) {
+      console.error("Error fetching failed requests:", error);
+      res.status(500).json({ error: "Failed to fetch failed requests" });
+    }
+  },
+);
+
+/**
+ * GET /api/admin/failed-requests/:id
+ * Get a single failed work request.
+ */
+router.get(
+  "/failed-requests/:id",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const row = await db("failed_work_requests").where({ id }).first();
+      if (!row) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      res.json({ failed_request: row });
+    } catch (error) {
+      console.error("Error fetching failed request:", error);
+      res.status(500).json({ error: "Failed to fetch failed request" });
+    }
+  },
+);
+
+/**
+ * PUT /api/admin/failed-requests/:id
+ * Update editable fields and/or admin notes before a retry.
+ */
+router.put(
+  "/failed-requests/:id",
+  authenticateToken,
+  [
+    body("title").optional().trim().notEmpty(),
+    body("status").optional().isIn(["pending", "resolved", "dismissed"]),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const { id } = req.params;
+      const {
+        title,
+        description,
+        priority,
+        category,
+        location,
+        assetic_asset_guid,
+        work_request_source_id,
+        requestor_display_name,
+        requestor_first_name,
+        requestor_surname,
+        requestor_email,
+        requestor_phone,
+        requestor_mobile,
+        supporting_information,
+        external_identifier,
+        assetic_payload,
+        admin_notes,
+        status,
+      } = req.body;
+
+      const updateFields: Record<string, any> = { updated_at: new Date() };
+      if (title !== undefined) updateFields.title = title;
+      if (description !== undefined) updateFields.description = description;
+      if (priority !== undefined) updateFields.priority = priority;
+      if (category !== undefined) updateFields.category = category;
+      if (location !== undefined) updateFields.location = location;
+      if (assetic_asset_guid !== undefined)
+        updateFields.assetic_asset_guid = assetic_asset_guid;
+      if (work_request_source_id !== undefined)
+        updateFields.work_request_source_id = work_request_source_id;
+      if (requestor_display_name !== undefined)
+        updateFields.requestor_display_name = requestor_display_name;
+      if (requestor_first_name !== undefined)
+        updateFields.requestor_first_name = requestor_first_name;
+      if (requestor_surname !== undefined)
+        updateFields.requestor_surname = requestor_surname;
+      if (requestor_email !== undefined)
+        updateFields.requestor_email = requestor_email;
+      if (requestor_phone !== undefined)
+        updateFields.requestor_phone = requestor_phone;
+      if (requestor_mobile !== undefined)
+        updateFields.requestor_mobile = requestor_mobile;
+      if (supporting_information !== undefined)
+        updateFields.supporting_information = supporting_information;
+      if (external_identifier !== undefined)
+        updateFields.external_identifier = external_identifier;
+      if (assetic_payload !== undefined)
+        updateFields.assetic_payload =
+          typeof assetic_payload === "string"
+            ? assetic_payload
+            : JSON.stringify(assetic_payload);
+      if (admin_notes !== undefined) updateFields.admin_notes = admin_notes;
+      if (status !== undefined) updateFields.status = status;
+
+      await db("failed_work_requests").where({ id }).update(updateFields);
+      const updated = await db("failed_work_requests").where({ id }).first();
+      res.json({ failed_request: updated });
+    } catch (error) {
+      console.error("Error updating failed request:", error);
+      res.status(500).json({ error: "Failed to update failed request" });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/failed-requests/:id/retry
+ * Re-attempt submitting the (optionally edited) payload to Assetic.
+ * On success creates a maintenance_requests row and marks the record resolved.
+ */
+router.post(
+  "/failed-requests/:id/retry",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const record = await db("failed_work_requests").where({ id }).first();
+      if (!record) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      // Parse the stored (or updated) Assetic payload
+      let asseticPayload: any;
+      try {
+        asseticPayload =
+          typeof record.assetic_payload === "string"
+            ? JSON.parse(record.assetic_payload)
+            : record.assetic_payload;
+      } catch {
+        return res
+          .status(422)
+          .json({
+            error: "Stored payload is not valid JSON. Edit it before retrying.",
+          });
+      }
+
+      // Update retry tracking
+      await db("failed_work_requests")
+        .where({ id })
+        .update({
+          retry_count: (record.retry_count || 0) + 1,
+          last_retry_at: new Date(),
+          updated_at: new Date(),
+        });
+
+      // Attempt to push to Assetic
+      let asseticResult: any;
+      try {
+        asseticResult = await asseticClient.createWorkRequest(asseticPayload);
+      } catch (asseticErr: any) {
+        const msg =
+          asseticErr?.response?.data?.Message ||
+          asseticErr?.response?.data?.message ||
+          "Failed to create work request in Assetic.";
+        await db("failed_work_requests").where({ id }).update({
+          error_message: msg,
+          updated_at: new Date(),
+        });
+        return res
+          .status(502)
+          .json({ error: `Assetic rejected the retry: ${msg}` });
+      }
+
+      const asseticWorkRequestId =
+        asseticResult?.Id ||
+        asseticResult?.id ||
+        asseticResult?.data?.Id ||
+        asseticResult?.data?.id ||
+        null;
+
+      // Create the maintenance_request row
+      const [newRequestId] = await db("maintenance_requests").insert({
+        requested_by: record.requested_by,
+        title: record.title,
+        description: record.description || null,
+        priority: record.priority || "medium",
+        category: record.category || null,
+        location: record.location || null,
+        assetic_asset_guid: record.assetic_asset_guid || null,
+        asset_display_name: null,
+        assetic_work_request_id: asseticWorkRequestId,
+        work_request_source_id: record.work_request_source_id || null,
+        requestor_display_name: record.requestor_display_name || null,
+        requestor_first_name: record.requestor_first_name || null,
+        requestor_surname: record.requestor_surname || null,
+        requestor_email: record.requestor_email || null,
+        requestor_phone: record.requestor_phone || null,
+        requestor_mobile: record.requestor_mobile || null,
+        supporting_information: record.supporting_information || null,
+        external_identifier: record.external_identifier || null,
+        status: "open",
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      // Mark the failed record as resolved
+      await db("failed_work_requests").where({ id }).update({
+        status: "resolved",
+        resolved_request_id: newRequestId,
+        updated_at: new Date(),
+      });
+
+      res.json({
+        message: "Retry successful. Work request created.",
+        maintenance_request_id: newRequestId,
+        assetic_work_request_id: asseticWorkRequestId,
+      });
+    } catch (error) {
+      console.error("Error retrying failed request:", error);
+      res.status(500).json({ error: "Retry failed due to a server error" });
+    }
+  },
+);
+
+/**
+ * DELETE /api/admin/failed-requests/:id
+ * Dismiss (permanently delete) a failed work request record.
+ */
+router.delete(
+  "/failed-requests/:id",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const deleted = await db("failed_work_requests").where({ id }).delete();
+      if (!deleted) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      res.json({ message: "Failed request dismissed and deleted." });
+    } catch (error) {
+      console.error("Error deleting failed request:", error);
+      res.status(500).json({ error: "Failed to delete record" });
+    }
+  },
+);
+
 export default router;
