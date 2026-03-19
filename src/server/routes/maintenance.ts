@@ -277,8 +277,6 @@ router.post(
         reactiveInspectionDate,
       } = req.body;
 
-      const [inserted] = await db("maintenance_requests")
-        .insert({
       // ── Resolve asset GUID from the synced Assetic asset cache ─────────────
       let resolvedAssetGuid: string | null = null;
       let resolvedAssetName: string | null = null;
@@ -366,7 +364,8 @@ router.post(
         }
 
         try {
-          const asseticResult = await asseticClient.createWorkRequest(asseticPayload);
+          const asseticResult =
+            await asseticClient.createWorkRequest(asseticPayload);
           asseticWorkRequestId =
             asseticResult?.Id ||
             asseticResult?.id ||
@@ -613,7 +612,8 @@ router.post(
       // when transitioning from work request → work order.
       const inheritedPriority = priority || reqCheck.priority || "medium";
       const inheritedAssetGuid = reqCheck.assetic_asset_guid || null;
-      const inheritedAssetName = reqCheck.asset_display_name || reqCheck.asset_name || null;
+      const inheritedAssetName =
+        reqCheck.asset_display_name || reqCheck.asset_name || null;
       const inheritedAssetLocation = reqCheck.location || null;
 
       const [inserted] = await db("work_orders")
