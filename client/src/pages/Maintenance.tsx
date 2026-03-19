@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
 import Modal from "../components/Modal";
+import FilterPresetsPanel from "../components/FilterPresetsPanel";
 
 const priorityBadgeClass = (p: string) => {
   const map: Record<string, string> = {
@@ -27,10 +28,41 @@ const toLabel = (s: string) =>
   (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 const Maintenance: React.FC = () => {
-  const [requests, setRequests] = useState<any[]>([]);
+  const [allRequests, setAllRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filters, setFilters] = useState({ status: "", priority: "" });
+  const [filters, setFilters] = useState({
+    status: "",
+    priority: "",
+    search: "",
+    dateFrom: "",
+    dateTo: "",
+  });
+
+  // Client-side filtered view (search + date applied locally)
+  const requests = useMemo(() => {
+    let list = allRequests;
+    if (filters.search) {
+      const s = filters.search.toLowerCase();
+      list = list.filter(
+        (r) =>
+          (r.title || "").toLowerCase().includes(s) ||
+          (r.requestor_display_name || r.requested_by_username || "")
+            .toLowerCase()
+            .includes(s) ||
+          (r.location || "").toLowerCase().includes(s),
+      );
+    }
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom);
+      list = list.filter((r) => new Date(r.created_at) >= from);
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo + "T23:59:59");
+      list = list.filter((r) => new Date(r.created_at) <= to);
+    }
+    return list;
+  }, [allRequests, filters.search, filters.dateFrom, filters.dateTo]);
 
   // Selected request for detail panel
   const [selected, setSelected] = useState<any | null>(null);
@@ -50,6 +82,7 @@ const Maintenance: React.FC = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -59,10 +92,11 @@ const Maintenance: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const data = await maintenanceService.getRequests(
-        activeFilters.status || activeFilters.priority ? activeFilters : {},
-      );
-      setRequests(data.requests || []);
+      const data = await maintenanceService.getRequests({
+        status: activeFilters.status || undefined,
+        priority: activeFilters.priority || undefined,
+      });
+      setAllRequests(data.requests || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch requests");
     } finally {
@@ -98,10 +132,11 @@ const Maintenance: React.FC = () => {
   };
 
   const refreshAndReselect = async (requestId: number) => {
-    const data = await maintenanceService.getRequests(
-      filters.status || filters.priority ? filters : {},
-    );
-    setRequests(data.requests || []);
+    const data = await maintenanceService.getRequests({
+      status: filters.status || undefined,
+      priority: filters.priority || undefined,
+    });
+    setAllRequests(data.requests || []);
     const updated = (data.requests || []).find((r: any) => r.id === requestId);
     if (updated) setSelected(updated);
     return updated;
@@ -165,163 +200,287 @@ const Maintenance: React.FC = () => {
     }
   };
 
+  const hasActiveFilters = !!(
+    filters.status ||
+    filters.priority ||
+    filters.search ||
+    filters.dateFrom ||
+    filters.dateTo
+  );
+  const activeFilterCount = [
+    filters.status,
+    filters.priority,
+    filters.dateFrom,
+    filters.dateTo,
+  ].filter(Boolean).length;
+
   return (
-    <div className="container" style={{ maxWidth: "1300px" }}>
-      {/* ── Header ── */}
-      <div className="page-header">
+    <div className="container" style={{ maxWidth: "1600px" }}>
+      {/* ── Filter topbar ── */}
+      <div className="filter-topbar">
         <h2>Requests</h2>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            style={{ width: "140px" }}
+        <div className="filter-topbar-controls">
+          <input
+            type="text"
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            placeholder="Search requests…"
+            className="filter-search"
+          />
+          <button
+            className={`filter-toggle-btn${
+              filtersOpen ? " filter-toggle-open" : ""
+            }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
+            onClick={() => setFiltersOpen((o) => !o)}
           >
-            <option value="">All Statuses</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select
-            value={filters.priority}
-            onChange={(e) =>
-              setFilters({ ...filters, priority: e.target.value })
-            }
-            style={{ width: "140px" }}
-          >
-            <option value="">All Priorities</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
+            ⚙ Filters
+            {activeFilterCount > 0 && (
+              <span className="filter-badge">{activeFilterCount}</span>
+            )}
+          </button>
           <button onClick={() => fetchRequests(filters)}>Refresh</button>
+          {hasActiveFilters && (
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                const cleared = {
+                  status: "",
+                  priority: "",
+                  search: "",
+                  dateFrom: "",
+                  dateTo: "",
+                };
+                setFilters(cleared);
+                fetchRequests(cleared);
+              }}
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
-
-      {error && <div className="error card">{error}</div>}
-
-      {/* ── Request List ── */}
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        {loading ? (
-          <div
-            style={{
-              padding: "40px",
-              textAlign: "center",
-              color: "var(--text-muted)",
-            }}
-          >
-            Loading requests…
+      {/* ── Expandable filter panel ── */}
+      {filtersOpen && (
+        <div className="filter-panel card">
+          <div className="filter-grid">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => {
+                  const f = { ...filters, status: e.target.value };
+                  setFilters(f);
+                  fetchRequests(f);
+                }}
+              >
+                <option value="">All Statuses</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Priority</label>
+              <select
+                value={filters.priority}
+                onChange={(e) => {
+                  const f = { ...filters, priority: e.target.value };
+                  setFilters(f);
+                  fetchRequests(f);
+                }}
+              >
+                <option value="">All Priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Date From</label>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) =>
+                  setFilters({ ...filters, dateFrom: e.target.value })
+                }
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Date To</label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) =>
+                  setFilters({ ...filters, dateTo: e.target.value })
+                }
+              />
+            </div>
           </div>
-        ) : requests.length === 0 ? (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px",
-              color: "var(--text-muted)",
-            }}
-          >
-            No requests found.
-          </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: "40px" }}>#</th>
-                <th>Title</th>
-                <th>Submitted By</th>
-                <th style={{ width: "90px" }}>Priority</th>
-                <th style={{ width: "110px" }}>Status</th>
-                <th>Location</th>
-                <th style={{ width: "110px" }}>Work Order</th>
-                <th style={{ width: "90px" }}>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((req) => (
-                <tr
-                  key={req.id}
-                  onClick={() => selectRequest(req)}
-                  style={{
-                    cursor: "pointer",
-                    background:
-                      selected?.id === req.id
-                        ? "rgba(14,165,233,0.08)"
-                        : undefined,
-                  }}
-                >
-                  <td style={{ color: "var(--text-muted)", fontSize: "13px" }}>
-                    {req.id}
-                  </td>
-                  <td style={{ fontWeight: 500 }}>{req.title}</td>
-                  <td
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontSize: "13px",
-                    }}
-                  >
-                    {req.requestor_display_name ||
-                      req.requested_by_username ||
-                      "—"}
-                  </td>
-                  <td>
-                    <span
-                      className={`badge ${priorityBadgeClass(req.priority)}`}
+        </div>
+      )}
+      {/* ── Main: data table + presets sidebar ── */}
+      <div className="admin-page-layout">
+        <div className="admin-page-main">
+          {error && <div className="error card">{error}</div>}
+
+          {allRequests.length > 0 && requests.length !== allRequests.length && (
+            <div
+              style={{
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                marginBottom: "6px",
+              }}
+            >
+              Showing {requests.length} of {allRequests.length} requests
+            </div>
+          )}
+
+          {/* ── Request List ── */}
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            {loading ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Loading requests…
+              </div>
+            ) : requests.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px",
+                  color: "var(--text-muted)",
+                }}
+              >
+                No requests found.
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "40px" }}>#</th>
+                    <th>Title</th>
+                    <th>Submitted By</th>
+                    <th style={{ width: "90px" }}>Priority</th>
+                    <th style={{ width: "110px" }}>Status</th>
+                    <th>Location</th>
+                    <th style={{ width: "110px" }}>Work Order</th>
+                    <th style={{ width: "90px" }}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((req) => (
+                    <tr
+                      key={req.id}
+                      onClick={() => selectRequest(req)}
+                      style={{
+                        cursor: "pointer",
+                        background:
+                          selected?.id === req.id
+                            ? "rgba(14,165,233,0.08)"
+                            : undefined,
+                      }}
                     >
-                      {req.priority || "—"}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${statusBadgeClass(req.status)}`}>
-                      {toLabel(req.status || "open")}
-                    </span>
-                  </td>
-                  <td
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontSize: "13px",
-                      maxWidth: "200px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {req.location || "—"}
-                  </td>
-                  <td>
-                    {req.work_order_id ? (
-                      <span
-                        className={`badge ${statusBadgeClass(req.work_order_status || "pending")}`}
+                      <td
+                        style={{ color: "var(--text-muted)", fontSize: "13px" }}
                       >
-                        WO #{req.work_order_id}
-                      </span>
-                    ) : (
-                      <span
+                        {req.id}
+                      </td>
+                      <td style={{ fontWeight: 500 }}>{req.title}</td>
+                      <td
                         style={{
-                          color: "var(--text-muted)",
+                          color: "var(--text-secondary)",
                           fontSize: "13px",
                         }}
                       >
-                        —
-                      </span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      color: "var(--text-muted)",
-                      fontSize: "13px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {new Date(req.created_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
+                        {req.requestor_display_name ||
+                          req.requested_by_username ||
+                          "—"}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${priorityBadgeClass(req.priority)}`}
+                        >
+                          {req.priority || "—"}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${statusBadgeClass(req.status)}`}
+                        >
+                          {toLabel(req.status || "open")}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontSize: "13px",
+                          maxWidth: "200px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {req.location || "—"}
+                      </td>
+                      <td>
+                        {req.work_order_id ? (
+                          <span
+                            className={`badge ${statusBadgeClass(req.work_order_status || "pending")}`}
+                          >
+                            WO #{req.work_order_id}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              color: "var(--text-muted)",
+                              fontSize: "13px",
+                            }}
+                          >
+                            —
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          color: "var(--text-muted)",
+                          fontSize: "13px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {new Date(req.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>{" "}
+        {/* admin-page-main */}
+        <FilterPresetsPanel
+          storageKey="filterPresets_requests"
+          currentFilters={filters}
+          onApply={(f) => {
+            const merged = {
+              status: "",
+              priority: "",
+              search: "",
+              dateFrom: "",
+              dateTo: "",
+              ...f,
+            };
+            setFilters(merged);
+            fetchRequests(merged);
+          }}
+        />
+      </div>{" "}
+      {/* admin-page-layout */}
       {/* ── Detail Modal ── */}
       {selected && (
         <Modal onClose={() => setSelected(null)}>

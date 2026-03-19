@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Maintenance from "./pages/Maintenance";
 import MyRequests from "./pages/MyRequests";
 import WorkOrders from "./pages/WorkOrders";
+import WorkGroups from "./pages/WorkGroups";
 import NewWorkRequest from "./pages/NewWorkRequest";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
@@ -152,6 +153,22 @@ function AppContent() {
                       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                     </svg>
                     Work Orders
+                  </NavLink>
+                  <NavLink to="/work-groups">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    Work Groups
                   </NavLink>
                 </>
               ) : (
@@ -378,6 +395,16 @@ function AppContent() {
             element={
               isAuthenticated && isAdmin ? (
                 <WorkOrders />
+              ) : (
+                <Navigate to="/my-requests" replace />
+              )
+            }
+          />
+          <Route
+            path="/work-groups"
+            element={
+              isAuthenticated && isAdmin ? (
+                <WorkGroups />
               ) : (
                 <Navigate to="/my-requests" replace />
               )

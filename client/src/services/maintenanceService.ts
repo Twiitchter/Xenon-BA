@@ -116,6 +116,7 @@ interface UpdateWorkOrderParams {
   priority?: string;
   status?: string;
   craft?: string;
+  workGroup?: string;
   assignedTo?: number;
   scheduledDate?: string;
 }
@@ -254,6 +255,27 @@ class MaintenanceService {
     const response = await axios.get(`${API_URL}/maintenance/crafts`, {
       headers: authService.getAuthHeader(),
     });
+    return response.data;
+  }
+
+  // ─── Work Groups (Assetic labour groups) ─────────────────────────
+
+  async getWorkGroups() {
+    const response = await axios.get(
+      `${API_URL}/maintenance/assetic/work-groups`,
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  // ─── Clone Work Order ─────────────────────────────────────────────
+
+  async cloneWorkOrder(id: number) {
+    const response = await axios.post(
+      `${API_URL}/maintenance/work-orders/${id}/clone`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
     return response.data;
   }
 

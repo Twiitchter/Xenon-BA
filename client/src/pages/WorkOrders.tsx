@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
 import Modal from "../components/Modal";
+import FilterPresetsPanel from "../components/FilterPresetsPanel";
 
 const priorityBadgeClass = (p: string) => {
   const map: Record<string, string> = {
@@ -27,11 +28,58 @@ const toLabel = (s: string) =>
   (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 const WorkOrders: React.FC = () => {
-  const [workOrders, setWorkOrders] = useState<any[]>([]);
+  const [allWorkOrders, setAllWorkOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filters, setFilters] = useState({ status: "", craft: "" });
+  const [filters, setFilters] = useState({
+    status: "",
+    craft: "",
+    workGroup: "",
+    priority: "",
+    search: "",
+    dateFrom: "",
+    dateTo: "",
+  });
   const [crafts, setCrafts] = useState<string[]>([]);
+  const [workGroups, setWorkGroups] = useState<any[]>([]);
+
+  // Client-side filtered view
+  const workOrders = useMemo(() => {
+    let list = allWorkOrders;
+    if (filters.search) {
+      const s = filters.search.toLowerCase();
+      list = list.filter(
+        (w) =>
+          (w.title || "").toLowerCase().includes(s) ||
+          (w.craft || "").toLowerCase().includes(s) ||
+          (w.work_group || "").toLowerCase().includes(s) ||
+          (w.assigned_to_username || "").toLowerCase().includes(s),
+      );
+    }
+    if (filters.priority) {
+      list = list.filter((w) => w.priority === filters.priority);
+    }
+    if (filters.workGroup) {
+      const wg = filters.workGroup.toLowerCase();
+      list = list.filter((w) => (w.work_group || "").toLowerCase() === wg);
+    }
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom);
+      list = list.filter((w) => new Date(w.created_at) >= from);
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo + "T23:59:59");
+      list = list.filter((w) => new Date(w.created_at) <= to);
+    }
+    return list;
+  }, [
+    allWorkOrders,
+    filters.search,
+    filters.priority,
+    filters.workGroup,
+    filters.dateFrom,
+    filters.dateTo,
+  ]);
 
   // Selected WO for modal
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
@@ -41,21 +89,28 @@ const WorkOrders: React.FC = () => {
 
   // Edit state (inside modal)
   const [editCraft, setEditCraft] = useState("");
+  const [editWorkGroup, setEditWorkGroup] = useState("");
   const [editStatus, setEditStatus] = useState("");
   const [editScheduled, setEditScheduled] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [cloning, setCloning] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     fetchWorkOrders();
     fetchCrafts();
+    fetchWorkGroups();
   }, []);
 
-  const fetchWorkOrders = async () => {
+  const fetchWorkOrders = async (activeFilters = filters) => {
     setLoading(true);
     setError("");
     try {
-      const data = await maintenanceService.getWorkOrders(filters);
-      setWorkOrders(data.workOrders || []);
+      const data = await maintenanceService.getWorkOrders({
+        status: activeFilters.status || undefined,
+        craft: activeFilters.craft || undefined,
+      });
+      setAllWorkOrders(data.workOrders || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch work orders");
     } finally {
@@ -72,15 +127,19 @@ const WorkOrders: React.FC = () => {
     }
   };
 
-  const handleFilterChange = (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>,
-  ) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+  const fetchWorkGroups = async () => {
+    try {
+      const data = await maintenanceService.getWorkGroups();
+      setWorkGroups(data.workGroups || []);
+    } catch {
+      // non-critical: work groups are used for display/filter only
+    }
   };
 
   const openDetail = async (wo: any) => {
     setSelectedOrder(wo);
     setEditCraft(wo.craft || "");
+    setEditWorkGroup(wo.work_group || "");
     setEditStatus(wo.status || "pending");
     setEditScheduled(wo.scheduled_date ? wo.scheduled_date.split("T")[0] : "");
     setMessages([]);
@@ -101,11 +160,15 @@ const WorkOrders: React.FC = () => {
     try {
       await maintenanceService.updateWorkOrder(selectedOrder.id, {
         craft: editCraft || undefined,
+        workGroup: editWorkGroup || undefined,
         status: editStatus || undefined,
         scheduledDate: editScheduled || undefined,
       });
-      const data = await maintenanceService.getWorkOrders(filters);
-      setWorkOrders(data.workOrders || []);
+      const data = await maintenanceService.getWorkOrders({
+        status: filters.status || undefined,
+        craft: filters.craft || undefined,
+      });
+      setAllWorkOrders(data.workOrders || []);
       const updated = (data.workOrders || []).find(
         (w: any) => w.id === selectedOrder.id,
       );
@@ -114,6 +177,20 @@ const WorkOrders: React.FC = () => {
       setError(err.response?.data?.error || "Failed to update work order");
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleCloneOrder = async () => {
+    if (!selectedOrder) return;
+    setCloning(true);
+    try {
+      await maintenanceService.cloneWorkOrder(selectedOrder.id);
+      setSelectedOrder(null);
+      await fetchWorkOrders();
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to clone work order");
+    } finally {
+      setCloning(false);
     }
   };
 
@@ -130,143 +207,337 @@ const WorkOrders: React.FC = () => {
     }
   };
 
+  const hasActiveFilters = !!(
+    filters.status ||
+    filters.craft ||
+    filters.workGroup ||
+    filters.priority ||
+    filters.search ||
+    filters.dateFrom ||
+    filters.dateTo
+  );
+  const activeFilterCount = [
+    filters.status,
+    filters.craft,
+    filters.workGroup,
+    filters.priority,
+    filters.dateFrom,
+    filters.dateTo,
+  ].filter(Boolean).length;
+
   return (
-    <div className="container" style={{ maxWidth: "1300px" }}>
-      {/* ── Header ── */}
-      <div className="page-header">
+    <div className="container" style={{ maxWidth: "1600px" }}>
+      {/* ── Filter topbar ── */}
+      <div className="filter-topbar">
         <h2>Work Orders</h2>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <select
-            name="status"
-            value={filters.status}
-            onChange={handleFilterChange}
-            style={{ width: "140px" }}
-          >
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+        <div className="filter-topbar-controls">
           <input
             type="text"
-            name="craft"
-            value={filters.craft}
-            onChange={handleFilterChange}
-            placeholder="Filter by craft"
-            style={{ width: "140px" }}
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            placeholder="Search work orders…"
+            className="filter-search"
           />
-          <button onClick={fetchWorkOrders}>Refresh</button>
+          <button
+            className={`filter-toggle-btn${
+              filtersOpen ? " filter-toggle-open" : ""
+            }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
+            onClick={() => setFiltersOpen((o) => !o)}
+          >
+            ⚙ Filters
+            {activeFilterCount > 0 && (
+              <span className="filter-badge">{activeFilterCount}</span>
+            )}
+          </button>
+          <button onClick={() => fetchWorkOrders(filters)}>Refresh</button>
+          {hasActiveFilters && (
+            <button
+              className="btn-ghost"
+              onClick={() => {
+                const cleared = {
+                  status: "",
+                  craft: "",
+                  workGroup: "",
+                  priority: "",
+                  search: "",
+                  dateFrom: "",
+                  dateTo: "",
+                };
+                setFilters(cleared);
+                fetchWorkOrders(cleared);
+              }}
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
-
-      {error && <div className="error card">{error}</div>}
-
-      {/* ── Work Order List ── */}
-      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        {loading ? (
-          <div
-            style={{
-              padding: "40px",
-              textAlign: "center",
-              color: "var(--text-muted)",
-            }}
-          >
-            Loading work orders…
+      {/* ── Expandable filter panel ── */}
+      {filtersOpen && (
+        <div className="filter-panel card">
+          <div className="filter-grid">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => {
+                  const f = { ...filters, status: e.target.value };
+                  setFilters(f);
+                  fetchWorkOrders(f);
+                }}
+              >
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Priority</label>
+              <select
+                value={filters.priority}
+                onChange={(e) =>
+                  setFilters({ ...filters, priority: e.target.value })
+                }
+              >
+                <option value="">All Priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Craft / Trade</label>
+              <input
+                type="text"
+                value={filters.craft}
+                onChange={(e) => {
+                  const f = { ...filters, craft: e.target.value };
+                  setFilters(f);
+                  fetchWorkOrders(f);
+                }}
+                placeholder="Filter by craft…"
+                list="craft-options"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Work Group</label>
+              <select
+                value={filters.workGroup}
+                onChange={(e) =>
+                  setFilters({ ...filters, workGroup: e.target.value })
+                }
+              >
+                <option value="">All Work Groups</option>
+                {workGroups.map((g) => (
+                  <option
+                    key={g.Id || g.id || g.Name || g.name}
+                    value={g.Name || g.name || ""}
+                  >
+                    {g.Name || g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Date From</label>
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) =>
+                  setFilters({ ...filters, dateFrom: e.target.value })
+                }
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Date To</label>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) =>
+                  setFilters({ ...filters, dateTo: e.target.value })
+                }
+              />
+            </div>
           </div>
-        ) : workOrders.length === 0 ? (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "40px",
-              color: "var(--text-muted)",
-            }}
-          >
-            No work orders found.
-          </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: "40px" }}>#</th>
-                <th>Title</th>
-                <th style={{ width: "90px" }}>Priority</th>
-                <th style={{ width: "120px" }}>Status</th>
-                <th>Craft / Trade</th>
-                <th>Assigned To</th>
-                <th style={{ width: "100px" }}>Scheduled</th>
-              </tr>
-            </thead>
-            <tbody>
-              {workOrders.map((wo) => (
-                <tr
-                  key={wo.id}
-                  onClick={() => openDetail(wo)}
-                  style={{
-                    cursor: "pointer",
-                    background:
-                      selectedOrder?.id === wo.id
-                        ? "rgba(14,165,233,0.08)"
-                        : undefined,
-                  }}
-                >
-                  <td style={{ color: "var(--text-muted)", fontSize: "13px" }}>
-                    {wo.id}
-                  </td>
-                  <td style={{ fontWeight: 500 }}>{wo.title}</td>
-                  <td>
-                    <span
-                      className={`badge ${priorityBadgeClass(wo.priority)}`}
+        </div>
+      )}
+      {/* ── Main: data table + presets sidebar ── */}
+      <div className="admin-page-layout">
+        <div className="admin-page-main">
+          {error && <div className="error card">{error}</div>}
+
+          {allWorkOrders.length > 0 &&
+            workOrders.length !== allWorkOrders.length && (
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                  marginBottom: "6px",
+                }}
+              >
+                Showing {workOrders.length} of {allWorkOrders.length} work
+                orders
+              </div>
+            )}
+
+          {/* ── Work Order List ── */}
+          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            {loading ? (
+              <div
+                style={{
+                  padding: "40px",
+                  textAlign: "center",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Loading work orders…
+              </div>
+            ) : workOrders.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px",
+                  color: "var(--text-muted)",
+                }}
+              >
+                No work orders found.
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "40px" }}>#</th>
+                    <th>Title</th>
+                    <th style={{ width: "90px" }}>Priority</th>
+                    <th style={{ width: "120px" }}>Status</th>
+                    <th>Craft / Trade</th>
+                    <th>Work Group</th>
+                    <th>Assigned To</th>
+                    <th style={{ width: "100px" }}>Scheduled</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {workOrders.map((wo) => (
+                    <tr
+                      key={wo.id}
+                      onClick={() => openDetail(wo)}
+                      style={{
+                        cursor: "pointer",
+                        background:
+                          selectedOrder?.id === wo.id
+                            ? "rgba(14,165,233,0.08)"
+                            : undefined,
+                      }}
                     >
-                      {wo.priority || "—"}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${statusBadgeClass(wo.status)}`}>
-                      {toLabel(wo.status || "pending")}
-                    </span>
-                  </td>
-                  <td
-                    style={{ color: "var(--text-secondary)", fontSize: "13px" }}
-                  >
-                    {wo.craft || (
-                      <span style={{ color: "var(--text-muted)" }}>
-                        Unassigned
-                      </span>
-                    )}
-                  </td>
-                  <td
-                    style={{ color: "var(--text-secondary)", fontSize: "13px" }}
-                  >
-                    {wo.assigned_to_username || (
-                      <span style={{ color: "var(--text-muted)" }}>—</span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      color: "var(--text-muted)",
-                      fontSize: "13px",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {wo.scheduled_date
-                      ? new Date(wo.scheduled_date).toLocaleDateString()
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
+                      <td
+                        style={{ color: "var(--text-muted)", fontSize: "13px" }}
+                      >
+                        {wo.id}
+                      </td>
+                      <td style={{ fontWeight: 500 }}>{wo.title}</td>
+                      <td>
+                        <span
+                          className={`badge ${priorityBadgeClass(wo.priority)}`}
+                        >
+                          {wo.priority || "—"}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${statusBadgeClass(wo.status)}`}
+                        >
+                          {toLabel(wo.status || "pending")}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontSize: "13px",
+                        }}
+                      >
+                        {wo.craft || (
+                          <span style={{ color: "var(--text-muted)" }}>
+                            Unassigned
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontSize: "13px",
+                        }}
+                      >
+                        {wo.work_group || (
+                          <span style={{ color: "var(--text-muted)" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          color: "var(--text-secondary)",
+                          fontSize: "13px",
+                        }}
+                      >
+                        {wo.assigned_to_username || (
+                          <span style={{ color: "var(--text-muted)" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          color: "var(--text-muted)",
+                          fontSize: "13px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {wo.scheduled_date
+                          ? new Date(wo.scheduled_date).toLocaleDateString()
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>{" "}
+        {/* admin-page-main */}
+        <FilterPresetsPanel
+          storageKey="filterPresets_workOrders"
+          currentFilters={filters}
+          onApply={(f) => {
+            const merged = {
+              status: "",
+              craft: "",
+              workGroup: "",
+              priority: "",
+              search: "",
+              dateFrom: "",
+              dateTo: "",
+              ...f,
+            };
+            setFilters(merged);
+            fetchWorkOrders(merged);
+          }}
+        />
+      </div>{" "}
+      {/* admin-page-layout */}
       {/* Datalist for craft suggestions */}
       <datalist id="craft-options">
         {crafts.map((c) => (
           <option key={c} value={c} />
         ))}
       </datalist>
-
+      {/* Datalist for work group suggestions */}
+      <datalist id="workgroup-options">
+        {workGroups.map((g) => (
+          <option
+            key={g.Id || g.id || g.Name || g.name}
+            value={g.Name || g.name || ""}
+          />
+        ))}
+      </datalist>
       {/* ── Work Order Modal ── */}
       {selectedOrder && (
         <Modal onClose={() => setSelectedOrder(null)}>
@@ -296,13 +567,30 @@ const WorkOrders: React.FC = () => {
                 )}
               </div>
             </div>
-            <button
-              className="btn-ghost"
-              onClick={() => setSelectedOrder(null)}
-              style={{ flexShrink: 0 }}
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+                flexShrink: 0,
+              }}
             >
-              ✕
-            </button>
+              <button
+                className="btn-ghost"
+                onClick={handleCloneOrder}
+                disabled={cloning}
+                title="Clone this work order into a new pending work order"
+                style={{ fontSize: "13px" }}
+              >
+                {cloning ? "Cloning…" : "⧉ Clone"}
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => setSelectedOrder(null)}
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="modal-body">
@@ -353,6 +641,14 @@ const WorkOrders: React.FC = () => {
                   <div style={{ marginBottom: "8px", fontSize: "14px" }}>
                     <span style={{ color: "var(--text-muted)" }}>Craft: </span>
                     <span>{selectedOrder.craft}</span>
+                  </div>
+                )}
+                {selectedOrder.work_group && (
+                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      Work Group:{" "}
+                    </span>
+                    <span>{selectedOrder.work_group}</span>
                   </div>
                 )}
                 {selectedOrder.assigned_to_username && (
@@ -435,6 +731,16 @@ const WorkOrders: React.FC = () => {
                     onChange={(e) => setEditCraft(e.target.value)}
                     placeholder="e.g. Plumbing, HVAC"
                     list="craft-options"
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: "10px" }}>
+                  <label style={{ fontSize: "12px" }}>Work Group</label>
+                  <input
+                    type="text"
+                    value={editWorkGroup}
+                    onChange={(e) => setEditWorkGroup(e.target.value)}
+                    placeholder="Assetic labour / trade group"
+                    list="workgroup-options"
                   />
                 </div>
                 <button

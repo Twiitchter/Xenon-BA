@@ -385,7 +385,7 @@ router.put(
  */
 router.get("/work-orders", async (req: AuthRequest, res: Response) => {
   try {
-    const { status, craft, limit = 100, offset = 0 } = req.query;
+    const { status, craft, work_group, limit = 100, offset = 0 } = req.query;
 
     let qb = db("work_orders as wo")
       .leftJoin("users as u", "wo.assigned_to", "u.id")
@@ -402,6 +402,10 @@ router.get("/work-orders", async (req: AuthRequest, res: Response) => {
 
     if (craft) {
       qb = qb.where("wo.craft", craft as string);
+    }
+
+    if (work_group) {
+      qb = qb.where("wo.work_group", work_group as string);
     }
 
     const workOrders = await qb
@@ -461,6 +465,7 @@ router.post(
     body("description").optional().trim(),
     body("priority").optional().isIn(["low", "medium", "high", "critical"]),
     body("craft").optional().trim(),
+    body("workGroup").optional().trim(),
     body("assignedTo").optional().isInt(),
     body("scheduledDate").optional().isISO8601(),
   ],
@@ -477,6 +482,7 @@ router.post(
         description,
         priority,
         craft,
+        workGroup,
         assignedTo,
         scheduledDate,
       } = req.body;
@@ -494,6 +500,7 @@ router.post(
           request_id: requestId,
           assigned_to: assignedTo || null,
           craft: craft || null,
+          work_group: workGroup || null,
           title,
           description: description || null,
           priority: priority || "medium",
@@ -535,6 +542,7 @@ router.put(
       .optional()
       .isIn(["pending", "in_progress", "completed", "cancelled"]),
     body("craft").optional().trim(),
+    body("workGroup").optional().trim(),
     body("assignedTo").optional().isInt(),
     body("scheduledDate").optional().isISO8601(),
   ],
@@ -552,6 +560,7 @@ router.put(
         priority,
         status,
         craft,
+        workGroup,
         assignedTo,
         scheduledDate,
       } = req.body;
@@ -570,6 +579,7 @@ router.put(
       if (priority) updateData.priority = priority;
       if (status) updateData.status = status;
       if (craft) updateData.craft = craft;
+      if (workGroup !== undefined) updateData.work_group = workGroup || null;
       if (assignedTo) updateData.assigned_to = assignedTo;
       if (scheduledDate) updateData.scheduled_date = scheduledDate;
       if (status === "completed") updateData.completed_at = db.fn.now();
@@ -724,6 +734,72 @@ router.get(
     }
   },
 );
+
+/**
+ * POST /api/maintenance/work-orders/:id/clone
+ * Clone a work order into a new pending work order
+ */
+router.post(
+  "/work-orders/:id/clone",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const source = await db("work_orders").where("id", id).first();
+      if (!source) {
+        return res.status(404).json({ error: "Work order not found" });
+      }
+
+      const [inserted] = await db("work_orders")
+        .insert({
+          request_id: source.request_id || null,
+          craft: source.craft || null,
+          work_group: source.work_group || null,
+          title: `${source.title} (Copy)`,
+          description: source.description || null,
+          priority: source.priority || "medium",
+          status: "pending",
+          scheduled_date: null,
+        })
+        .returning("*");
+
+      if (!inserted || typeof inserted === "number") {
+        const newId =
+          typeof inserted === "number" ? inserted : (inserted as any);
+        const row = await db("work_orders").where("id", newId).first();
+        return res.status(201).json(row);
+      }
+
+      res.status(201).json(inserted);
+    } catch (error) {
+      console.error("Error cloning work order:", error);
+      res.status(500).json({ error: "Failed to clone work order" });
+    }
+  },
+);
+
+/**
+ * GET /api/maintenance/assetic/work-groups
+ * Get available work groups (labour/trade groups) from Assetic API
+ */
+router.get("/assetic/work-groups", async (_req: AuthRequest, res: Response) => {
+  try {
+    const enabled = await asseticClient.isEnabled();
+    if (!enabled) {
+      return res
+        .status(503)
+        .json({ error: "Assetic integration is not enabled" });
+    }
+
+    const data = await asseticClient.getWorkgroups();
+    const groups = Array.isArray(data)
+      ? data
+      : data?.ResourceList || data?.Results || data?.results || [];
+    res.json({ workGroups: groups });
+  } catch (error) {
+    console.error("Error fetching work groups:", error);
+    res.status(502).json({ error: "Failed to fetch work groups from Assetic" });
+  }
+});
 
 /**
  * GET /api/maintenance/assetic/work-request-types
