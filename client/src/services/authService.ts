@@ -60,6 +60,23 @@ class AuthService {
       return null;
     }
   }
+
+  async updateProfile(profileData: {
+    prefRegionId?: string;
+    prefRegionName?: string;
+    prefSiteId?: string;
+    prefSiteName?: string;
+    prefBuildingId?: string;
+    prefBuildingName?: string;
+    prefFloorId?: string;
+    prefFloorName?: string;
+  }) {
+    const response = await axios.put(`${API_URL}/auth/profile`, profileData, {
+      headers: this.getAuthHeader(),
+    });
+    localStorage.setItem("user", JSON.stringify(response.data));
+    return response.data;
+  }
 }
 
 export const authService = new AuthService();

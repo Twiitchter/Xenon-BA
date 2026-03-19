@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LocationHierarchyResponse,
@@ -11,11 +11,6 @@ import LocationHierarchyPicker, {
   LocationSelection,
   buildLocationPath,
 } from "../components/LocationHierarchyPicker";
-
-interface WorkRequestSource {
-  id: string;
-  name: string;
-}
 
 interface WorkRequestType {
   Id: string;
@@ -37,21 +32,14 @@ const NewWorkRequest: React.FC = () => {
     requestorPhone: "",
     requestorMobile: "",
     supportingInformation: "",
-    workRequestSourceId: "",
+    workRequestSourceId: "3",
     workRequestSubtypeId: "",
   });
 
-  // Asset picker state
-  const [assetSearch, setAssetSearch] = useState("");
-  const [assetResults, setAssetResults] = useState<any[]>([]);
-  const [assetSearchLoading, setAssetSearchLoading] = useState(false);
+  // Asset is resolved automatically from the selected building — not shown in UI
   const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
-  const assetDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Assetic integration state
-  const [workRequestSources, setWorkRequestSources] = useState<
-    WorkRequestSource[]
-  >([]);
   const [workRequestTypes, setWorkRequestTypes] = useState<WorkRequestType[]>(
     [],
   );
@@ -67,37 +55,17 @@ const NewWorkRequest: React.FC = () => {
     fetchAsseticData();
   }, []);
 
-  const handleAssetSearchChange = (value: string) => {
-    setAssetSearch(value);
-    if (!value || value.length < 2) {
-      setAssetResults([]);
+  // When the building selection changes, silently look up its linked Assetic asset
+  useEffect(() => {
+    if (!locationSelection.buildingId) {
+      setSelectedAsset(null);
       return;
     }
-    if (assetDebounce.current) clearTimeout(assetDebounce.current);
-    assetDebounce.current = setTimeout(async () => {
-      setAssetSearchLoading(true);
-      try {
-        const data = await assetService.searchAssets(value);
-        setAssetResults(data.assets || []);
-      } catch {
-        setAssetResults([]);
-      } finally {
-        setAssetSearchLoading(false);
-      }
-    }, 300);
-  };
-
-  const selectAsset = (asset: any) => {
-    setSelectedAsset(asset);
-    setAssetSearch(asset.asset_name || asset.asset_id || "");
-    setAssetResults([]);
-  };
-
-  const clearAsset = () => {
-    setSelectedAsset(null);
-    setAssetSearch("");
-    setAssetResults([]);
-  };
+    void assetService
+      .getAssetByFunctionalLocation(locationSelection.buildingId)
+      .then((res) => setSelectedAsset(res.asset || null))
+      .catch(() => setSelectedAsset(null));
+  }, [locationSelection.buildingId]);
 
   const prefillFromUser = async () => {
     const user = await authService.getCurrentUser();
@@ -123,16 +91,10 @@ const NewWorkRequest: React.FC = () => {
 
   const fetchAsseticData = async () => {
     try {
-      const [sourcesRes, typesRes, hierarchyRes] = await Promise.allSettled([
-        maintenanceService.getWorkRequestSources(),
+      const [typesRes, hierarchyRes] = await Promise.allSettled([
         maintenanceService.getWorkRequestTypes(),
         maintenanceService.getLocationHierarchy(),
       ]);
-
-      if (sourcesRes.status === "fulfilled" && sourcesRes.value?.sources) {
-        setWorkRequestSources(sourcesRes.value.sources);
-        setAsseticEnabled(true);
-      }
 
       if (typesRes.status === "fulfilled" && typesRes.value?.ResourceList) {
         setWorkRequestTypes(typesRes.value.ResourceList);
@@ -286,140 +248,6 @@ const NewWorkRequest: React.FC = () => {
             Request Details
           </h4>
 
-          {/* ── Asset picker ── */}
-          <div className="form-group">
-            <label>
-              Asset{" "}
-              {asseticEnabled && (
-                <span style={{ color: "var(--accent)", fontWeight: 700 }}>
-                  *
-                </span>
-              )}
-            </label>
-            {selectedAsset ? (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "8px 12px",
-                  background: "rgba(14,165,233,0.08)",
-                  border: "1px solid var(--accent)",
-                  borderRadius: "var(--radius)",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: "14px" }}>
-                    {selectedAsset.asset_name}
-                  </div>
-                  <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                    {selectedAsset.asset_id}
-                    {selectedAsset.asset_type
-                      ? ` · ${selectedAsset.asset_type}`
-                      : ""}
-                    {selectedAsset.asset_category
-                      ? ` · ${selectedAsset.asset_category}`
-                      : ""}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={clearAsset}
-                  style={{ fontSize: "12px" }}
-                >
-                  ✕ Change
-                </button>
-              </div>
-            ) : (
-              <div style={{ position: "relative" }}>
-                <input
-                  type="text"
-                  value={assetSearch}
-                  onChange={(e) => handleAssetSearchChange(e.target.value)}
-                  placeholder="Search by asset name or code…"
-                  autoComplete="off"
-                />
-                {asseticEnabled && !selectedAsset && (
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      color: "var(--text-muted)",
-                      marginTop: "3px",
-                    }}
-                  >
-                    Required — type at least 2 characters to search synced
-                    assets.
-                  </div>
-                )}
-                {assetSearchLoading && (
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "var(--text-muted)",
-                      marginTop: "4px",
-                    }}
-                  >
-                    Searching…
-                  </div>
-                )}
-                {assetResults.length > 0 && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      zIndex: 100,
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      background: "var(--bg-card)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius)",
-                      maxHeight: "220px",
-                      overflowY: "auto",
-                      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-                    }}
-                  >
-                    {assetResults.map((a) => (
-                      <div
-                        key={a.assetic_guid || a.id}
-                        onClick={() => selectAsset(a)}
-                        style={{
-                          padding: "9px 14px",
-                          cursor: "pointer",
-                          borderBottom: "1px solid var(--border)",
-                        }}
-                        onMouseEnter={(e) =>
-                          ((
-                            e.currentTarget as HTMLDivElement
-                          ).style.background = "rgba(14,165,233,0.1)")
-                        }
-                        onMouseLeave={(e) =>
-                          ((
-                            e.currentTarget as HTMLDivElement
-                          ).style.background = "")
-                        }
-                      >
-                        <div style={{ fontWeight: 500, fontSize: "14px" }}>
-                          {a.asset_name}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "var(--text-muted)",
-                          }}
-                        >
-                          {a.asset_id}
-                          {a.asset_type ? ` · ${a.asset_type}` : ""}
-                          {a.asset_category ? ` · ${a.asset_category}` : ""}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           <div style={{ display: "flex", gap: "10px" }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label>Priority</label>
@@ -448,48 +276,25 @@ const NewWorkRequest: React.FC = () => {
             </div>
           </div>
 
-          {asseticEnabled && workRequestSources.length > 0 && (
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Request Source</label>
-                <select
-                  value={formData.workRequestSourceId}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      workRequestSourceId: e.target.value,
-                    })
-                  }
-                >
-                  <option value="">Select a source...</option>
-                  {workRequestSources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {source.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {workRequestTypes.length > 0 && (
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>Request Type</label>
-                  <select
-                    value={formData.workRequestSubtypeId}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        workRequestSubtypeId: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">Select a type...</option>
-                    {workRequestTypes.map((type: any) => (
-                      <option key={type.Id} value={type.Id}>
-                        {type.Name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+          {asseticEnabled && workRequestTypes.length > 0 && (
+            <div className="form-group">
+              <label>Request Type</label>
+              <select
+                value={formData.workRequestSubtypeId}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    workRequestSubtypeId: e.target.value,
+                  })
+                }
+              >
+                <option value="">Select a type...</option>
+                {workRequestTypes.map((type: any) => (
+                  <option key={type.Id} value={type.Id}>
+                    {type.Name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 

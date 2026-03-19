@@ -110,6 +110,43 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
 });
 
 /**
+ * GET /api/assets/by-fl/:flGuid
+ * Return the (first active) asset linked to a given functional location GUID.
+ * Used to auto-resolve the building asset from the location hierarchy picker.
+ */
+router.get("/by-fl/:flGuid", async (req: AuthRequest, res: Response) => {
+  try {
+    const { flGuid } = req.params;
+    const asset = await db("assetic_assets as aa")
+      .join(
+        "assetic_asset_functional_locations as aafl",
+        "aa.assetic_guid",
+        "aafl.asset_guid",
+      )
+      .where("aafl.fl_guid", flGuid)
+      .where("aa.asset_status", "Active")
+      .select(
+        "aa.id",
+        "aa.assetic_guid",
+        "aa.asset_id",
+        "aa.asset_name",
+        "aa.asset_status",
+        "aa.asset_type",
+        "aa.asset_category",
+      )
+      .first();
+
+    if (!asset) {
+      return res.json({ asset: null });
+    }
+    res.json({ asset });
+  } catch (error) {
+    console.error("Error fetching asset by functional location:", error);
+    res.status(500).json({ error: "Failed to fetch asset" });
+  }
+});
+
+/**
  * GET /api/assets/:id/changes
  * Get change history for an asset
  */

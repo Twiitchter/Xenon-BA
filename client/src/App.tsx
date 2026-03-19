@@ -15,6 +15,7 @@ import WorkGroups from "./pages/WorkGroups";
 import NewWorkRequest from "./pages/NewWorkRequest";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
+import MyProfile from "./pages/MyProfile";
 import { authService } from "./services/authService";
 import { ToastProvider } from "./contexts/ToastContext";
 import ToastContainer from "./components/ToastContainer";
@@ -203,6 +204,20 @@ function AppContent() {
                       <line x1="8" y1="12" x2="16" y2="12" />
                     </svg>
                     New Work Request
+                  </NavLink>
+                  <NavLink to="/my-profile">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                    My Settings
                   </NavLink>
                 </>
               )}
@@ -435,6 +450,12 @@ function AppContent() {
                   replace
                 />
               )
+            }
+          />
+          <Route
+            path="/my-profile"
+            element={
+              isAuthenticated ? <MyProfile /> : <Navigate to="/login" replace />
             }
           />
           <Route path="/" element={<Navigate to={landingPath} replace />} />

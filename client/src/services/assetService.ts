@@ -26,6 +26,16 @@ class AssetService {
     return response.data;
   }
 
+  /** Find the active asset linked to an Assetic functional location GUID (e.g. a building). */
+  async getAssetByFunctionalLocation(
+    flGuid: string,
+  ): Promise<{ asset: any | null }> {
+    const response = await axios.get(`${API_URL}/assets/by-fl/${flGuid}`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data;
+  }
+
   async getAsset(id: number) {
     const response = await axios.get(`${API_URL}/assets/${id}`, {
       headers: authService.getAuthHeader(),
