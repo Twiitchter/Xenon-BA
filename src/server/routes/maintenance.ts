@@ -945,6 +945,13 @@ router.get(
       }
 
       const types = await asseticClient.getWorkRequestTypes();
+      // Log the first item so we can verify the field names in production
+      if (types?.ResourceList?.length > 0) {
+        console.log(
+          "[WorkRequestTypes] Sample item:",
+          JSON.stringify(types.ResourceList[0]),
+        );
+      }
       res.json(types);
     } catch (error) {
       console.error("Error fetching work request types:", error);

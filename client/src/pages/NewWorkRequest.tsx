@@ -291,7 +291,11 @@ const NewWorkRequest: React.FC = () => {
                 <option value="">Select a type...</option>
                 {workRequestTypes.map((type: any) => (
                   <option key={type.Id} value={type.Id}>
-                    {type.Name}
+                    {type.Name ||
+                      type.WorkRequestSubType ||
+                      type.SubTypeName ||
+                      type.Description ||
+                      `Type ${type.Id}`}
                   </option>
                 ))}
               </select>
