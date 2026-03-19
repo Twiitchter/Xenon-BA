@@ -1,0 +1,1114 @@
+{
+  "Id": "string",
+  "FriendlyIdStr": "string",
+  "ContactType": 0,
+  "RequestorId": "string",
+  "WorkRequestSourceId": 0,
+  "WorkRequestPriorityId": 0,
+  "Description": "string",
+  "SupportingInformation": "string",
+  "CreatedDateTime": "2026-03-19T22:57:10.218Z",
+  "FeedbackRequired": true,
+  "FeedbackMethodId": 0,
+  "Location": "string",
+  "WorkRequestStatusId": 0,
+  "WorkRequestStatus": "string",
+  "WorkRequestTypeId": 0,
+  "WorkRequestSubTypeId": 0,
+  "ClosedDate": "2026-03-19T22:57:10.218Z",
+  "AcknowledgeDueDate": "2026-03-19T22:57:10.218Z",
+  "ResolutionDueDate": "2026-03-19T22:57:10.218Z",
+  "ComplexAssetId": "string",
+  "AssetId": "string",
+  "CreatedBy": "string",
+  "WorkOrderId": "string",
+  "ExternalIdentifier": "string",
+  "WorkOrderPriorityId": 0,
+  "ReferenceNumber": "string",
+  "LastModified": "2026-03-19T22:57:10.218Z",
+  "Requestor": {
+    "Address": {
+      "PhysicalLocation": {
+        "ResourceId": "string",
+        "Address": {
+          "Id": "string",
+          "StreetNumber": "string",
+          "StreetAddress": "string",
+          "CitySuburb": "string",
+          "State": "string",
+          "ZipPostcode": "string",
+          "Country": "string",
+          "GooglePlaceId": "string",
+          "_links": [
+            {
+              "Curie": {
+                "Name": "string",
+                "Href": "string"
+              },
+              "Rel": "string",
+              "Href": "string",
+              "Title": "string",
+              "Type": "string",
+              "Deprecation": "string",
+              "Name": "string",
+              "Profile": "string",
+              "HrefLang": "string",
+              "IsTemplated": true
+            }
+          ],
+          "_embedded": [
+            {
+              "IsSourceAnArray": true,
+              "Resources": [
+                {
+                  "_links": [
+                    {
+                      "Curie": {
+                        "Name": "string",
+                        "Href": "string"
+                      },
+                      "Rel": "string",
+                      "Href": "string",
+                      "Title": "string",
+                      "Type": "string",
+                      "Deprecation": "string",
+                      "Name": "string",
+                      "Profile": "string",
+                      "HrefLang": "string",
+                      "IsTemplated": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "OtherLocation": "string",
+        "WhereLocation": "string",
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "SpatialLocation": {
+        "ResourceId": "string",
+        "Point": {
+          "Geography": {
+            "CoordinateSystemId": 0,
+            "WellKnownText": "string",
+            "WellKnownBinary": "string"
+          }
+        },
+        "PointString": "string",
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "_links": [
+        {
+          "Curie": {
+            "Name": "string",
+            "Href": "string"
+          },
+          "Rel": "string",
+          "Href": "string",
+          "Title": "string",
+          "Type": "string",
+          "Deprecation": "string",
+          "Name": "string",
+          "Profile": "string",
+          "HrefLang": "string",
+          "IsTemplated": true
+        }
+      ],
+      "_embedded": [
+        {
+          "IsSourceAnArray": true,
+          "Resources": [
+            {
+              "_links": [
+                {
+                  "Curie": {
+                    "Name": "string",
+                    "Href": "string"
+                  },
+                  "Rel": "string",
+                  "Href": "string",
+                  "Title": "string",
+                  "Type": "string",
+                  "Deprecation": "string",
+                  "Name": "string",
+                  "Profile": "string",
+                  "HrefLang": "string",
+                  "IsTemplated": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "Types": [
+      {
+        "Id": 0,
+        "Type": "string",
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "Id": "string",
+    "DisplayName": "string",
+    "FirstName": "string",
+    "Surname": "string",
+    "Company": "string",
+    "Position": "string",
+    "Phone": "string",
+    "Mobile": "string",
+    "Fax": "string",
+    "Email": "string",
+    "AddressComment": "string",
+    "ExternalID": "string",
+    "StatusId": 0,
+    "ContractorOrganization": "string",
+    "Status": "Active",
+    "_links": [
+      {
+        "Curie": {
+          "Name": "string",
+          "Href": "string"
+        },
+        "Rel": "string",
+        "Href": "string",
+        "Title": "string",
+        "Type": "string",
+        "Deprecation": "string",
+        "Name": "string",
+        "Profile": "string",
+        "HrefLang": "string",
+        "IsTemplated": true
+      }
+    ],
+    "_embedded": [
+      {
+        "IsSourceAnArray": true,
+        "Resources": [
+          {
+            "_links": [
+              {
+                "Curie": {
+                  "Name": "string",
+                  "Href": "string"
+                },
+                "Rel": "string",
+                "Href": "string",
+                "Title": "string",
+                "Type": "string",
+                "Deprecation": "string",
+                "Name": "string",
+                "Profile": "string",
+                "HrefLang": "string",
+                "IsTemplated": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "ReactiveInspectorId": "string",
+  "ReactiveInspector": {
+    "Id": "string",
+    "DisplayName": "string",
+    "_links": [
+      {
+        "Curie": {
+          "Name": "string",
+          "Href": "string"
+        },
+        "Rel": "string",
+        "Href": "string",
+        "Title": "string",
+        "Type": "string",
+        "Deprecation": "string",
+        "Name": "string",
+        "Profile": "string",
+        "HrefLang": "string",
+        "IsTemplated": true
+      }
+    ],
+    "_embedded": [
+      {
+        "IsSourceAnArray": true,
+        "Resources": [
+          {
+            "_links": [
+              {
+                "Curie": {
+                  "Name": "string",
+                  "Href": "string"
+                },
+                "Rel": "string",
+                "Href": "string",
+                "Title": "string",
+                "Type": "string",
+                "Deprecation": "string",
+                "Name": "string",
+                "Profile": "string",
+                "HrefLang": "string",
+                "IsTemplated": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "ResponsibleOfficerId": "string",
+  "ResponsibleOfficer": {
+    "Id": "string",
+    "DisplayName": "string",
+    "_links": [
+      {
+        "Curie": {
+          "Name": "string",
+          "Href": "string"
+        },
+        "Rel": "string",
+        "Href": "string",
+        "Title": "string",
+        "Type": "string",
+        "Deprecation": "string",
+        "Name": "string",
+        "Profile": "string",
+        "HrefLang": "string",
+        "IsTemplated": true
+      }
+    ],
+    "_embedded": [
+      {
+        "IsSourceAnArray": true,
+        "Resources": [
+          {
+            "_links": [
+              {
+                "Curie": {
+                  "Name": "string",
+                  "Href": "string"
+                },
+                "Rel": "string",
+                "Href": "string",
+                "Title": "string",
+                "Type": "string",
+                "Deprecation": "string",
+                "Name": "string",
+                "Profile": "string",
+                "HrefLang": "string",
+                "IsTemplated": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "ReactiveInspectionDate": "2026-03-19T22:57:10.218Z",
+  "SupportingInformationHistory": [
+    {
+      "Id": "string",
+      "Description": "string",
+      "CreatedBy": "string",
+      "CreatedByDisplayName": "string",
+      "CreatedDateTime": "2026-03-19T22:57:10.218Z",
+      "SystemAddedTime": "2026-03-19T22:57:10.218Z",
+      "LastModifiedTime": "2026-03-19T22:57:10.218Z",
+      "_links": [
+        {
+          "Curie": {
+            "Name": "string",
+            "Href": "string"
+          },
+          "Rel": "string",
+          "Href": "string",
+          "Title": "string",
+          "Type": "string",
+          "Deprecation": "string",
+          "Name": "string",
+          "Profile": "string",
+          "HrefLang": "string",
+          "IsTemplated": true
+        }
+      ],
+      "_embedded": [
+        {
+          "IsSourceAnArray": true,
+          "Resources": [
+            {
+              "_links": [
+                {
+                  "Curie": {
+                    "Name": "string",
+                    "Href": "string"
+                  },
+                  "Rel": "string",
+                  "Href": "string",
+                  "Title": "string",
+                  "Type": "string",
+                  "Deprecation": "string",
+                  "Name": "string",
+                  "Profile": "string",
+                  "HrefLang": "string",
+                  "IsTemplated": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "AttachedDocuments": [
+    {
+      "Id": "string",
+      "Name": "string",
+      "Label": "string",
+      "ExternalId": "string",
+      "Description": "string",
+      "ExpiryDate": "2026-03-19T22:57:10.218Z",
+      "IsExpired": true,
+      "CreatedDate": "2026-03-19T22:57:10.218Z",
+      "LastModified": "2026-03-19T22:57:10.218Z",
+      "DocumentSize": 0,
+      "DocumentLink": "string",
+      "MimeType": "string",
+      "DocumentGroup": 0,
+      "DocGroupValue": "string",
+      "DocGroupLabel": "string",
+      "DocumentSubCategory": 0,
+      "DocSubCategoryValue": "string",
+      "DocSubCategoryLabel": "string",
+      "DocumentCategory": 0,
+      "DocCategoryValue": "string",
+      "DocCategoryLabel": "string",
+      "CreatedUserFirstName": "string",
+      "CreatedUserLastName": "string",
+      "LastModifiedUserFirstName": "string",
+      "LastModifiedUserLastName": "string",
+      "FileProperty": [
+        {
+          "Name": "string",
+          "FileSize": 0,
+          "mimetype": "string",
+          "filecontent": "string",
+          "fileuuid": "string",
+          "encoding": "string"
+        }
+      ],
+      "DocumentSource": "string",
+      "ParentType": "None",
+      "ParentId": "string",
+      "ParentIdentifier": "string",
+      "RecordId": "string",
+      "IsKeyPhoto": true,
+      "IsImage": true,
+      "Status": "None",
+      "DocumentAsset": {
+        "AssetName": "string",
+        "Id": "string",
+        "AssetId": "string",
+        "AssetCategoryId": "string",
+        "AssetCategory": "string",
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "DocumentWorkRequest": {
+        "WorkRequestId": "string",
+        "FriendlyId": "string",
+        "DocumentAsset": {
+          "AssetName": "string",
+          "Id": "string",
+          "AssetId": "string",
+          "AssetCategoryId": "string",
+          "AssetCategory": "string",
+          "_links": [
+            {
+              "Curie": {
+                "Name": "string",
+                "Href": "string"
+              },
+              "Rel": "string",
+              "Href": "string",
+              "Title": "string",
+              "Type": "string",
+              "Deprecation": "string",
+              "Name": "string",
+              "Profile": "string",
+              "HrefLang": "string",
+              "IsTemplated": true
+            }
+          ],
+          "_embedded": [
+            {
+              "IsSourceAnArray": true,
+              "Resources": [
+                {
+                  "_links": [
+                    {
+                      "Curie": {
+                        "Name": "string",
+                        "Href": "string"
+                      },
+                      "Rel": "string",
+                      "Href": "string",
+                      "Title": "string",
+                      "Type": "string",
+                      "Deprecation": "string",
+                      "Name": "string",
+                      "Profile": "string",
+                      "HrefLang": "string",
+                      "IsTemplated": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "DocumentWorkOrder": {
+        "WorkOrderId": "string",
+        "FriendlyId": "string",
+        "DocumentAsset": {
+          "AssetName": "string",
+          "Id": "string",
+          "AssetId": "string",
+          "AssetCategoryId": "string",
+          "AssetCategory": "string",
+          "_links": [
+            {
+              "Curie": {
+                "Name": "string",
+                "Href": "string"
+              },
+              "Rel": "string",
+              "Href": "string",
+              "Title": "string",
+              "Type": "string",
+              "Deprecation": "string",
+              "Name": "string",
+              "Profile": "string",
+              "HrefLang": "string",
+              "IsTemplated": true
+            }
+          ],
+          "_embedded": [
+            {
+              "IsSourceAnArray": true,
+              "Resources": [
+                {
+                  "_links": [
+                    {
+                      "Curie": {
+                        "Name": "string",
+                        "Href": "string"
+                      },
+                      "Rel": "string",
+                      "Href": "string",
+                      "Title": "string",
+                      "Type": "string",
+                      "Deprecation": "string",
+                      "Name": "string",
+                      "Profile": "string",
+                      "HrefLang": "string",
+                      "IsTemplated": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "DocumentAssessmentFormResult": {
+        "ASMTFormResultId": "string",
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "DocumentGroupAsset": {
+        "GroupAssetName": "string",
+        "Id": "string",
+        "GroupAssetId": "string",
+        "_links": [
+          {
+            "Curie": {
+              "Name": "string",
+              "Href": "string"
+            },
+            "Rel": "string",
+            "Href": "string",
+            "Title": "string",
+            "Type": "string",
+            "Deprecation": "string",
+            "Name": "string",
+            "Profile": "string",
+            "HrefLang": "string",
+            "IsTemplated": true
+          }
+        ],
+        "_embedded": [
+          {
+            "IsSourceAnArray": true,
+            "Resources": [
+              {
+                "_links": [
+                  {
+                    "Curie": {
+                      "Name": "string",
+                      "Href": "string"
+                    },
+                    "Rel": "string",
+                    "Href": "string",
+                    "Title": "string",
+                    "Type": "string",
+                    "Deprecation": "string",
+                    "Name": "string",
+                    "Profile": "string",
+                    "HrefLang": "string",
+                    "IsTemplated": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "_links": [
+        {
+          "Curie": {
+            "Name": "string",
+            "Href": "string"
+          },
+          "Rel": "string",
+          "Href": "string",
+          "Title": "string",
+          "Type": "string",
+          "Deprecation": "string",
+          "Name": "string",
+          "Profile": "string",
+          "HrefLang": "string",
+          "IsTemplated": true
+        }
+      ],
+      "_embedded": [
+        {
+          "IsSourceAnArray": true,
+          "Resources": [
+            {
+              "_links": [
+                {
+                  "Curie": {
+                    "Name": "string",
+                    "Href": "string"
+                  },
+                  "Rel": "string",
+                  "Href": "string",
+                  "Title": "string",
+                  "Type": "string",
+                  "Deprecation": "string",
+                  "Name": "string",
+                  "Profile": "string",
+                  "HrefLang": "string",
+                  "IsTemplated": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "WorkRequestPhysicalLocation": {
+    "Address": {
+      "Id": "string",
+      "StreetNumber": "string",
+      "StreetAddress": "string",
+      "CitySuburb": "string",
+      "State": "string",
+      "ZipPostcode": "string",
+      "Country": "string",
+      "GooglePlaceId": "string",
+      "_links": [
+        {
+          "Curie": {
+            "Name": "string",
+            "Href": "string"
+          },
+          "Rel": "string",
+          "Href": "string",
+          "Title": "string",
+          "Type": "string",
+          "Deprecation": "string",
+          "Name": "string",
+          "Profile": "string",
+          "HrefLang": "string",
+          "IsTemplated": true
+        }
+      ],
+      "_embedded": [
+        {
+          "IsSourceAnArray": true,
+          "Resources": [
+            {
+              "_links": [
+                {
+                  "Curie": {
+                    "Name": "string",
+                    "Href": "string"
+                  },
+                  "Rel": "string",
+                  "Href": "string",
+                  "Title": "string",
+                  "Type": "string",
+                  "Deprecation": "string",
+                  "Name": "string",
+                  "Profile": "string",
+                  "HrefLang": "string",
+                  "IsTemplated": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "OtherLocation": "string",
+    "WhereLocation": "string",
+    "AddressId": "string",
+    "_links": [
+      {
+        "Curie": {
+          "Name": "string",
+          "Href": "string"
+        },
+        "Rel": "string",
+        "Href": "string",
+        "Title": "string",
+        "Type": "string",
+        "Deprecation": "string",
+        "Name": "string",
+        "Profile": "string",
+        "HrefLang": "string",
+        "IsTemplated": true
+      }
+    ],
+    "_embedded": [
+      {
+        "IsSourceAnArray": true,
+        "Resources": [
+          {
+            "_links": [
+              {
+                "Curie": {
+                  "Name": "string",
+                  "Href": "string"
+                },
+                "Rel": "string",
+                "Href": "string",
+                "Title": "string",
+                "Type": "string",
+                "Deprecation": "string",
+                "Name": "string",
+                "Profile": "string",
+                "HrefLang": "string",
+                "IsTemplated": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "WorkRequestSpatialLocation": {
+    "Point": {
+      "Geography": {
+        "CoordinateSystemId": 0,
+        "WellKnownText": "string",
+        "WellKnownBinary": "string"
+      }
+    },
+    "PointString": "string",
+    "_links": [
+      {
+        "Curie": {
+          "Name": "string",
+          "Href": "string"
+        },
+        "Rel": "string",
+        "Href": "string",
+        "Title": "string",
+        "Type": "string",
+        "Deprecation": "string",
+        "Name": "string",
+        "Profile": "string",
+        "HrefLang": "string",
+        "IsTemplated": true
+      }
+    ],
+    "_embedded": [
+      {
+        "IsSourceAnArray": true,
+        "Resources": [
+          {
+            "_links": [
+              {
+                "Curie": {
+                  "Name": "string",
+                  "Href": "string"
+                },
+                "Rel": "string",
+                "Href": "string",
+                "Title": "string",
+                "Type": "string",
+                "Deprecation": "string",
+                "Name": "string",
+                "Profile": "string",
+                "HrefLang": "string",
+                "IsTemplated": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "_links": [
+    {
+      "Curie": {
+        "Name": "string",
+        "Href": "string"
+      },
+      "Rel": "string",
+      "Href": "string",
+      "Title": "string",
+      "Type": "string",
+      "Deprecation": "string",
+      "Name": "string",
+      "Profile": "string",
+      "HrefLang": "string",
+      "IsTemplated": true
+    }
+  ],
+  "_embedded": [
+    {
+      "IsSourceAnArray": true,
+      "Resources": [
+        {
+          "_links": [
+            {
+              "Curie": {
+                "Name": "string",
+                "Href": "string"
+              },
+              "Rel": "string",
+              "Href": "string",
+              "Title": "string",
+              "Type": "string",
+              "Deprecation": "string",
+              "Name": "string",
+              "Profile": "string",
+              "HrefLang": "string",
+              "IsTemplated": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

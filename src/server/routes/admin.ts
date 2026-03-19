@@ -12,7 +12,47 @@ import asseticAssetSyncService from "../services/asseticAssetSyncService";
 
 const router = Router();
 
-function buildAsseticHierarchyError(error: any): {
+/**
+ * Extract the most informative human-readable message from an Assetic API
+ * error response. Handles ASP.NET Web API (ModelState), ASP.NET Core (errors),
+ * plain strings, and falls back to raw JSON.
+ */
+function extractAsseticErrorMessage(errData: any): string {
+  if (!errData) return "Failed to create work request in Assetic.";
+  if (typeof errData === "string") return errData;
+
+  const parts: string[] = [];
+  const primary =
+    errData.Message || errData.message || errData.title || errData.Title ||
+    errData.error || errData.Error;
+  if (primary && typeof primary === "string") parts.push(primary);
+
+  if (errData.ExceptionMessage && errData.ExceptionMessage !== primary) {
+    parts.push(`Detail: ${errData.ExceptionMessage}`);
+  }
+  if (errData.ModelState && typeof errData.ModelState === "object") {
+    Object.entries(errData.ModelState).forEach(([f, msgs]: [string, any]) => {
+      if (Array.isArray(msgs)) msgs.forEach((m) => parts.push(`${f}: ${m}`));
+      else parts.push(`${f}: ${String(msgs)}`);
+    });
+  }
+  if (errData.errors && typeof errData.errors === "object") {
+    Object.entries(errData.errors).forEach(([f, msgs]: [string, any]) => {
+      if (Array.isArray(msgs)) msgs.forEach((m) => parts.push(`${f}: ${m}`));
+      else parts.push(`${f}: ${String(msgs)}`);
+    });
+  }
+  if (parts.length > 0) return parts.join(" | ");
+
+  try {
+    const raw = JSON.stringify(errData);
+    return raw.length <= 500 ? raw : raw.slice(0, 500) + "…";
+  } catch {
+    return "Failed to create work request in Assetic. (response unparseable)";
+  }
+}
+
+(error: any): {
   status: number;
   message: string;
   log: string;
@@ -1255,12 +1295,19 @@ router.post(
       try {
         asseticResult = await asseticClient.createWorkRequest(asseticPayload);
       } catch (asseticErr: any) {
-        const msg =
-          asseticErr?.response?.data?.Message ||
-          asseticErr?.response?.data?.message ||
-          "Failed to create work request in Assetic.";
+        const errData = asseticErr?.response?.data;
+        const httpStatus = asseticErr?.response?.status ?? null;
+        const msg = extractAsseticErrorMessage(errData);
+        console.error(
+          `Assetic retry failed (HTTP ${httpStatus}):`,
+          msg,
+          "| Raw:",
+          JSON.stringify(errData),
+        );
         await db("failed_work_requests").where({ id }).update({
           error_message: msg,
+          assetic_error_response: errData ? JSON.stringify(errData) : null,
+          assetic_http_status: httpStatus,
           updated_at: new Date(),
         });
         return res

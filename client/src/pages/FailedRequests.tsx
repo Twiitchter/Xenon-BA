@@ -21,6 +21,8 @@ interface FailedRequest {
   external_identifier: string | null;
   assetic_payload: string | null;
   error_message: string | null;
+  assetic_error_response: string | null;
+  assetic_http_status: number | null;
   admin_notes: string | null;
   retry_count: number;
   last_retry_at: string | null;
@@ -530,12 +532,63 @@ const FailedRequests: React.FC = () => {
             </div>
 
             {/* Error message from last attempt */}
-            {editing.error_message && (
+            {(editing.error_message || editing.assetic_error_response) && (
               <div
                 className="error card"
                 style={{ marginBottom: 16, fontSize: 13 }}
               >
-                <strong>Last error:</strong> {editing.error_message}
+                <div>
+                  <strong>
+                    Last error
+                    {editing.assetic_http_status
+                      ? ` (HTTP ${editing.assetic_http_status})`
+                      : ""}
+                    :
+                  </strong>{" "}
+                  {editing.error_message || "(no message)"}
+                </div>
+                {editing.assetic_error_response && (
+                  <details style={{ marginTop: 8 }}>
+                    <summary
+                      style={{
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: "inherit",
+                        opacity: 0.85,
+                      }}
+                    >
+                      Raw Assetic response body
+                    </summary>
+                    <pre
+                      style={{
+                        marginTop: 8,
+                        padding: 10,
+                        background: "rgba(0,0,0,0.15)",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontFamily: "monospace",
+                        overflowX: "auto",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-all",
+                        maxHeight: 260,
+                        overflow: "auto",
+                      }}
+                    >
+                      {(() => {
+                        try {
+                          return JSON.stringify(
+                            JSON.parse(editing.assetic_error_response!),
+                            null,
+                            2,
+                          );
+                        } catch {
+                          return editing.assetic_error_response;
+                        }
+                      })()}
+                    </pre>
+                  </details>
+                )}
               </div>
             )}
 

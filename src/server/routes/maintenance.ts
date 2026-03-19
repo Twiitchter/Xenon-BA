@@ -7,6 +7,69 @@ import asseticLocationHierarchyService from "../services/asseticLocationHierarch
 
 const router = Router();
 
+/**
+ * Extract the most informative human-readable message from an Assetic API
+ * error response. Handles multiple formats:
+ *  - ASP.NET Web API: { Message, ExceptionMessage, ModelState }
+ *  - ASP.NET Core: { title, errors }
+ *  - Plain string responses
+ *  - Fallback: JSON.stringify of the full body
+ */
+function extractAsseticErrorMessage(errData: any): string {
+  if (!errData) return "Failed to create work request in Assetic.";
+
+  if (typeof errData === "string") return errData;
+
+  const parts: string[] = [];
+
+  // Primary message fields
+  const primary =
+    errData.Message ||
+    errData.message ||
+    errData.title ||
+    errData.Title ||
+    errData.error ||
+    errData.Error;
+  if (primary && typeof primary === "string") parts.push(primary);
+
+  // Exception detail (ASP.NET Web API)
+  if (errData.ExceptionMessage && errData.ExceptionMessage !== primary) {
+    parts.push(`Detail: ${errData.ExceptionMessage}`);
+  }
+
+  // ModelState validation errors (ASP.NET Web API)
+  if (errData.ModelState && typeof errData.ModelState === "object") {
+    const modelErrs = Object.entries(errData.ModelState).flatMap(
+      ([field, msgs]: [string, any]) =>
+        Array.isArray(msgs)
+          ? msgs.map((m: string) => `${field}: ${m}`)
+          : [`${field}: ${String(msgs)}`],
+    );
+    if (modelErrs.length) parts.push(...modelErrs);
+  }
+
+  // ASP.NET Core validation errors
+  if (errData.errors && typeof errData.errors === "object") {
+    const validErrs = Object.entries(errData.errors).flatMap(
+      ([field, msgs]: [string, any]) =>
+        Array.isArray(msgs)
+          ? msgs.map((m: string) => `${field}: ${m}`)
+          : [`${field}: ${String(msgs)}`],
+    );
+    if (validErrs.length) parts.push(...validErrs);
+  }
+
+  if (parts.length > 0) return parts.join(" | ");
+
+  // Last resort: full response JSON
+  try {
+    const raw = JSON.stringify(errData);
+    return raw.length <= 500 ? raw : raw.slice(0, 500) + "…";
+  } catch {
+    return "Failed to create work request in Assetic. (response unparseable)";
+  }
+}
+
 function buildAsseticHierarchyError(error: any): {
   status: number;
   message: string;
@@ -306,17 +369,39 @@ router.post(
         }
 
         const asseticPayload: any = {
-          Description: title + (description ? `\n\n${description}` : ""),
+          // Description is Char(250) — truncate to avoid rejection
+          Description: (
+            title + (description ? `\n\n${description}` : "")
+          ).slice(0, 250),
           WorkRequestSourceId: workRequestSourceId,
-          Location: location || null,
+          // Location is Char(100) and mandatory — truncate if the hierarchy path
+          // exceeds the limit but preserve as much as possible
+          Location: (location || "Not specified").slice(0, 100),
           SupportingInformation: supportingInformation || null,
           ExternalIdentifier: externalIdentifier || null,
           WorkRequestPriorityId: workRequestPriorityId || null,
-          WorkRequestSubTypeId: "",
+          // WorkRequestSubTypeId must be null (not empty string) for an Int field
+          WorkRequestSubTypeId: null,
+          // WorkRequestPhysicalLocation is mandatory per the Assetic API.
+          // Use the full location string in WhereLocation so the complete hierarchy
+          // path is preserved even when it exceeds the 100-char Location limit.
+          WorkRequestPhysicalLocation: {
+            Address: {
+              StreetNumber: streetNumber || null,
+              StreetAddress: streetAddress || null,
+              CitySuburb: citySuburb || null,
+              State: state || null,
+              ZipPostcode: zipPostcode || null,
+              Country: country || null,
+            },
+            OtherLocation: otherLocation || null,
+            WhereLocation: whereLocation || location || null,
+          },
         };
 
+        // Use ComplexAssetId for internal GUIDs (AssetId is for user-friendly IDs)
         if (resolvedAssetGuid) {
-          asseticPayload.AssetId = resolvedAssetGuid;
+          asseticPayload.ComplexAssetId = resolvedAssetGuid;
         }
 
         const requestor: any = {};
@@ -329,21 +414,6 @@ router.post(
         if (requestorTypeId) requestor.Types = [{ Id: requestorTypeId }];
         if (Object.keys(requestor).length > 0) {
           asseticPayload.Requestor = requestor;
-        }
-
-        if (streetAddress || citySuburb || state) {
-          asseticPayload.WorkRequestPhysicalLocation = {
-            Address: {
-              StreetNumber: streetNumber || null,
-              StreetAddress: streetAddress || null,
-              CitySuburb: citySuburb || null,
-              State: state || null,
-              ZipPostcode: zipPostcode || null,
-              Country: country || null,
-            },
-            OtherLocation: otherLocation || null,
-            WhereLocation: whereLocation || null,
-          };
         }
 
         if (spatialLocation) {
@@ -371,11 +441,15 @@ router.post(
             asseticResult?.data?.id ||
             null;
         } catch (asseticErr: any) {
-          const msg =
-            asseticErr?.response?.data?.Message ||
-            asseticErr?.response?.data?.message ||
-            "Failed to create work request in Assetic.";
-          console.error("Assetic WR creation failed:", msg);
+          const errData = asseticErr?.response?.data;
+          const httpStatus = asseticErr?.response?.status ?? null;
+          const msg = extractAsseticErrorMessage(errData);
+          console.error(
+            `Assetic WR creation failed (HTTP ${httpStatus}):`,
+            msg,
+            "| Raw:",
+            JSON.stringify(errData),
+          );
 
           // Persist the failed submission so an admin can edit and retry it
           try {
@@ -398,6 +472,8 @@ router.post(
               external_identifier: externalIdentifier || null,
               assetic_payload: JSON.stringify(asseticPayload),
               error_message: msg,
+              assetic_error_response: errData ? JSON.stringify(errData) : null,
+              assetic_http_status: httpStatus,
               status: "pending",
               created_at: new Date(),
               updated_at: new Date(),
