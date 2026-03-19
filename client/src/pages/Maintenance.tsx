@@ -1,485 +1,219 @@
 import React, { useState, useEffect } from "react";
-import {
-  LocationHierarchyResponse,
-  maintenanceService,
-} from "../services/maintenanceService";
-import LocationHierarchyPicker, {
-  EMPTY_LOCATION_SELECTION,
-  LocationSelection,
-  buildLocationPath,
-} from "../components/LocationHierarchyPicker";
+import { maintenanceService } from "../services/maintenanceService";
 
-interface WorkRequestSource {
-  id: string;
-  name: string;
-}
+const priorityBadgeClass = (p: string) => {
+  const map: Record<string, string> = {
+    critical: "badge-error",
+    high: "badge-warning",
+    medium: "badge-info",
+    low: "badge-muted",
+  };
+  return map[p] || "badge-muted";
+};
 
-interface WorkRequestType {
-  Id: string;
-  Name: string;
-}
+const statusBadgeClass = (s: string) => {
+  const map: Record<string, string> = {
+    open: "badge-info",
+    in_progress: "badge-warning",
+    completed: "badge-success",
+    cancelled: "badge-muted",
+    pending: "badge-secondary",
+  };
+  return map[s] || "badge-muted";
+};
+
+const toLabel = (s: string) =>
+  (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 const Maintenance: React.FC = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({ status: "", priority: "" });
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    priority: "medium",
-    category: "",
-    location: "",
-    // Requestor information
-    requestorDisplayName: "",
-    requestorEmail: "",
-    requestorPhone: "",
-    requestorMobile: "",
-    // Optional fields
-    supportingInformation: "",
-    // Assetic fields
-    workRequestSourceId: "",
-    workRequestSubtypeId: "",
-  });
 
-  // Assetic integration state
-  const [workRequestSources, setWorkRequestSources] = useState<
-    WorkRequestSource[]
-  >([]);
-  const [workRequestTypes, setWorkRequestTypes] = useState<WorkRequestType[]>(
-    [],
-  );
-  const [asseticEnabled, setAsseticEnabled] = useState(false);
-  const [locationHierarchy, setLocationHierarchy] =
-    useState<LocationHierarchyResponse | null>(null);
-  const [locationSelection, setLocationSelection] = useState<LocationSelection>(
-    EMPTY_LOCATION_SELECTION,
-  );
+  // Selected request for detail panel
+  const [selected, setSelected] = useState<any | null>(null);
 
-  // Messages state
-  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<number | null>(
-    null,
-  );
+  // Triage edit state
+  const [editStatus, setEditStatus] = useState("");
+  const [editPriority, setEditPriority] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [updating, setUpdating] = useState(false);
+
+  // Work order creation state
+  const [woCraft, setWoCraft] = useState("");
+  const [woScheduled, setWoScheduled] = useState("");
+  const [creatingWo, setCreatingWo] = useState(false);
+
+  // Messages
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
 
   useEffect(() => {
     fetchRequests();
-    fetchAsseticData();
   }, []);
 
-  const fetchAsseticData = async () => {
-    try {
-      // Try to fetch Assetic data, but don't fail if integration is not enabled
-      const [sourcesRes, typesRes, hierarchyRes] = await Promise.allSettled([
-        maintenanceService.getWorkRequestSources(),
-        maintenanceService.getWorkRequestTypes(),
-        maintenanceService.getLocationHierarchy(),
-      ]);
-
-      if (sourcesRes.status === "fulfilled" && sourcesRes.value?.sources) {
-        setWorkRequestSources(sourcesRes.value.sources);
-        setAsseticEnabled(true);
-      }
-
-      if (typesRes.status === "fulfilled" && typesRes.value?.ResourceList) {
-        setWorkRequestTypes(typesRes.value.ResourceList);
-      }
-
-      if (hierarchyRes.status === "fulfilled" && hierarchyRes.value?.regions) {
-        setLocationHierarchy(hierarchyRes.value);
-        setAsseticEnabled(true);
-      }
-    } catch (err) {
-      // Silently fail - Assetic integration may not be enabled
-      console.log("Assetic integration not available");
-    }
-  };
-
-  const fetchRequests = async () => {
+  const fetchRequests = async (activeFilters = filters) => {
     setLoading(true);
     setError("");
     try {
-      const data = await maintenanceService.getRequests(filters);
+      const data = await maintenanceService.getRequests(
+        activeFilters.status || activeFilters.priority ? activeFilters : {},
+      );
       setRequests(data.requests || []);
     } catch (err: any) {
-      setError(
-        err.response?.data?.error || "Failed to fetch maintenance requests",
-      );
+      setError(err.response?.data?.error || "Failed to fetch requests");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    try {
-      const selectedPath = buildLocationPath(
-        locationHierarchy,
-        locationSelection,
-      );
-      const freeTextLocation = formData.location.trim();
-      const combinedLocation = selectedPath
-        ? freeTextLocation
-          ? `${selectedPath} - ${freeTextLocation}`
-          : selectedPath
-        : freeTextLocation;
+  const selectRequest = async (req: any) => {
+    if (selected?.id === req.id) {
+      setSelected(null);
+      return;
+    }
+    setSelected(req);
+    setEditStatus(req.status || "open");
+    setEditPriority(req.priority || "medium");
+    setEditCategory(req.category || "");
+    setWoCraft("");
+    setWoScheduled("");
+    setMessages([]);
+    setNewMessage("");
 
-      await maintenanceService.createRequest({
-        ...formData,
-        location: combinedLocation,
-      });
-      setShowForm(false);
-      setFormData({
-        title: "",
-        description: "",
-        priority: "medium",
-        category: "",
-        location: "",
-        requestorDisplayName: "",
-        requestorEmail: "",
-        requestorPhone: "",
-        requestorMobile: "",
-        supportingInformation: "",
-        workRequestSourceId: "",
-        workRequestSubtypeId: "",
-      });
-      setLocationSelection(EMPTY_LOCATION_SELECTION);
-      fetchRequests();
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to create request");
+    if (req.work_order_id) {
+      setMessagesLoading(true);
+      try {
+        const data = await maintenanceService.getMessages(req.work_order_id);
+        setMessages(data.messages || []);
+      } catch {
+        // messages are non-critical
+      } finally {
+        setMessagesLoading(false);
+      }
     }
   };
 
-  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
+  const refreshAndReselect = async (requestId: number) => {
+    const data = await maintenanceService.getRequests(
+      filters.status || filters.priority ? filters : {},
+    );
+    setRequests(data.requests || []);
+    const updated = (data.requests || []).find((r: any) => r.id === requestId);
+    if (updated) setSelected(updated);
+    return updated;
   };
 
-  const openMessages = async (workOrderId: number) => {
-    setSelectedWorkOrderId(workOrderId);
-    setMessagesLoading(true);
+  const handleUpdate = async () => {
+    if (!selected) return;
+    setUpdating(true);
     try {
-      const data = await maintenanceService.getMessages(workOrderId);
-      setMessages(data.messages || []);
+      await maintenanceService.updateRequest(selected.id, {
+        status: editStatus,
+        priority: editPriority,
+        category: editCategory,
+      });
+      await refreshAndReselect(selected.id);
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to fetch messages");
+      setError(err.response?.data?.error || "Failed to update request");
     } finally {
-      setMessagesLoading(false);
+      setUpdating(false);
+    }
+  };
+
+  const handleCreateWorkOrder = async () => {
+    if (!selected) return;
+    setCreatingWo(true);
+    try {
+      await maintenanceService.createWorkOrder({
+        requestId: selected.id,
+        title: selected.title,
+        description: selected.description || undefined,
+        priority: selected.priority,
+        craft: woCraft || undefined,
+        scheduledDate: woScheduled || undefined,
+      });
+      const updated = await refreshAndReselect(selected.id);
+      if (updated?.work_order_id) {
+        const msgs = await maintenanceService.getMessages(
+          updated.work_order_id,
+        );
+        setMessages(msgs.messages || []);
+      }
+      setWoCraft("");
+      setWoScheduled("");
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to create work order");
+    } finally {
+      setCreatingWo(false);
     }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedWorkOrderId || !newMessage.trim()) return;
+    if (!selected?.work_order_id || !newMessage.trim()) return;
     try {
-      await maintenanceService.sendMessage(selectedWorkOrderId, newMessage);
+      await maintenanceService.sendMessage(selected.work_order_id, newMessage);
       setNewMessage("");
-      openMessages(selectedWorkOrderId);
+      const data = await maintenanceService.getMessages(selected.work_order_id);
+      setMessages(data.messages || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to send message");
     }
   };
 
   return (
-    <div className="container">
+    <div className="container" style={{ maxWidth: "1300px" }}>
+      {/* ── Header ── */}
       <div className="page-header">
-        <h2>Work Requests</h2>
-        <button onClick={() => setShowForm(!showForm)}>
-          {showForm ? "Cancel" : "+ New Request"}
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="card">
-          <h3>Log a Maintenance Request</h3>
-          <form onSubmit={handleCreate}>
-            <div className="form-group">
-              <label>Title *</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
-                required
-                aria-required="true"
-              />
-            </div>
-            <div className="form-group">
-              <label>Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                rows={3}
-              />
-            </div>
-
-            <h4
-              style={{
-                marginTop: "20px",
-                marginBottom: "10px",
-                fontSize: "16px",
-              }}
-            >
-              Contact Information
-            </h4>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Contact Name *</label>
-                <input
-                  type="text"
-                  value={formData.requestorDisplayName}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      requestorDisplayName: e.target.value,
-                    })
-                  }
-                  placeholder="Your full name"
-                  required
-                  aria-required="true"
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={formData.requestorEmail}
-                  onChange={(e) =>
-                    setFormData({ ...formData, requestorEmail: e.target.value })
-                  }
-                  placeholder="contact@example.com"
-                />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Phone</label>
-                <input
-                  type="tel"
-                  value={formData.requestorPhone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, requestorPhone: e.target.value })
-                  }
-                  placeholder="Office phone"
-                />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Mobile</label>
-                <input
-                  type="tel"
-                  value={formData.requestorMobile}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      requestorMobile: e.target.value,
-                    })
-                  }
-                  placeholder="Mobile phone"
-                />
-              </div>
-            </div>
-
-            <h4
-              style={{
-                marginTop: "20px",
-                marginBottom: "10px",
-                fontSize: "16px",
-              }}
-            >
-              Request Details
-            </h4>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Priority</label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) =>
-                    setFormData({ ...formData, priority: e.target.value })
-                  }
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label>Category</label>
-                <input
-                  type="text"
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                  placeholder="e.g. Plumbing, Electrical"
-                />
-              </div>
-            </div>
-
-            {asseticEnabled && workRequestSources.length > 0 && (
-              <div style={{ display: "flex", gap: "10px" }}>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>Request Source</label>
-                  <select
-                    value={formData.workRequestSourceId}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        workRequestSourceId: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">Select a source...</option>
-                    {workRequestSources.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {workRequestTypes.length > 0 && (
-                  <div className="form-group" style={{ flex: 1 }}>
-                    <label>Request Type</label>
-                    <select
-                      value={formData.workRequestSubtypeId}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          workRequestSubtypeId: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="">Select a type...</option>
-                      {workRequestTypes.map((type: any) => (
-                        <option key={type.Id} value={type.Id}>
-                          {type.Name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <h4
-              style={{
-                marginTop: "20px",
-                marginBottom: "10px",
-                fontSize: "16px",
-              }}
-            >
-              Location Information
-            </h4>
-            {locationHierarchy && (
-              <div
-                style={{
-                  marginBottom: "10px",
-                  fontSize: "12px",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Loaded {locationHierarchy.regions.length} regions from Assetic (
-                {locationHierarchy.source}).
-              </div>
-            )}
-            {locationHierarchy && (
-              <>
-                <LocationHierarchyPicker
-                  hierarchy={locationHierarchy}
-                  selection={locationSelection}
-                  onChange={setLocationSelection}
-                />
-                {buildLocationPath(locationHierarchy, locationSelection) && (
-                  <div
-                    className="settings-muted"
-                    style={{ marginBottom: "8px" }}
-                  >
-                    Selected hierarchy path:{" "}
-                    <strong>
-                      {buildLocationPath(locationHierarchy, locationSelection)}
-                    </strong>
-                  </div>
-                )}
-              </>
-            )}
-            <div className="form-group">
-              <label>Additional Location Details</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
-                }
-                placeholder="e.g. Room 101, opposite reception"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Supporting Information</label>
-              <textarea
-                value={formData.supportingInformation}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    supportingInformation: e.target.value,
-                  })
-                }
-                rows={2}
-                placeholder="Any additional details that might be helpful"
-              />
-            </div>
-
-            <button type="submit">Submit Request</button>
-          </form>
-        </div>
-      )}
-
-      <div className="card">
-        <h3>Filters</h3>
-        <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label>Status</label>
-            <select
-              name="status"
-              value={filters.status}
-              onChange={handleFilterChange}
-            >
-              <option value="">All</option>
-              <option value="open">Open</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label>Priority</label>
-            <select
-              name="priority"
-              value={filters.priority}
-              onChange={handleFilterChange}
-            >
-              <option value="">All</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-          </div>
-          <button onClick={fetchRequests}>Apply Filters</button>
+        <h2>Requests</h2>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <select
+            value={filters.status}
+            onChange={(e) =>
+              setFilters({ ...filters, status: e.target.value })
+            }
+            style={{ width: "140px" }}
+          >
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select
+            value={filters.priority}
+            onChange={(e) =>
+              setFilters({ ...filters, priority: e.target.value })
+            }
+            style={{ width: "140px" }}
+          >
+            <option value="">All Priorities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <button onClick={() => fetchRequests(filters)}>Refresh</button>
         </div>
       </div>
 
       {error && <div className="error card">{error}</div>}
 
-      <div className="card">
+      {/* ── Request List ── */}
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
-          <div className="loading">Loading requests...</div>
+          <div
+            style={{
+              padding: "40px",
+              textAlign: "center",
+              color: "var(--text-muted)",
+            }}
+          >
+            Loading requests…
+          </div>
         ) : requests.length === 0 ? (
           <div
             style={{
@@ -488,31 +222,104 @@ const Maintenance: React.FC = () => {
               color: "var(--text-muted)",
             }}
           >
-            No work requests found. Click "+ New Request" to create one.
+            No requests found.
           </div>
         ) : (
-          <table>
+          <table className="data-table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th style={{ width: "40px" }}>#</th>
                 <th>Title</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Category</th>
+                <th>Submitted By</th>
+                <th style={{ width: "90px" }}>Priority</th>
+                <th style={{ width: "110px" }}>Status</th>
                 <th>Location</th>
-                <th>Created</th>
+                <th style={{ width: "110px" }}>Work Order</th>
+                <th style={{ width: "90px" }}>Date</th>
               </tr>
             </thead>
             <tbody>
               {requests.map((req) => (
-                <tr key={req.id}>
-                  <td>{req.id}</td>
-                  <td>{req.title}</td>
-                  <td>{req.priority}</td>
-                  <td>{req.status}</td>
-                  <td>{req.category || "N/A"}</td>
-                  <td>{req.location || "N/A"}</td>
-                  <td>{new Date(req.created_at).toLocaleString()}</td>
+                <tr
+                  key={req.id}
+                  onClick={() => selectRequest(req)}
+                  style={{
+                    cursor: "pointer",
+                    background:
+                      selected?.id === req.id
+                        ? "rgba(14,165,233,0.08)"
+                        : undefined,
+                  }}
+                >
+                  <td
+                    style={{ color: "var(--text-muted)", fontSize: "13px" }}
+                  >
+                    {req.id}
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{req.title}</td>
+                  <td
+                    style={{
+                      color: "var(--text-secondary)",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {req.requestor_display_name ||
+                      req.requested_by_username ||
+                      "—"}
+                  </td>
+                  <td>
+                    <span
+                      className={`badge ${priorityBadgeClass(req.priority)}`}
+                    >
+                      {req.priority || "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge ${statusBadgeClass(req.status)}`}
+                    >
+                      {toLabel(req.status || "open")}
+                    </span>
+                  </td>
+                  <td
+                    style={{
+                      color: "var(--text-secondary)",
+                      fontSize: "13px",
+                      maxWidth: "200px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {req.location || "—"}
+                  </td>
+                  <td>
+                    {req.work_order_id ? (
+                      <span
+                        className={`badge ${statusBadgeClass(req.work_order_status || "pending")}`}
+                      >
+                        WO #{req.work_order_id}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          color: "var(--text-muted)",
+                          fontSize: "13px",
+                        }}
+                      >
+                        —
+                      </span>
+                    )}
+                  </td>
+                  <td
+                    style={{
+                      color: "var(--text-muted)",
+                      fontSize: "13px",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -520,53 +327,387 @@ const Maintenance: React.FC = () => {
         )}
       </div>
 
-      {/* Messages panel */}
-      {selectedWorkOrderId && (
+      {/* ── Detail Panel ── */}
+      {selected && (
         <div className="card">
+          {/* Panel header */}
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
+              alignItems: "flex-start",
+              marginBottom: "16px",
             }}
           >
-            <h3>Work Order #{selectedWorkOrderId} Messages</h3>
-            <button onClick={() => setSelectedWorkOrderId(null)}>Close</button>
-          </div>
-          {messagesLoading ? (
-            <div className="loading">Loading messages...</div>
-          ) : (
-            <>
-              <div className="messages-box">
-                {messages.length === 0 ? (
-                  <p style={{ color: "var(--text-muted)" }}>No messages yet.</p>
-                ) : (
-                  messages.map((msg) => (
-                    <div key={msg.id} className="message-bubble">
-                      <strong>{msg.sender_username || "Unknown"}</strong>
-                      <span className="message-meta">
-                        {new Date(msg.created_at).toLocaleString()}
-                      </span>
-                      <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
-                    </div>
-                  ))
-                )}
+            <div>
+              <h3 style={{ marginBottom: "4px" }}>{selected.title}</h3>
+              <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+                Submitted by{" "}
+                <strong style={{ color: "var(--text-secondary)" }}>
+                  {selected.requestor_display_name ||
+                    selected.requested_by_username ||
+                    "Unknown"}
+                </strong>
+                {selected.requestor_email &&
+                  ` — ${selected.requestor_email}`}
+                {selected.requestor_phone &&
+                  ` · Phone: ${selected.requestor_phone}`}
+                {selected.requestor_mobile &&
+                  ` · Mobile: ${selected.requestor_mobile}`}
+                {" · "}
+                {new Date(selected.created_at).toLocaleString()}
               </div>
-              <form
-                onSubmit={handleSendMessage}
-                style={{ display: "flex", gap: "10px" }}
+            </div>
+            <button
+              className="btn-ghost"
+              onClick={() => setSelected(null)}
+              style={{ flexShrink: 0 }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Two-column body */}
+          <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+            {/* Left — reported issue */}
+            <div style={{ flex: "1 1 300px" }}>
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.6px",
+                  marginBottom: "10px",
+                }}
               >
+                Reported Issue
+              </div>
+
+              {selected.location && (
+                <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    Location:{" "}
+                  </span>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {selected.location}
+                  </span>
+                </div>
+              )}
+
+              {selected.category && (
+                <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                  <span style={{ color: "var(--text-muted)" }}>
+                    Category:{" "}
+                  </span>
+                  <span>{selected.category}</span>
+                </div>
+              )}
+
+              {selected.description ? (
+                <div
+                  style={{
+                    fontSize: "14px",
+                    color: "var(--text-secondary)",
+                    lineHeight: "1.6",
+                    padding: "12px",
+                    background: "var(--bg-secondary)",
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)",
+                    marginBottom: "8px",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {selected.description}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--text-muted)",
+                    fontStyle: "italic",
+                    marginBottom: "8px",
+                  }}
+                >
+                  No description provided.
+                </div>
+              )}
+
+              {selected.supporting_information && (
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--text-muted)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {selected.supporting_information}
+                </div>
+              )}
+            </div>
+
+            {/* Right — triage + work order */}
+            <div style={{ flex: "1 1 300px" }}>
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.6px",
+                  marginBottom: "10px",
+                }}
+              >
+                Triage
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  marginBottom: "10px",
+                }}
+              >
+                <div
+                  className="form-group"
+                  style={{ flex: 1, marginBottom: 0 }}
+                >
+                  <label style={{ fontSize: "12px" }}>Priority</label>
+                  <select
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value)}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                <div
+                  className="form-group"
+                  style={{ flex: 1, marginBottom: 0 }}
+                >
+                  <label style={{ fontSize: "12px" }}>Status</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                  >
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: "10px" }}>
+                <label style={{ fontSize: "12px" }}>Category</label>
                 <input
                   type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  style={{ flex: 1 }}
-                  required
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  placeholder="e.g. Plumbing, Electrical, HVAC"
                 />
-                <button type="submit">Send</button>
-              </form>
-            </>
+              </div>
+
+              <button
+                onClick={handleUpdate}
+                disabled={updating}
+                style={{ width: "100%", marginBottom: "20px" }}
+              >
+                {updating ? "Saving…" : "Update Request"}
+              </button>
+
+              {/* Work Order section */}
+              <div
+                style={{
+                  paddingTop: "16px",
+                  borderTop: "1px solid var(--border)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Work Order
+                </div>
+
+                {selected.work_order_id ? (
+                  <div
+                    style={{
+                      padding: "12px",
+                      background: "var(--bg-secondary)",
+                      borderRadius: "var(--radius)",
+                      border: "1px solid var(--border)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>
+                        WO #{selected.work_order_id}
+                      </span>
+                      <span
+                        className={`badge ${statusBadgeClass(selected.work_order_status || "pending")}`}
+                      >
+                        {toLabel(
+                          selected.work_order_status || "pending",
+                        )}
+                      </span>
+                    </div>
+                    {selected.work_order_craft && (
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        Craft: {selected.work_order_craft}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--text-muted)",
+                        marginTop: "6px",
+                      }}
+                    >
+                      Manage this work order from the Work Orders list.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "10px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <div
+                        className="form-group"
+                        style={{ flex: 1, marginBottom: 0 }}
+                      >
+                        <label style={{ fontSize: "12px" }}>
+                          Craft / Trade
+                        </label>
+                        <input
+                          type="text"
+                          value={woCraft}
+                          onChange={(e) => setWoCraft(e.target.value)}
+                          placeholder="e.g. Plumbing, HVAC"
+                        />
+                      </div>
+                      <div
+                        className="form-group"
+                        style={{ flex: 1, marginBottom: 0 }}
+                      >
+                        <label style={{ fontSize: "12px" }}>
+                          Scheduled Date
+                        </label>
+                        <input
+                          type="date"
+                          value={woScheduled}
+                          onChange={(e) => setWoScheduled(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCreateWorkOrder}
+                      disabled={creatingWo}
+                      style={{
+                        width: "100%",
+                        background: "rgba(34,197,94,0.15)",
+                        color: "#4ade80",
+                        border: "1px solid rgba(34,197,94,0.3)",
+                      }}
+                    >
+                      {creatingWo ? "Creating…" : "↑ Create Work Order"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Messages — shown once a work order exists */}
+          {selected.work_order_id && (
+            <div
+              style={{
+                marginTop: "20px",
+                paddingTop: "16px",
+                borderTop: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.6px",
+                  marginBottom: "10px",
+                }}
+              >
+                Work Order Messages
+              </div>
+              {messagesLoading ? (
+                <div
+                  style={{ color: "var(--text-muted)", fontSize: "14px" }}
+                >
+                  Loading messages…
+                </div>
+              ) : (
+                <>
+                  <div className="messages-box">
+                    {messages.length === 0 ? (
+                      <p style={{ color: "var(--text-muted)" }}>
+                        No messages yet.
+                      </p>
+                    ) : (
+                      messages.map((msg) => (
+                        <div key={msg.id} className="message-bubble">
+                          <strong>
+                            {msg.sender_username || "Unknown"}
+                          </strong>
+                          <span className="message-meta">
+                            {new Date(msg.created_at).toLocaleString()}
+                          </span>
+                          <p style={{ margin: "4px 0 0 0" }}>
+                            {msg.message}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <form
+                    onSubmit={handleSendMessage}
+                    style={{ display: "flex", gap: "10px" }}
+                  >
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Add a note or message…"
+                      style={{ flex: 1 }}
+                      required
+                    />
+                    <button type="submit">Send</button>
+                  </form>
+                </>
+              )}
+            </div>
           )}
         </div>
       )}

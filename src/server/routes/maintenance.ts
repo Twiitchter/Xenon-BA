@@ -136,7 +136,14 @@ router.get("/requests", async (req: AuthRequest, res: Response) => {
 
     let qb = db("maintenance_requests as mr")
       .leftJoin("users as u", "mr.requested_by", "u.id")
-      .select("mr.*", "u.username as requested_by_username");
+      .leftJoin("work_orders as wo", "wo.request_id", "mr.id")
+      .select(
+        "mr.*",
+        "u.username as requested_by_username",
+        db.raw("wo.id as work_order_id"),
+        db.raw("wo.status as work_order_status"),
+        db.raw("wo.craft as work_order_craft"),
+      );
 
     if (status) {
       qb = qb.where("mr.status", status as string);
