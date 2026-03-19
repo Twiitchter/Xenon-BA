@@ -27,6 +27,12 @@ const statusBadgeClass = (s: string) => {
 const toLabel = (s: string) =>
   (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+// Extracts the craft sub-name from a work group name like "North West - Carpenter" → "Carpenter"
+const deriveCraftFromWorkGroup = (name: string): string => {
+  const idx = name.lastIndexOf(" - ");
+  return idx >= 0 ? name.slice(idx + 3).trim() : "";
+};
+
 const WorkOrders: React.FC = () => {
   const [allWorkOrders, setAllWorkOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -735,13 +741,37 @@ const WorkOrders: React.FC = () => {
                 </div>
                 <div className="form-group" style={{ marginBottom: "10px" }}>
                   <label style={{ fontSize: "12px" }}>Work Group</label>
-                  <input
-                    type="text"
+                  <select
                     value={editWorkGroup}
-                    onChange={(e) => setEditWorkGroup(e.target.value)}
-                    placeholder="Assetic labour / trade group"
-                    list="workgroup-options"
-                  />
+                    onChange={(e) => {
+                      const wg = e.target.value;
+                      setEditWorkGroup(wg);
+                      const derived = deriveCraftFromWorkGroup(wg);
+                      if (derived) setEditCraft(derived);
+                    }}
+                  >
+                    <option value="">— Select work group —</option>
+                    {workGroups.map((g) => (
+                      <option
+                        key={g.Id || g.id || g.Name || g.name}
+                        value={g.Name || g.name || ""}
+                      >
+                        {g.Name || g.name}
+                      </option>
+                    ))}
+                  </select>
+                  {editWorkGroup && deriveCraftFromWorkGroup(editWorkGroup) && (
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--text-muted)",
+                        marginTop: "3px",
+                      }}
+                    >
+                      Craft auto-set to &ldquo;
+                      {deriveCraftFromWorkGroup(editWorkGroup)}&rdquo;
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={handleUpdateOrder}

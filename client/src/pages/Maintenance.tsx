@@ -27,6 +27,12 @@ const statusBadgeClass = (s: string) => {
 const toLabel = (s: string) =>
   (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+// Extracts the craft sub-name from a work group name like "North West - Carpenter" → "Carpenter"
+const deriveCraftFromWorkGroup = (name: string): string => {
+  const idx = name.lastIndexOf(" - ");
+  return idx >= 0 ? name.slice(idx + 3).trim() : "";
+};
+
 const Maintenance: React.FC = () => {
   const [allRequests, setAllRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,8 +81,10 @@ const Maintenance: React.FC = () => {
 
   // Work order creation state
   const [woCraft, setWoCraft] = useState("");
+  const [woWorkGroup, setWoWorkGroup] = useState("");
   const [woScheduled, setWoScheduled] = useState("");
   const [creatingWo, setCreatingWo] = useState(false);
+  const [workGroups, setWorkGroups] = useState<any[]>([]);
 
   // Messages
   const [messages, setMessages] = useState<any[]>([]);
@@ -86,7 +94,17 @@ const Maintenance: React.FC = () => {
 
   useEffect(() => {
     fetchRequests();
+    fetchWorkGroups();
   }, []);
+
+  const fetchWorkGroups = async () => {
+    try {
+      const data = await maintenanceService.getWorkGroups();
+      setWorkGroups(data.workGroups || []);
+    } catch {
+      // non-critical
+    }
+  };
 
   const fetchRequests = async (activeFilters = filters) => {
     setLoading(true);
@@ -114,6 +132,7 @@ const Maintenance: React.FC = () => {
     setEditPriority(req.priority || "medium");
     setEditCategory(req.category || "");
     setWoCraft("");
+    setWoWorkGroup("");
     setWoScheduled("");
     setMessages([]);
     setNewMessage("");
@@ -169,6 +188,7 @@ const Maintenance: React.FC = () => {
         description: selected.description || undefined,
         priority: selected.priority,
         craft: woCraft || undefined,
+        workGroup: woWorkGroup || undefined,
         scheduledDate: woScheduled || undefined,
       });
       const updated = await refreshAndReselect(selected.id);
@@ -179,6 +199,7 @@ const Maintenance: React.FC = () => {
         setMessages(msgs.messages || []);
       }
       setWoCraft("");
+      setWoWorkGroup("");
       setWoScheduled("");
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to create work order");
@@ -761,6 +782,44 @@ const Maintenance: React.FC = () => {
                     </div>
                   ) : (
                     <>
+                      <div
+                        className="form-group"
+                        style={{ marginBottom: "8px" }}
+                      >
+                        <label style={{ fontSize: "12px" }}>Work Group</label>
+                        <select
+                          value={woWorkGroup}
+                          onChange={(e) => {
+                            const wg = e.target.value;
+                            setWoWorkGroup(wg);
+                            const derived = deriveCraftFromWorkGroup(wg);
+                            if (derived) setWoCraft(derived);
+                          }}
+                        >
+                          <option value="">— Select work group —</option>
+                          {workGroups.map((g) => (
+                            <option
+                              key={g.Id || g.id || g.Name || g.name}
+                              value={g.Name || g.name || ""}
+                            >
+                              {g.Name || g.name}
+                            </option>
+                          ))}
+                        </select>
+                        {woWorkGroup &&
+                          deriveCraftFromWorkGroup(woWorkGroup) && (
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "var(--text-muted)",
+                                marginTop: "3px",
+                              }}
+                            >
+                              Craft auto-set to &ldquo;
+                              {deriveCraftFromWorkGroup(woWorkGroup)}&rdquo;
+                            </div>
+                          )}
+                      </div>
                       <div
                         style={{
                           display: "flex",
