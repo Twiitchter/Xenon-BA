@@ -930,8 +930,50 @@ router.get("/assetic/work-groups", async (_req: AuthRequest, res: Response) => {
 });
 
 /**
+ * Fetches work request sub-types from Assetic, flattens, stores in DB cache,
+ * and returns the list. Exported so the admin refresh endpoint can reuse it.
+ */
+export async function fetchAndCacheWorkRequestTypes(): Promise<
+  { Id: number; Name: string; TypeName: string }[]
+> {
+  const types = await asseticClient.getWorkRequestTypes();
+  const subtypes = (types?.ResourceList || []).flatMap((t: any) => {
+    const typeName: string = t.WorkRequestActivityType || t.Description || "";
+    const subs: any[] = Array.isArray(t.WorkRequestSubType)
+      ? t.WorkRequestSubType
+      : [];
+    return subs.map((st: any) => ({
+      Id: st.Id,
+      Name:
+        st.WorkRequestActivitySubType ||
+        st.SubCodeText ||
+        st.Description ||
+        `${typeName} ${st.Id}`,
+      TypeName: typeName,
+    }));
+  });
+
+  // Replace existing cache
+  await db("assetic_work_request_types").delete();
+  if (subtypes.length > 0) {
+    const now = new Date();
+    await db("assetic_work_request_types").insert(
+      subtypes.map((st: { Id: number; Name: string; TypeName: string }) => ({
+        assetic_id: st.Id,
+        name: st.Name,
+        type_name: st.TypeName,
+        cached_at: now,
+      })),
+    );
+  }
+
+  return subtypes;
+}
+
+/**
  * GET /api/maintenance/assetic/work-request-types
- * Get available work request types from Assetic API
+ * Returns the cached work request sub-types. On first call (or if the cache
+ * is empty) it fetches from Assetic, stores the results, and returns them.
  */
 router.get(
   "/assetic/work-request-types",
@@ -944,15 +986,18 @@ router.get(
           .json({ error: "Assetic integration is not enabled" });
       }
 
-      const types = await asseticClient.getWorkRequestTypes();
-      // Log the first item so we can verify the field names in production
-      if (types?.ResourceList?.length > 0) {
-        console.log(
-          "[WorkRequestTypes] Sample item:",
-          JSON.stringify(types.ResourceList[0]),
-        );
+      // Serve from cache if available
+      const cached = await db("assetic_work_request_types")
+        .orderBy("assetic_id", "asc")
+        .select("assetic_id as Id", "name as Name", "type_name as TypeName");
+
+      if (cached.length > 0) {
+        return res.json({ ResourceList: cached });
       }
-      res.json(types);
+
+      // Cache is empty — fetch from Assetic and store
+      const subtypes = await fetchAndCacheWorkRequestTypes();
+      res.json({ ResourceList: subtypes });
     } catch (error) {
       console.error("Error fetching work request types:", error);
       res

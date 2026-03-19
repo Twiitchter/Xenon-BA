@@ -9,6 +9,7 @@ import asseticClient from "../services/asseticClient";
 import asseticApiLogger from "../services/asseticApiLogger";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import asseticAssetSyncService from "../services/asseticAssetSyncService";
+import { fetchAndCacheWorkRequestTypes } from "./maintenance";
 
 const router = Router();
 
@@ -586,6 +587,32 @@ router.get(
       res.json(logs);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/settings/refresh-work-request-types
+ * Force re-fetch work request types from Assetic and update the local cache.
+ */
+router.post(
+  "/settings/refresh-work-request-types",
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const enabled = await asseticClient.isEnabled();
+      if (!enabled) {
+        return res
+          .status(503)
+          .json({ error: "Assetic integration is not enabled" });
+      }
+      const subtypes = await fetchAndCacheWorkRequestTypes();
+      res.json({
+        count: subtypes.length,
+        message: `${subtypes.length} work request types refreshed.`,
+      });
+    } catch (error: any) {
+      console.error("Error refreshing work request types:", error);
+      res.status(500).json({ error: "Failed to refresh work request types" });
     }
   },
 );
