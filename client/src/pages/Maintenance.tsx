@@ -34,7 +34,13 @@ const deriveCraftFromWorkGroup = (name: string): string => {
   return idx >= 0 ? name.slice(idx + 3).trim() : "";
 };
 
-// Extracts the region from a location string like "North > Hospital > ..."
+// Extracts the direction from a work group name: "North West - Carpenter" → "North West"
+const directionFromWorkGroup = (name: string): string => {
+  const idx = name.indexOf(" - ");
+  return idx >= 0 ? name.slice(0, idx).trim() : name.trim();
+};
+
+// Extracts the direction from a location string like "North > Hospital > ..."
 const regionFromLocation = (location: string): string =>
   location ? location.split(" > ")[0].trim() : "";
 
@@ -213,7 +219,12 @@ const Maintenance: React.FC = () => {
       setWoScheduled("");
       setWoEstimatedDuration("");
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to create work order");
+      const data = err.response?.data;
+      const baseMsg = data?.error || "Failed to create work order";
+      const assetInfo = data?.resolvedAsset
+        ? ` (Asset attempted: "${data.resolvedAsset.name}" — ${data.resolvedAsset.guid})`
+        : "";
+      setError(baseMsg + assetInfo);
     } finally {
       setCreatingWo(false);
     }
@@ -830,12 +841,16 @@ const Maintenance: React.FC = () => {
                             const region = regionFromLocation(
                               selected?.location || "",
                             );
+                            // Exact-match the direction prefix of each work group
+                            // name (e.g. "North") against the location's direction
+                            // so "North" only shows North groups, not North West.
                             const filtered = region
                               ? workGroups.filter((g) => {
                                   const name: string = g.Name || g.name || "";
-                                  return name
-                                    .toLowerCase()
-                                    .startsWith(region.toLowerCase());
+                                  return (
+                                    directionFromWorkGroup(name).toLowerCase() ===
+                                    region.toLowerCase()
+                                  );
                                 })
                               : workGroups;
                             return (
@@ -884,20 +899,6 @@ const Maintenance: React.FC = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        <div
-                          className="form-group"
-                          style={{ flex: 1, marginBottom: 0 }}
-                        >
-                          <label style={{ fontSize: "12px" }}>
-                            Craft / Trade
-                          </label>
-                          <input
-                            type="text"
-                            value={woCraft}
-                            onChange={(e) => setWoCraft(e.target.value)}
-                            placeholder="e.g. Plumbing, HVAC"
-                          />
-                        </div>
                         <div
                           className="form-group"
                           style={{ flex: 1, marginBottom: 0 }}

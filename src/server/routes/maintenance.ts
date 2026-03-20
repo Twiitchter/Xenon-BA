@@ -815,11 +815,14 @@ async function resolveIncidentTypeId(
  * Asset (NAN/NAS/NANW) for the same site and trade using name-based matching.
  *
  * Strategy:
- *  1. Extract the site code = first word of the original asset name (e.g. "LGH")
+ *  1. Extract the site code = first word of the original asset name (e.g. "LGHP")
  *  2. Determine the discipline string from the craft keyword
  *  3. Determine the NAN/NAS/NANW suffix from the direction embedded in the work
  *     group name ("North - Electrician" → NAN) or the asset location field
- *  4. Query assetic_assets restricted to that exact suffix
+ *  4. Query assetic_assets restricted to that exact suffix, trying progressively
+ *     shorter site code prefixes (LGHP → LGH → LG) until candidates are found.
+ *     Each attempt uses "LIKE '{code} %'" (space after code) to avoid a shorter
+ *     code (LGH) accidentally matching a longer one (LGHP).
  *  5. Among candidates, prefer the shortest name (fewest words) — this picks the
  *     site-level notional asset over sub-building variants
  *
@@ -835,9 +838,9 @@ async function resolveNotionalAsset(
   const discipline = craftToDiscipline(craft);
   if (!discipline) return null;
 
-  // Site code is the first word of the asset name, e.g. "LGH Level 2 Ward 1" → "LGH"
-  const siteCode = (originalAssetName || "").trim().split(/\s+/)[0];
-  if (!siteCode) return null;
+  // Site code is the first word of the asset name, e.g. "LGHP Level 2 Ward 1" → "LGHP"
+  const fullCode = (originalAssetName || "").trim().split(/\s+/)[0];
+  if (!fullCode) return null;
 
   // Determine the directional suffix from the work group name first (most reliable),
   // then fall back to the asset location field.
@@ -854,27 +857,42 @@ async function resolveNotionalAsset(
     suffix = "NAN";
   }
 
-  // Find all notional assets belonging to this site with the matching discipline and direction
-  const candidates = await db("assetic_assets")
-    .where("asset_name", "like", `${siteCode}%`)
-    .whereRaw("asset_name LIKE ?", [`%${discipline}%`])
-    .where("asset_name", "like", `% ${suffix}`)
-    .select(
-      "assetic_guid as guid",
-      "asset_id as assetId",
-      "asset_name as name",
+  // Try progressively shorter site code prefixes until candidates are found.
+  // e.g. "LGHP Launceston General Hospital (BUILDING)" has site code "LGHP",
+  // but its NAN assets are stored as "LGH Structure NAN" (without the P).
+  // Each attempt uses "'{code} %'" (space after code) so "LGH" never matches
+  // "LGHP Structure NAN" assets and vice versa.
+  for (let len = fullCode.length; len >= 2; len--) {
+    const siteCode = fullCode.slice(0, len);
+    const candidates = await db("assetic_assets")
+      .where("asset_name", "like", `${siteCode} %`)
+      .whereRaw("asset_name LIKE ?", [`%${discipline}%`])
+      .where("asset_name", "like", `% ${suffix}`)
+      .select(
+        "assetic_guid as guid",
+        "asset_id as assetId",
+        "asset_name as name",
+      );
+
+    if (candidates.length) {
+      // Prefer the site-level asset (shortest name = fewest words between site code and suffix)
+      // e.g. "LGH Structure NAN" (3 words) beats "LGH Holman Structure NAN" (4 words)
+      candidates.sort(
+        (a: any, b: any) =>
+          a.name.trim().split(/\s+/).length - b.name.trim().split(/\s+/).length,
+      );
+      console.log(
+        `Notional asset search: siteCode "${siteCode}" (from "${fullCode}") → found "${candidates[0].name}"`,
+      );
+      return candidates[0];
+    }
+
+    console.log(
+      `Notional asset search: siteCode "${siteCode}" → no candidates, trying shorter prefix`,
     );
+  }
 
-  if (!candidates.length) return null;
-
-  // Prefer the site-level asset (shortest name = fewest words between site code and suffix)
-  // e.g. "LGH Structure NAN" (3 words) beats "LGH Holman Structure NAN" (4 words)
-  candidates.sort(
-    (a: any, b: any) =>
-      a.name.trim().split(/\s+/).length - b.name.trim().split(/\s+/).length,
-  );
-
-  return candidates[0];
+  return null;
 }
 
 /**
@@ -946,10 +964,14 @@ router.post(
           );
           if (notional) {
             console.log(
-              `Notional asset resolved: ${notional.name} (${notional.assetId}) for craft "${craft}"`,
+              `Notional asset resolved: ${notional.name} (assetId: ${notional.assetId}, guid: ${notional.guid}) for craft "${craft}" / workGroup "${workGroup}"`,
             );
             inheritedAssetGuid = notional.guid;
             inheritedAssetName = notional.name;
+          } else {
+            console.log(
+              `No notional asset found for craft "${craft}" / workGroup "${workGroup}" / location "${inheritedAssetLocation}" — using original asset: ${inheritedAssetName} (guid: ${inheritedAssetGuid})`,
+            );
           }
         } catch (notionalErr: any) {
           console.warn(
@@ -987,7 +1009,10 @@ router.post(
 
       if (asseticEnabled) {
         // ── Step 1: Create the work order in PREP status ──────────────────
-        // We deliberately start in PREP so the record exists in Assetic even if
+        // Log the asset being used so failures are easy to diagnose
+        console.log(
+          `Creating WO for request ${requestId} — asset: "${inheritedAssetName}" (guid: ${inheritedAssetGuid}) | workGroup: "${workGroup}" | craft: "${craft}"`,
+        );
         // the subsequent RFE status transition fails. Admins can see the failure
         // and retry the promotion separately.
         const prepPayload: any = {
@@ -1121,6 +1146,13 @@ router.post(
           // PREP creation failed entirely — nothing was created in Assetic
           return res.status(502).json({
             error: `Assetic rejected the work order: ${msg}`,
+            // Asset resolution details so admins can diagnose mismatches
+            resolvedAsset: inheritedAssetName
+              ? {
+                  name: inheritedAssetName,
+                  guid: inheritedAssetGuid,
+                }
+              : null,
           });
         }
 
