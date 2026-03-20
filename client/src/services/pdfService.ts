@@ -282,7 +282,10 @@ export function generatePdf(template: PdfTemplate): void {
 // ── Pre-built template factories ─────────────────────────────────────────────
 
 /** Build a work order PDF template from a work order data object */
-export function buildWorkOrderTemplate(wo: any): PdfTemplate {
+export function buildWorkOrderTemplate(
+  wo: any,
+  extraSection?: { title: string; content: string },
+): PdfTemplate {
   const fmt = (v: any) => (v ? String(v) : undefined);
   const fmtDate = (v: any) => {
     if (!v) return undefined;
@@ -363,6 +366,20 @@ export function buildWorkOrderTemplate(wo: any): PdfTemplate {
               fields: [
                 { label: "WR Title", value: fmt(wo.request_title) },
                 { label: "WR Reference", value: fmt(wrId) },
+              ],
+            },
+          ]
+        : []),
+      ...(extraSection && extraSection.content.trim()
+        ? [
+            {
+              title: extraSection.title || "Additional Notes",
+              fields: [
+                {
+                  label: extraSection.title || "Additional Notes",
+                  value: extraSection.content,
+                  fullWidth: true,
+                },
               ],
             },
           ]
