@@ -131,6 +131,9 @@ router.get("/my-items", async (req: AuthRequest, res: Response) => {
         "mr.status",
         "mr.category",
         "mr.location",
+        "mr.assetic_work_request_id",
+        "mr.assetic_friendly_id",
+        "mr.requestor_display_name",
         "mr.created_at",
         "mr.updated_at",
         db.raw("? as item_type", ["request"]),
@@ -358,6 +361,7 @@ router.post(
       // The work request must exist in Assetic before it appears in the portal.
       // If Assetic creation fails we block the local save so the lists stay in sync.
       let asseticWorkRequestId: string | null = null;
+      let asseticFriendlyId: string | null = null;
       const asseticEnabled = await asseticClient.isEnabled();
 
       if (asseticEnabled) {
@@ -369,10 +373,10 @@ router.post(
         }
 
         const asseticPayload: any = {
-          // Description is Char(250) — truncate to avoid rejection
-          Description: (
-            title + (description ? `\n\n${description}` : "")
-          ).slice(0, 250),
+          // Description is Char(250) — truncate to avoid rejection.
+          // The title alone goes here; the user's full description goes
+          // into SupportingInformation below (which has a larger limit).
+          Description: title.slice(0, 250),
           WorkRequestSourceId: workRequestSourceId,
           // Location is Char(100) and mandatory — truncate if the hierarchy path
           // exceeds the limit but preserve as much as possible
@@ -383,18 +387,22 @@ router.post(
           // WorkRequestSubTypeId must be null (not empty string) for an Int field
           WorkRequestSubTypeId: null,
           // WorkRequestPhysicalLocation is mandatory per the Assetic API.
-          // Use the full location string in WhereLocation so the complete hierarchy
-          // path is preserved even when it exceeds the 100-char Location limit.
+          // Address.Country defaults to "Australia" to satisfy Assetic's country
+          // validation. When no real street address is provided, StreetAddress
+          // is populated from the hierarchy path so the location is meaningful.
+          // The full untruncated hierarchy path also goes into WhereLocation.
           WorkRequestPhysicalLocation: {
             Address: {
               StreetNumber: streetNumber || null,
-              StreetAddress: streetAddress || null,
+              StreetAddress:
+                streetAddress || (location ? location.slice(0, 255) : null),
               CitySuburb: citySuburb || null,
               State: state || null,
               ZipPostcode: zipPostcode || null,
-              Country: country || null,
+              Country: country || "Australia",
             },
             OtherLocation: otherLocation || null,
+            // Full hierarchy path preserved here without truncation
             WhereLocation: whereLocation || location || null,
           },
         };
@@ -434,12 +442,36 @@ router.post(
         try {
           const asseticResult =
             await asseticClient.createWorkRequest(asseticPayload);
-          asseticWorkRequestId =
-            asseticResult?.Id ||
-            asseticResult?.id ||
-            asseticResult?.data?.Id ||
-            asseticResult?.data?.id ||
-            null;
+
+          // Assetic POST /workrequest returns the GUID as a plain string,
+          // not a JSON object. Handle both a raw string and an object response.
+          if (typeof asseticResult === "string") {
+            asseticWorkRequestId = asseticResult.trim().replace(/^"|"$/g, "");
+          } else if (asseticResult && typeof asseticResult === "object") {
+            asseticWorkRequestId = asseticResult.Id || asseticResult.id || null;
+          }
+
+          console.log(`Assetic WR created — GUID: ${asseticWorkRequestId}`);
+
+          // Fetch the full WR record to get the human-readable FriendlyIdStr (e.g. "WR35").
+          // This is a fire-and-continue — if it fails we still save the request.
+          if (asseticWorkRequestId) {
+            try {
+              const wrDetail =
+                await asseticClient.getWorkRequest(asseticWorkRequestId);
+              asseticFriendlyId =
+                wrDetail?.FriendlyIdStr ||
+                wrDetail?.FriendlyId ||
+                wrDetail?.FriendlyID ||
+                wrDetail?.friendlyIdStr ||
+                null;
+              console.log(`Assetic WR FriendlyId: ${asseticFriendlyId}`);
+            } catch (fetchErr: any) {
+              console.warn(
+                `Could not fetch WR detail for friendly ID (non-fatal): ${fetchErr.message}`,
+              );
+            }
+          }
         } catch (asseticErr: any) {
           const errData = asseticErr?.response?.data;
           const httpStatus = asseticErr?.response?.status ?? null;
@@ -502,6 +534,7 @@ router.post(
           location: location || null,
           // Assetic sync fields
           assetic_work_request_id: asseticWorkRequestId,
+          assetic_friendly_id: asseticFriendlyId,
           work_request_source_id: workRequestSourceId || null,
           requestor_display_name: requestorDisplayName || null,
           requestor_first_name: requestorFirstName || null,
@@ -905,6 +938,162 @@ router.post(
     } catch (error) {
       console.error("Error creating work order message:", error);
       res.status(500).json({ error: "Failed to create message" });
+    }
+  },
+);
+
+// ─── Attachments ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/maintenance/requests/:id/attachments
+ * List attachments for a maintenance request.
+ * Returns metadata only — file content is stored in Assetic.
+ */
+router.get(
+  "/requests/:id/attachments",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const request = await db("maintenance_requests").where("id", id).first();
+      if (!request) {
+        return res.status(404).json({ error: "Maintenance request not found" });
+      }
+
+      const attachments = await db("work_request_attachments")
+        .where("maintenance_request_id", id)
+        .orderBy("created_at", "asc");
+
+      res.json({ attachments });
+    } catch (error) {
+      console.error("Error fetching attachments:", error);
+      res.status(500).json({ error: "Failed to fetch attachments" });
+    }
+  },
+);
+
+/**
+ * POST /api/maintenance/requests/:id/attachments
+ * Upload a file attachment for a maintenance request.
+ *
+ * Body: { filename: string, mimeType: string, contentBase64: string, fileSizeBytes?: number }
+ *
+ * The file content (base64) is forwarded directly to the Assetic /api/v2/document endpoint
+ * and only the resulting document GUID is stored in the local DB.
+ */
+router.post(
+  "/requests/:id/attachments",
+  [
+    body("filename").trim().notEmpty(),
+    body("mimeType").trim().notEmpty(),
+    // contentBase64 can be many MB — just check it's present, not its length
+    body("contentBase64").exists().notEmpty(),
+    body("fileSizeBytes").optional().isInt({ min: 0 }),
+    // Hard limit: 15 MB base64 ≈ 20 MB encoded — reject oversized payloads early
+    body("contentBase64").custom((val: string) => {
+      if (val && val.length > 20 * 1024 * 1024) {
+        throw new Error("File exceeds the 15 MB size limit");
+      }
+      return true;
+    }),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { id } = req.params;
+      const { filename, mimeType, contentBase64, fileSizeBytes } = req.body;
+
+      const request = await db("maintenance_requests").where("id", id).first();
+      if (!request) {
+        return res.status(404).json({ error: "Maintenance request not found" });
+      }
+
+      // Insert a pending record first so the attachment is tracked even if Assetic upload fails
+      const [attachmentId] = await db("work_request_attachments").insert({
+        maintenance_request_id: Number(id),
+        original_filename: filename,
+        mime_type: mimeType,
+        file_size: fileSizeBytes || null,
+        assetic_upload_status: "pending",
+        uploaded_by: req.user.id,
+        created_at: new Date(),
+      });
+
+      // Attempt to upload to Assetic if integration is enabled and the WR has been synced
+      const asseticEnabled = await asseticClient.isEnabled();
+      const wrGuid = request.assetic_work_request_id;
+
+      if (asseticEnabled && wrGuid) {
+        try {
+          const asseticResult = await asseticClient.uploadDocument(wrGuid, {
+            name: filename,
+            mimeType,
+            contentBase64,
+            fileSizeBytes: fileSizeBytes || 0,
+          });
+
+          const asseticDocId =
+            asseticResult?.Id ||
+            asseticResult?.id ||
+            asseticResult?.DocumentGuid ||
+            null;
+
+          await db("work_request_attachments")
+            .where("id", attachmentId)
+            .update({
+              assetic_document_id: asseticDocId,
+              assetic_upload_status: "uploaded",
+            });
+
+          const attachment = await db("work_request_attachments")
+            .where("id", attachmentId)
+            .first();
+          return res.status(201).json(attachment);
+        } catch (asseticErr: any) {
+          const msg =
+            asseticErr?.response?.data?.Message ||
+            asseticErr?.message ||
+            "Assetic upload failed";
+          console.error(`Assetic document upload failed for WR ${id}:`, msg);
+
+          await db("work_request_attachments")
+            .where("id", attachmentId)
+            .update({
+              assetic_upload_status: "failed",
+              error_message: String(msg).slice(0, 500),
+            });
+
+          const attachment = await db("work_request_attachments")
+            .where("id", attachmentId)
+            .first();
+          // Return 207 so the frontend knows the attachment was recorded but sync failed
+          return res.status(207).json({
+            ...attachment,
+            warning:
+              "Attachment recorded but failed to sync with Assetic. It will not appear in Assetic.",
+          });
+        }
+      } else {
+        // Assetic disabled or WR not yet synced — just mark as uploaded locally
+        await db("work_request_attachments")
+          .where("id", attachmentId)
+          .update({
+            assetic_upload_status:
+              asseticEnabled && !wrGuid ? "pending" : "uploaded",
+          });
+      }
+
+      const attachment = await db("work_request_attachments")
+        .where("id", attachmentId)
+        .first();
+      res.status(201).json(attachment);
+    } catch (error) {
+      console.error("Error uploading attachment:", error);
+      res.status(500).json({ error: "Failed to upload attachment" });
     }
   },
 );

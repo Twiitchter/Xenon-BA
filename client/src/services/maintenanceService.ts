@@ -255,6 +255,33 @@ class MaintenanceService {
     return response.data;
   }
 
+  // ─── Attachments ──────────────────────────────────────────────────
+
+  async getAttachments(requestId: number) {
+    const response = await axios.get(
+      `${API_URL}/maintenance/requests/${requestId}/attachments`,
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  async uploadAttachment(
+    requestId: number,
+    file: {
+      filename: string;
+      mimeType: string;
+      contentBase64: string;
+      fileSizeBytes?: number;
+    },
+  ) {
+    const response = await axios.post(
+      `${API_URL}/maintenance/requests/${requestId}/attachments`,
+      file,
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
   // ─── Work Groups (Assetic labour groups) ─────────────────────────
 
   async getWorkGroups() {

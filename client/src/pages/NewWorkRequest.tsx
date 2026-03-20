@@ -12,13 +12,26 @@ import LocationHierarchyPicker, {
   buildLocationPath,
 } from "../components/LocationHierarchyPicker";
 
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]); // strip the data-URL prefix
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 const NewWorkRequest: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [attachmentStatus, setAttachmentStatus] = useState<string>("");
   const [formData, setFormData] = useState({
     title: "",
-    description: "",
     priority: "medium",
     category: "",
     location: "",
@@ -108,12 +121,39 @@ const NewWorkRequest: React.FC = () => {
           : selectedPath
         : freeTextLocation;
 
-      await maintenanceService.createRequest({
+      const created = await maintenanceService.createRequest({
         ...formData,
+        description: formData.title,
         workRequestSubtypeId: "",
         location: combinedLocation,
         asseticAssetGuid: selectedAsset?.assetic_guid || undefined,
       });
+
+      // Upload any pending attachments after the WR is created
+      if (pendingFiles.length > 0 && created?.id) {
+        setAttachmentStatus(
+          `Uploading ${pendingFiles.length} attachment(s)...`,
+        );
+        let uploaded = 0;
+        for (const file of pendingFiles) {
+          try {
+            const contentBase64 = await readFileAsBase64(file);
+            await maintenanceService.uploadAttachment(created.id, {
+              filename: file.name,
+              mimeType: file.type || "application/octet-stream",
+              contentBase64,
+              fileSizeBytes: file.size,
+            });
+            uploaded++;
+            setAttachmentStatus(
+              `Uploaded ${uploaded}/${pendingFiles.length} attachment(s)...`,
+            );
+          } catch {
+            // Attachment upload failure is non-blocking — the WR was created
+          }
+        }
+      }
+
       navigate("/my-requests");
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to create request");
@@ -134,28 +174,18 @@ const NewWorkRequest: React.FC = () => {
         <h3>Log a Maintenance Request</h3>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Title *</label>
+            <label>Title / Brief Summary *</label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) =>
                 setFormData({ ...formData, title: e.target.value })
               }
+              placeholder="e.g. Leaking tap in Level 2 bathroom"
               required
               aria-required="true"
             />
           </div>
-          <div className="form-group">
-            <label>Description</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              rows={3}
-            />
-          </div>
-
           <h4
             style={{
               marginTop: "20px",
@@ -311,7 +341,7 @@ const NewWorkRequest: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label>Supporting Information</label>
+            <label>Description</label>
             <textarea
               value={formData.supportingInformation}
               onChange={(e) =>
@@ -320,13 +350,142 @@ const NewWorkRequest: React.FC = () => {
                   supportingInformation: e.target.value,
                 })
               }
-              rows={2}
-              placeholder="Any additional details that might be helpful"
+              rows={4}
+              placeholder="Describe the issue in detail — what is happening, where exactly, and how long it has been occurring"
             />
           </div>
 
+          <h4
+            style={{
+              marginTop: "20px",
+              marginBottom: "10px",
+              fontSize: "16px",
+            }}
+          >
+            Attachments (Optional)
+          </h4>
+          <div className="form-group">
+            <label style={{ marginBottom: "6px", display: "block" }}>
+              Upload photos or documents to help describe the issue
+            </label>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                setPendingFiles((prev) => {
+                  const existing = new Set(prev.map((f) => f.name + f.size));
+                  return [
+                    ...prev,
+                    ...files.filter((f) => !existing.has(f.name + f.size)),
+                  ];
+                });
+                e.target.value = ""; // allow re-selecting same file
+              }}
+              style={{ display: "block" }}
+            />
+          </div>
+          {pendingFiles.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                marginBottom: "14px",
+              }}
+            >
+              {pendingFiles.map((file, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    position: "relative",
+                    border: "1px solid var(--border)",
+                    borderRadius: "6px",
+                    padding: "6px",
+                    background: "var(--surface)",
+                    maxWidth: "120px",
+                    textAlign: "center",
+                  }}
+                >
+                  {file.type.startsWith("image/") ? (
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={file.name}
+                      style={{
+                        width: "90px",
+                        height: "70px",
+                        objectFit: "cover",
+                        borderRadius: "4px",
+                        display: "block",
+                        margin: "0 auto 4px",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "90px",
+                        height: "70px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "28px",
+                        margin: "0 auto 4px",
+                      }}
+                    >
+                      📄
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--text-muted)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      maxWidth: "100px",
+                    }}
+                    title={file.name}
+                  >
+                    {file.name}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPendingFiles((prev) =>
+                        prev.filter((_, i) => i !== idx),
+                      )
+                    }
+                    style={{
+                      position: "absolute",
+                      top: "2px",
+                      right: "2px",
+                      background: "rgba(0,0,0,0.5)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "18px",
+                      height: "18px",
+                      cursor: "pointer",
+                      fontSize: "11px",
+                      lineHeight: "18px",
+                      padding: 0,
+                    }}
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <button type="submit" disabled={submitting}>
-            {submitting ? "Submitting..." : "Submit Request"}
+            {submitting && attachmentStatus
+              ? attachmentStatus
+              : submitting
+                ? "Submitting..."
+                : "Submit Request"}
           </button>
         </form>
       </div>

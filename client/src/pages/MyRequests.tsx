@@ -11,6 +11,9 @@ interface MyItem {
   status: string;
   category?: string;
   location?: string;
+  assetic_work_request_id?: string | null;
+  assetic_friendly_id?: string | null;
+  requestor_display_name?: string | null;
   created_at: string;
   updated_at: string;
   item_type: "request" | "work_order";
@@ -30,6 +33,16 @@ interface Message {
   message: string;
 }
 
+interface AttachmentRecord {
+  id: number;
+  original_filename: string;
+  mime_type?: string;
+  file_size?: number;
+  assetic_document_id?: string | null;
+  assetic_upload_status: string;
+  created_at: string;
+}
+
 const MyRequests: React.FC = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState<MyItem[]>([]);
@@ -42,6 +55,7 @@ const MyRequests: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [attachments, setAttachments] = useState<AttachmentRecord[]>([]);
 
   useEffect(() => {
     fetchMyItems();
@@ -66,6 +80,17 @@ const MyRequests: React.FC = () => {
 
   const openDetail = async (item: MyItem) => {
     setSelectedItem(item);
+    setAttachments([]);
+
+    // Fetch attachments for the request
+    if (item.item_type === "request" || item.item_type) {
+      try {
+        const attachData = await maintenanceService.getAttachments(item.id);
+        setAttachments(attachData.attachments || []);
+      } catch {
+        // Non-critical — silently ignore
+      }
+    }
 
     // Fetch messages if there's a work order
     const workOrderId =
@@ -231,6 +256,10 @@ const MyRequests: React.FC = () => {
                     {item.display_type === "work_order" &&
                     item.work_order_id ? (
                       <>WO-{item.work_order_id}</>
+                    ) : item.assetic_friendly_id ? (
+                      <span title={`Local ID: ${item.id}`}>
+                        {item.assetic_friendly_id}
+                      </span>
                     ) : (
                       <>WR-{item.id}</>
                     )}
@@ -280,7 +309,9 @@ const MyRequests: React.FC = () => {
                 {selectedItem.display_type === "work_order" &&
                 selectedItem.work_order_id
                   ? `Work Order #${selectedItem.work_order_id}`
-                  : `Work Request #${selectedItem.id}`}
+                  : selectedItem.assetic_friendly_id
+                    ? `Work Request ${selectedItem.assetic_friendly_id}`
+                    : `Work Request #${selectedItem.id}`}
                 : {selectedItem.title}
               </h3>
               <div
@@ -290,7 +321,9 @@ const MyRequests: React.FC = () => {
                   marginTop: "4px",
                 }}
               >
-                Submitted{" "}
+                {selectedItem.requestor_display_name
+                  ? `Submitted by ${selectedItem.requestor_display_name}`
+                  : "Submitted"}{" "}
                 {new Date(selectedItem.created_at).toLocaleDateString()}
                 {selectedItem.location && ` · ${selectedItem.location}`}
               </div>
@@ -412,7 +445,86 @@ const MyRequests: React.FC = () => {
               </div>
             </div>
 
-            {/* Messages section */}
+            {/* Attachments section */}
+            {attachments.length > 0 && (
+              <div
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: "16px",
+                  marginBottom: "4px",
+                }}
+              >
+                <h4 style={{ marginBottom: "10px" }}>Attachments</h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                  {attachments.map((att) => (
+                    <div
+                      key={att.id}
+                      style={{
+                        border: "1px solid var(--border)",
+                        borderRadius: "6px",
+                        padding: "8px 12px",
+                        background: "var(--surface)",
+                        minWidth: "160px",
+                        maxWidth: "220px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "20px",
+                          marginBottom: "4px",
+                          textAlign: "center",
+                        }}
+                      >
+                        {att.mime_type?.startsWith("image/") ? "🖼️" : "📄"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={att.original_filename}
+                      >
+                        {att.original_filename}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--text-muted)",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {att.file_size != null
+                          ? att.file_size > 1048576
+                            ? `${(att.file_size / 1048576).toFixed(1)} MB`
+                            : `${Math.ceil(att.file_size / 1024)} KB`
+                          : att.mime_type || ""}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          marginTop: "4px",
+                          color:
+                            att.assetic_upload_status === "uploaded"
+                              ? "var(--success, #16a34a)"
+                              : att.assetic_upload_status === "failed"
+                                ? "var(--danger, #dc2626)"
+                                : "var(--text-muted)",
+                        }}
+                      >
+                        {att.assetic_upload_status === "uploaded"
+                          ? "✓ Synced"
+                          : att.assetic_upload_status === "failed"
+                            ? "⚠ Sync failed"
+                            : "⏳ Pending"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div
               style={{
                 borderTop: "1px solid var(--border)",

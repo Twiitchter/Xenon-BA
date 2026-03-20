@@ -23,8 +23,12 @@ function extractAsseticErrorMessage(errData: any): string {
 
   const parts: string[] = [];
   const primary =
-    errData.Message || errData.message || errData.title || errData.Title ||
-    errData.error || errData.Error;
+    errData.Message ||
+    errData.message ||
+    errData.title ||
+    errData.Title ||
+    errData.error ||
+    errData.Error;
   if (primary && typeof primary === "string") parts.push(primary);
 
   if (errData.ExceptionMessage && errData.ExceptionMessage !== primary) {
@@ -52,7 +56,7 @@ function extractAsseticErrorMessage(errData: any): string {
   }
 }
 
-(error: any): {
+function buildAsseticHierarchyError(error: any): {
   status: number;
   message: string;
   log: string;
@@ -1274,11 +1278,9 @@ router.post(
             ? JSON.parse(record.assetic_payload)
             : record.assetic_payload;
       } catch {
-        return res
-          .status(422)
-          .json({
-            error: "Stored payload is not valid JSON. Edit it before retrying.",
-          });
+        return res.status(422).json({
+          error: "Stored payload is not valid JSON. Edit it before retrying.",
+        });
       }
 
       // Update retry tracking
@@ -1304,23 +1306,48 @@ router.post(
           "| Raw:",
           JSON.stringify(errData),
         );
-        await db("failed_work_requests").where({ id }).update({
-          error_message: msg,
-          assetic_error_response: errData ? JSON.stringify(errData) : null,
-          assetic_http_status: httpStatus,
-          updated_at: new Date(),
-        });
+        await db("failed_work_requests")
+          .where({ id })
+          .update({
+            error_message: msg,
+            assetic_error_response: errData ? JSON.stringify(errData) : null,
+            assetic_http_status: httpStatus,
+            updated_at: new Date(),
+          });
         return res
           .status(502)
           .json({ error: `Assetic rejected the retry: ${msg}` });
       }
 
-      const asseticWorkRequestId =
-        asseticResult?.Id ||
-        asseticResult?.id ||
-        asseticResult?.data?.Id ||
-        asseticResult?.data?.id ||
-        null;
+      // POST /workrequest returns the GUID as a plain string, not an object
+      let asseticWorkRequestId: string | null = null;
+      if (typeof asseticResult === "string") {
+        asseticWorkRequestId = asseticResult.trim().replace(/^"|"$/g, "");
+      } else if (asseticResult && typeof asseticResult === "object") {
+        asseticWorkRequestId =
+          asseticResult.Id ||
+          asseticResult.id ||
+          asseticResult.data?.Id ||
+          asseticResult.data?.id ||
+          null;
+      }
+
+      // Fetch friendly ID (e.g. "WR35") via follow-up GET
+      let asseticFriendlyId: string | null = null;
+      if (asseticWorkRequestId) {
+        try {
+          const wrDetail =
+            await asseticClient.getWorkRequest(asseticWorkRequestId);
+          asseticFriendlyId =
+            wrDetail?.FriendlyIdStr ||
+            wrDetail?.FriendlyId ||
+            wrDetail?.FriendlyID ||
+            wrDetail?.friendlyIdStr ||
+            null;
+        } catch {
+          // Non-fatal — friendly ID will just remain null
+        }
+      }
 
       // Create the maintenance_request row
       const [newRequestId] = await db("maintenance_requests").insert({
@@ -1333,6 +1360,7 @@ router.post(
         assetic_asset_guid: record.assetic_asset_guid || null,
         asset_display_name: null,
         assetic_work_request_id: asseticWorkRequestId,
+        assetic_friendly_id: asseticFriendlyId,
         work_request_source_id: record.work_request_source_id || null,
         requestor_display_name: record.requestor_display_name || null,
         requestor_first_name: record.requestor_first_name || null,
@@ -1358,6 +1386,7 @@ router.post(
         message: "Retry successful. Work request created.",
         maintenance_request_id: newRequestId,
         assetic_work_request_id: asseticWorkRequestId,
+        assetic_friendly_id: asseticFriendlyId,
       });
     } catch (error) {
       console.error("Error retrying failed request:", error);

@@ -378,6 +378,55 @@ class AsseticClient {
     });
   }
 
+  /**
+   * Upload a document (file) linked to a Work Request via the Assetic document API.
+   *
+   * POST /api/v2/document
+   * The file content must be base64-encoded.  Assetic returns a document object
+   * containing an `Id` (GUID) used to reference the document later.
+   *
+   * @param wrGuid       - The Work Request GUID (from createWorkRequest response)
+   * @param file         - File metadata + base64 content
+   */
+  async uploadDocument(
+    wrGuid: string,
+    file: {
+      name: string;
+      mimeType: string;
+      contentBase64: string;
+      fileSizeBytes?: number;
+    },
+  ): Promise<any> {
+    const payload = {
+      ParentId: wrGuid,
+      ParentType: "WorkRequest",
+      FileProperty: [
+        {
+          Name: file.name,
+          FileSize: file.fileSizeBytes ?? 0,
+          mimetype: file.mimeType,
+          filecontent: file.contentBase64,
+        },
+      ],
+    };
+
+    // Log the request without the raw base64 blob to keep log sizes sane
+    const loggablePayload = {
+      ...payload,
+      FileProperty: [{ ...payload.FileProperty[0], filecontent: "[base64]" }],
+    };
+
+    return this.loggedCall({
+      method: "POST",
+      endpoint: "/document",
+      description: `POST /document (WR attachment: ${file.name})`,
+      entityType: "work_request",
+      entityGuid: wrGuid,
+      requestBody: loggablePayload,
+      fn: (c) => c.post("/document", payload),
+    });
+  }
+
   async getWorkRequestTypes() {
     return this.call(
       (c) => c.get("/workrequesttype").then((r) => r.data),
@@ -623,7 +672,7 @@ class AsseticClient {
     );
   }
 
-  async uploadDocument(data: any) {
+  async postDocument(data: any) {
     return this.call(
       (c) => c.post("/document", data).then((r) => r.data),
       "POST /document",
