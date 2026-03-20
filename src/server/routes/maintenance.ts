@@ -703,9 +703,81 @@ router.get("/work-orders/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── Notional Asset Resolution ─────────────────────────────────────────────────
+//
+// Assets ending in NAN / NAS / NANW are "Notional Assets" — virtual trade buckets
+// at the building level (e.g. "LGH Allambie Structure NAN").  When a work order is
+// created we swap the specific asset for the appropriate notional asset so that
+// trade work accumulates against the right virtual bucket.
+//
+// Mapping: craft keyword → discipline substring in the notional asset name.
+const CRAFT_TO_DISCIPLINE: Array<[RegExp, string]> = [
+  [/carpent|joinr?y?|builder|structur|joiner/i, "Structure"],
+  [/electri/i, "Electrical Services"],
+  [/plumb|hydraulic/i, "Hydraulics & Plumbing"],
+  [/mechanical|hvac|air.?con|ventilat/i, "Mechanical"],
+  [/refriger|cold.?room/i, "Refrigeration"],
+  [/fire/i, "Fire System"],
+  [/secur/i, "Security"],
+  [/horticul|garden|grounds|landscap/i, "Horticultural"],
+  [/generator|genset/i, "Generator"],
+  [/lift|elevator/i, "Lift"],
+  [/medical.?gas|gas/i, "Medical Gases"],
+  [/bms|building.?manag|ctrl/i, "Bld Mgmt and Ctrl"],
+  [/cardiac|body.?protect|defib/i, "Body & Cardiac Protection"],
+];
+
+function craftToDiscipline(craft: string): string | null {
+  for (const [pattern, discipline] of CRAFT_TO_DISCIPLINE) {
+    if (pattern.test(craft)) return discipline;
+  }
+  return null;
+}
+
+/**
+ * Given an asset GUID and a craft name, attempt to find the most appropriate
+ * Notional Asset (NAN/NAS/NANW) for the same building and trade.
+ * Returns { guid, assetId, name } or null if not found.
+ */
+async function resolveNotionalAsset(
+  originalAssetGuid: string,
+  craft: string,
+): Promise<{ guid: string; assetId: string; name: string } | null> {
+  const discipline = craftToDiscipline(craft);
+  if (!discipline) return null;
+
+  // 1. Find all FL GUIDs that the original asset belongs to
+  const flRows = await db("assetic_asset_functional_locations")
+    .where("asset_guid", originalAssetGuid)
+    .select("fl_guid");
+
+  if (!flRows.length) return null;
+  const flGuids = flRows.map((r: any) => r.fl_guid);
+
+  // 2. Find notional assets in those same FLs whose name contains the discipline
+  const notional = await db("assetic_asset_functional_locations as afl")
+    .join("assetic_assets as a", "a.assetic_guid", "afl.asset_guid")
+    .whereIn("afl.fl_guid", flGuids)
+    .where(function () {
+      this.where("a.asset_name", "like", "% NAN")
+        .orWhere("a.asset_name", "like", "% NAS")
+        .orWhere("a.asset_name", "like", "% NANW");
+    })
+    .whereRaw("a.asset_name LIKE ?", [`%${discipline}%`])
+    .select(
+      "a.assetic_guid as guid",
+      "a.asset_id as assetId",
+      "a.asset_name as name",
+    )
+    .first();
+
+  return notional || null;
+}
+
 /**
  * POST /api/maintenance/work-orders
- * Create a work order from a maintenance request
+ * Create a work order (locally + in Assetic) from a maintenance request.
+ * Failures are logged to failed_work_orders so admins can review and retry.
  */
 router.post(
   "/work-orders",
@@ -717,7 +789,9 @@ router.post(
     body("craft").optional().trim(),
     body("workGroup").optional().trim(),
     body("assignedTo").optional().isInt(),
-    body("scheduledDate").optional().isISO8601(),
+    // Accept full datetime-local strings (YYYY-MM-DDTHH:mm) or plain dates
+    body("scheduledDate").optional().trim(),
+    body("scheduledFinish").optional().trim(),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -735,6 +809,7 @@ router.post(
         workGroup,
         assignedTo,
         scheduledDate,
+        scheduledFinish,
       } = req.body;
 
       // Verify the maintenance request exists
@@ -745,15 +820,191 @@ router.post(
         return res.status(404).json({ error: "Maintenance request not found" });
       }
 
-      // Carry asset info and priority from the parent request so nothing is lost
-      // when transitioning from work request → work order.
+      // Inherit asset info and priority from the parent request
       const inheritedPriority = priority || reqCheck.priority || "medium";
-      const inheritedAssetGuid = reqCheck.assetic_asset_guid || null;
-      const inheritedAssetName =
+      let inheritedAssetGuid = reqCheck.assetic_asset_guid || null;
+      let inheritedAssetName =
         reqCheck.asset_display_name || reqCheck.asset_name || null;
-      const inheritedAssetLocation = reqCheck.location || null;
+      const inheritedAssetLocation =
+        reqCheck.location || reqCheck.where_location || null;
+      const inheritedWrGuid = reqCheck.assetic_work_request_id || null;
 
-      const [inserted] = await db("work_orders")
+      // Attempt to resolve the Notional Asset (NAN/NAS/NANW) for the given craft.
+      // If found, the work order is assigned to that virtual trade bucket instead of
+      // the specific asset, which is standard practice for reactive maintenance.
+      if (inheritedAssetGuid && craft) {
+        try {
+          const notional = await resolveNotionalAsset(
+            inheritedAssetGuid,
+            craft,
+          );
+          if (notional) {
+            console.log(
+              `Notional asset resolved: ${notional.name} (${notional.assetId}) for craft "${craft}"`,
+            );
+            inheritedAssetGuid = notional.guid;
+            inheritedAssetName = notional.name;
+          }
+        } catch (notionalErr: any) {
+          console.warn(
+            `Notional asset lookup failed (non-fatal): ${notionalErr.message}`,
+          );
+        }
+      }
+
+      // Normalise dates: Assetic requires a full ISO datetime (T00:00:00 if no
+      // time was provided). Plain date strings like "2026-04-01" get midnight appended.
+      const normaliseDateTime = (val?: string): string | null => {
+        if (!val) return null;
+        // Already has time component (T or space separator)
+        if (val.includes("T") || val.match(/\d{4}-\d{2}-\d{2} \d{2}:/))
+          return val.replace(" ", "T");
+        // Plain date — append midnight
+        return `${val}T00:00:00`;
+      };
+
+      const normScheduledStart = normaliseDateTime(scheduledDate);
+      const normScheduledFinish = normaliseDateTime(scheduledFinish);
+
+      // ── Assetic integration ───────────────────────────────────────────────
+      let asseticWorkOrderId: string | null = null;
+      let asseticFriendlyId: string | null = null;
+      const asseticEnabled = await asseticClient.isEnabled();
+
+      if (asseticEnabled) {
+        const asseticPayload: any = {
+          // Status PREP = Work Order in Preparation (standard initial state)
+          Status: "PREP",
+          BriefDescription: title.slice(0, 250),
+          LocationDescription: inheritedAssetLocation || undefined,
+        };
+
+        if (inheritedAssetGuid) {
+          asseticPayload.AssetId = inheritedAssetGuid;
+        }
+        if (workGroup) {
+          asseticPayload.WorkOrderWorkGroup = workGroup;
+        }
+
+        // Build supporting information: prepend location + requestor info,
+        // then append any extra description provided by the admin.
+        const siParts: string[] = [];
+        if (inheritedAssetLocation) {
+          siParts.push(`Location: ${inheritedAssetLocation}`);
+        }
+        const requestorParts: string[] = [];
+        if (reqCheck.requestor_display_name)
+          requestorParts.push(reqCheck.requestor_display_name);
+        if (reqCheck.requestor_email)
+          requestorParts.push(`Email: ${reqCheck.requestor_email}`);
+        if (reqCheck.requestor_phone)
+          requestorParts.push(`Ph: ${reqCheck.requestor_phone}`);
+        if (reqCheck.requestor_mobile)
+          requestorParts.push(`Mob: ${reqCheck.requestor_mobile}`);
+        if (requestorParts.length) {
+          siParts.push(`Reported by: ${requestorParts.join(" | ")}`);
+        }
+        if (reqCheck.supporting_information) {
+          siParts.push(reqCheck.supporting_information);
+        }
+        if (description) siParts.push(description);
+
+        if (siParts.length) {
+          asseticPayload.SupportingInformation = [
+            { Description: siParts.join("\n") },
+          ];
+        }
+        if (normScheduledStart || normScheduledFinish) {
+          asseticPayload.Scheduling = {};
+          if (normScheduledStart)
+            asseticPayload.Scheduling.ScheduledStart = normScheduledStart;
+          if (normScheduledFinish)
+            asseticPayload.Scheduling.ScheduledFinish = normScheduledFinish;
+        }
+        // Link back to the originating work request in Assetic
+        if (inheritedWrGuid) {
+          asseticPayload.WorkRequestId = inheritedWrGuid;
+        }
+
+        try {
+          const asseticResult =
+            await asseticClient.createWorkOrder(asseticPayload);
+
+          // Response can be a GUID string OR an object with Id
+          if (typeof asseticResult === "string") {
+            asseticWorkOrderId = asseticResult.trim().replace(/^"|"$/g, "");
+          } else if (asseticResult && typeof asseticResult === "object") {
+            asseticWorkOrderId = asseticResult.Id || asseticResult.id || null;
+          }
+
+          console.log(`Assetic WO created — GUID: ${asseticWorkOrderId}`);
+
+          // Fetch the full WO record to get the human-readable FriendlyId
+          if (asseticWorkOrderId) {
+            try {
+              const woDetail =
+                await asseticClient.getWorkOrder(asseticWorkOrderId);
+              asseticFriendlyId =
+                woDetail?.FriendlyId?.toString() ||
+                woDetail?.FriendlyIdStr ||
+                null;
+              console.log(`Assetic WO FriendlyId: ${asseticFriendlyId}`);
+            } catch (fetchErr: any) {
+              console.warn(
+                `Could not fetch WO detail for friendly ID (non-fatal): ${fetchErr.message}`,
+              );
+            }
+          }
+        } catch (asseticErr: any) {
+          const errData = asseticErr?.response?.data;
+          const httpStatus = asseticErr?.response?.status ?? null;
+          const msg =
+            extractAsseticErrorMessage(errData) ||
+            asseticErr?.message ||
+            "Assetic work order creation failed";
+
+          console.error(
+            `Assetic WO creation failed (HTTP ${httpStatus}):`,
+            msg,
+            "| Raw:",
+            JSON.stringify(errData),
+          );
+
+          // Log the failure so admins can review and retry
+          try {
+            await db("failed_work_orders").insert({
+              request_id: requestId,
+              created_by: req.user?.id ?? null,
+              title,
+              description: description || null,
+              priority: inheritedPriority,
+              craft: craft || null,
+              work_group: workGroup || null,
+              assetic_asset_guid: inheritedAssetGuid,
+              asset_name: inheritedAssetName,
+              asset_location: inheritedAssetLocation,
+              scheduled_start: normScheduledStart,
+              scheduled_finish: normScheduledFinish,
+              assetic_payload: JSON.stringify(asseticPayload),
+              error_message: msg,
+              assetic_error_response: errData ? JSON.stringify(errData) : null,
+              assetic_http_status: httpStatus,
+              status: "pending",
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+          } catch (dbErr) {
+            console.error("Failed to log failed work order to DB:", dbErr);
+          }
+
+          return res.status(502).json({
+            error: `Assetic rejected the work order: ${msg}`,
+          });
+        }
+      }
+
+      // ── Save to local database ────────────────────────────────────────────
+      const insertedRows = await db("work_orders")
         .insert({
           request_id: requestId,
           assigned_to: assignedTo || null,
@@ -762,27 +1013,30 @@ router.post(
           title,
           description: description || null,
           priority: inheritedPriority,
-          scheduled_date: scheduledDate || null,
+          scheduled_date: normScheduledStart,
+          scheduled_finish: normScheduledFinish,
+          assetic_work_order_id: asseticWorkOrderId,
+          assetic_friendly_id: asseticFriendlyId,
           // Asset fields carried from the maintenance request
           assetic_asset_guid: inheritedAssetGuid,
           asset_name: inheritedAssetName,
           asset_location: inheritedAssetLocation,
         })
-        .returning("*");
+        .returning("id");
+
+      const firstRow = insertedRows[0];
+      const newId: number =
+        typeof firstRow === "object" && firstRow !== null
+          ? (firstRow as any).id
+          : Number(firstRow);
 
       // Update the maintenance request status to in_progress
       await db("maintenance_requests")
         .where("id", requestId)
         .update({ status: "in_progress", updated_at: db.fn.now() });
 
-      // For MySQL/MSSQL that don't support RETURNING, fetch the inserted row
-      if (!inserted || typeof inserted === "number") {
-        const id = typeof inserted === "number" ? inserted : (inserted as any);
-        const row = await db("work_orders").where("id", id).first();
-        return res.status(201).json(row);
-      }
-
-      res.status(201).json(inserted);
+      const workOrder = await db("work_orders").where("id", newId).first();
+      return res.status(201).json(workOrder);
     } catch (error) {
       console.error("Error creating work order:", error);
       res.status(500).json({ error: "Failed to create work order" });
@@ -1013,15 +1267,23 @@ router.post(
       }
 
       // Insert a pending record first so the attachment is tracked even if Assetic upload fails
-      const [attachmentId] = await db("work_request_attachments").insert({
-        maintenance_request_id: Number(id),
-        original_filename: filename,
-        mime_type: mimeType,
-        file_size: fileSizeBytes || null,
-        assetic_upload_status: "pending",
-        uploaded_by: req.user.id,
-        created_at: new Date(),
-      });
+      const insertedRows = await db("work_request_attachments")
+        .insert({
+          maintenance_request_id: Number(id),
+          original_filename: filename,
+          mime_type: mimeType,
+          file_size: fileSizeBytes || null,
+          assetic_upload_status: "pending",
+          uploaded_by: req.user.id,
+          created_at: new Date(),
+        })
+        .returning("id");
+      // MSSQL returns [{ id: N }], others return [N]
+      const firstRow = insertedRows[0];
+      const attachmentId: number =
+        typeof firstRow === "object" && firstRow !== null
+          ? (firstRow as any).id
+          : Number(firstRow);
 
       // Attempt to upload to Assetic if integration is enabled and the WR has been synced
       const asseticEnabled = await asseticClient.isEnabled();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
+import { generatePdf, buildWorkRequestTemplate } from "../services/pdfService";
 import Modal from "../components/Modal";
 import FilterPresetsPanel from "../components/FilterPresetsPanel";
 
@@ -87,6 +88,7 @@ const Maintenance: React.FC = () => {
   const [woCraft, setWoCraft] = useState("");
   const [woWorkGroup, setWoWorkGroup] = useState("");
   const [woScheduled, setWoScheduled] = useState("");
+  const [woScheduledFinish, setWoScheduledFinish] = useState("");
   const [creatingWo, setCreatingWo] = useState(false);
   const [workGroups, setWorkGroups] = useState<any[]>([]);
 
@@ -138,6 +140,7 @@ const Maintenance: React.FC = () => {
     setWoCraft("");
     setWoWorkGroup("");
     setWoScheduled("");
+    setWoScheduledFinish("");
     setMessages([]);
     setNewMessage("");
 
@@ -191,9 +194,10 @@ const Maintenance: React.FC = () => {
         title: selected.title,
         description: selected.description || undefined,
         priority: selected.priority,
-        craft: woCraft || undefined,
+        craft: woCraft || deriveCraftFromWorkGroup(woWorkGroup) || undefined,
         workGroup: woWorkGroup || undefined,
         scheduledDate: woScheduled || undefined,
+        scheduledFinish: woScheduledFinish || undefined,
       });
       const updated = await refreshAndReselect(selected.id);
       if (updated?.work_order_id) {
@@ -205,6 +209,7 @@ const Maintenance: React.FC = () => {
       setWoCraft("");
       setWoWorkGroup("");
       setWoScheduled("");
+      setWoScheduledFinish("");
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to create work order");
     } finally {
@@ -534,13 +539,26 @@ const Maintenance: React.FC = () => {
                 {new Date(selected.created_at).toLocaleString()}
               </div>
             </div>
-            <button
-              className="btn-ghost"
-              onClick={() => setSelected(null)}
-              style={{ flexShrink: 0 }}
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+                flexShrink: 0,
+              }}
             >
-              ✕
-            </button>
+              <button
+                className="btn-ghost"
+                onClick={() => generatePdf(buildWorkRequestTemplate(selected))}
+                title="Download PDF"
+                style={{ fontSize: "13px" }}
+              >
+                ↓ PDF
+              </button>
+              <button className="btn-ghost" onClick={() => setSelected(null)}>
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="modal-body">
@@ -883,12 +901,35 @@ const Maintenance: React.FC = () => {
                           style={{ flex: 1, marginBottom: 0 }}
                         >
                           <label style={{ fontSize: "12px" }}>
-                            Scheduled Date
+                            Scheduled Start
                           </label>
                           <input
-                            type="date"
+                            type="datetime-local"
                             value={woScheduled}
                             onChange={(e) => setWoScheduled(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <div
+                          className="form-group"
+                          style={{ flex: 1, marginBottom: 0 }}
+                        >
+                          <label style={{ fontSize: "12px" }}>
+                            Scheduled Finish
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={woScheduledFinish}
+                            onChange={(e) =>
+                              setWoScheduledFinish(e.target.value)
+                            }
                           />
                         </div>
                       </div>

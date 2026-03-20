@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
+import { generatePdf, buildWorkOrderTemplate } from "../services/pdfService";
 import Modal from "../components/Modal";
 import FilterPresetsPanel from "../components/FilterPresetsPanel";
 
@@ -581,6 +582,16 @@ const WorkOrders: React.FC = () => {
                 flexShrink: 0,
               }}
             >
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  generatePdf(buildWorkOrderTemplate(selectedOrder))
+                }
+                title="Download PDF"
+                style={{ fontSize: "13px" }}
+              >
+                ↓ PDF
+              </button>
               <button
                 className="btn-ghost"
                 onClick={handleCloneOrder}

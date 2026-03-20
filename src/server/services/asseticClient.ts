@@ -397,6 +397,13 @@ class AsseticClient {
       fileSizeBytes?: number;
     },
   ): Promise<any> {
+    // Assetic expects 'mimetype' as the file extension only (e.g. "png", "pdf"),
+    // not a full MIME type string (e.g. "image/png"). Using the full type causes
+    // Assetic to store the file as a generic document and show a placeholder thumbnail.
+    const fileExtension = file.name.includes(".")
+      ? file.name.split(".").pop()!.toLowerCase()
+      : file.mimeType.split("/").pop()!.toLowerCase();
+
     const payload = {
       ParentId: wrGuid,
       ParentType: "WorkRequest",
@@ -404,7 +411,7 @@ class AsseticClient {
         {
           Name: file.name,
           FileSize: file.fileSizeBytes ?? 0,
-          mimetype: file.mimeType,
+          mimetype: fileExtension,
           filecontent: file.contentBase64,
         },
       ],
