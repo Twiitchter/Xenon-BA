@@ -1417,4 +1417,213 @@ router.delete(
   },
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Failed Work Order Status Changes (PREP → RFE failures)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/failed-work-orders
+ * List failed Assetic WO status transitions (e.g. PREP→RFE), optionally filtered by status.
+ */
+router.get(
+  "/failed-work-orders",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { status, limit = "100" } = req.query as Record<string, string>;
+      const query = db("failed_assetic_status_changes as fasc")
+        .leftJoin("work_orders as wo", "fasc.work_order_id", "wo.id")
+        .select(
+          "fasc.*",
+          "wo.title as work_order_title",
+          "wo.location as work_order_location",
+          "wo.work_group as work_order_work_group",
+        )
+        .orderBy("fasc.created_at", "desc")
+        .limit(Number(limit) || 100);
+
+      if (status) {
+        query.where("fasc.status", status);
+      }
+
+      const rows = await query;
+      res.json({ failed_work_orders: rows });
+    } catch (error) {
+      console.error("Error fetching failed work order status changes:", error);
+      res.status(500).json({ error: "Failed to fetch records" });
+    }
+  },
+);
+
+/**
+ * GET /api/admin/failed-work-orders/:id
+ * Get a single failed work order status change record.
+ */
+router.get(
+  "/failed-work-orders/:id",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const row = await db("failed_assetic_status_changes as fasc")
+        .leftJoin("work_orders as wo", "fasc.work_order_id", "wo.id")
+        .select(
+          "fasc.*",
+          "wo.title as work_order_title",
+          "wo.location as work_order_location",
+          "wo.work_group as work_order_work_group",
+        )
+        .where("fasc.id", id)
+        .first();
+      if (!row) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      res.json({ failed_work_order: row });
+    } catch (error) {
+      console.error("Error fetching failed work order status change:", error);
+      res.status(500).json({ error: "Failed to fetch record" });
+    }
+  },
+);
+
+/**
+ * PUT /api/admin/failed-work-orders/:id
+ * Update the admin_notes field and/or the stored Assetic payload before a retry.
+ */
+router.put(
+  "/failed-work-orders/:id",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { admin_notes, assetic_payload, status } = req.body;
+
+      const updateFields: Record<string, any> = { updated_at: new Date() };
+      if (admin_notes !== undefined) updateFields.admin_notes = admin_notes;
+      if (assetic_payload !== undefined) {
+        updateFields.assetic_payload =
+          typeof assetic_payload === "string"
+            ? assetic_payload
+            : JSON.stringify(assetic_payload);
+      }
+      if (status !== undefined && ["pending", "resolved", "dismissed"].includes(status)) {
+        updateFields.status = status;
+      }
+
+      await db("failed_assetic_status_changes").where({ id }).update(updateFields);
+      const updated = await db("failed_assetic_status_changes").where({ id }).first();
+      res.json({ failed_work_order: updated });
+    } catch (error) {
+      console.error("Error updating failed work order status change:", error);
+      res.status(500).json({ error: "Failed to update record" });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/failed-work-orders/:id/retry
+ * Re-attempt the Assetic status transition (PUT /workorder/{guid}) using the stored payload.
+ */
+router.post(
+  "/failed-work-orders/:id/retry",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const record = await db("failed_assetic_status_changes").where({ id }).first();
+      if (!record) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      if (!record.assetic_work_order_guid) {
+        return res.status(422).json({ error: "No Assetic work order GUID stored — cannot retry." });
+      }
+
+      let payload: any;
+      try {
+        payload =
+          typeof record.assetic_payload === "string"
+            ? JSON.parse(record.assetic_payload)
+            : record.assetic_payload;
+      } catch {
+        return res.status(422).json({
+          error: "Stored payload is not valid JSON. Edit it before retrying.",
+        });
+      }
+
+      // Increment retry tracking before attempting
+      await db("failed_assetic_status_changes")
+        .where({ id })
+        .update({
+          retry_count: (record.retry_count || 0) + 1,
+          last_retry_at: new Date(),
+          updated_at: new Date(),
+        });
+
+      // Attempt the PUT to Assetic
+      try {
+        await asseticClient.updateWorkOrder(record.assetic_work_order_guid, payload);
+      } catch (asseticErr: any) {
+        const errData = asseticErr?.response?.data;
+        const httpStatus = asseticErr?.response?.status ?? null;
+        const msg = extractAsseticErrorMessage(errData);
+        console.error(
+          `Assetic WO status retry failed (HTTP ${httpStatus}):`,
+          msg,
+          "| Raw:",
+          JSON.stringify(errData),
+        );
+        await db("failed_assetic_status_changes")
+          .where({ id })
+          .update({
+            error_message: msg,
+            assetic_error_response: errData ? JSON.stringify(errData) : null,
+            assetic_http_status: httpStatus,
+            updated_at: new Date(),
+          });
+        return res.status(502).json({ error: `Assetic rejected the retry: ${msg}` });
+      }
+
+      // Success — mark resolved
+      await db("failed_assetic_status_changes").where({ id }).update({
+        status: "resolved",
+        updated_at: new Date(),
+      });
+
+      console.log(
+        `Assetic WO ${record.assetic_work_order_guid} successfully transitioned to ${record.to_status} via admin retry`,
+      );
+
+      res.json({
+        message: `Work order successfully transitioned to ${record.to_status}.`,
+        assetic_work_order_guid: record.assetic_work_order_guid,
+      });
+    } catch (error) {
+      console.error("Error retrying failed work order status change:", error);
+      res.status(500).json({ error: "Retry failed due to a server error" });
+    }
+  },
+);
+
+/**
+ * DELETE /api/admin/failed-work-orders/:id
+ * Dismiss (permanently delete) a failed work order status change record.
+ */
+router.delete(
+  "/failed-work-orders/:id",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const deleted = await db("failed_assetic_status_changes").where({ id }).delete();
+      if (!deleted) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      res.json({ message: "Record dismissed and deleted." });
+    } catch (error) {
+      console.error("Error deleting failed work order status change:", error);
+      res.status(500).json({ error: "Failed to delete record" });
+    }
+  },
+);
+
 export default router;
