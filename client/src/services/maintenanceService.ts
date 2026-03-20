@@ -106,7 +106,7 @@ interface CreateWorkOrderParams {
   workGroup?: string;
   assignedTo?: number;
   scheduledDate?: string;
-  scheduledFinish?: string;
+  estimatedDuration?: number;
 }
 
 interface UpdateWorkOrderParams {

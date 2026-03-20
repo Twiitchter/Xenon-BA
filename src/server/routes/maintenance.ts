@@ -386,6 +386,9 @@ router.post(
           WorkRequestPriorityId: workRequestPriorityId || null,
           // WorkRequestSubTypeId must be null (not empty string) for an Int field
           WorkRequestSubTypeId: null,
+          // Automatically set the Incident type based on direction extracted from
+          // the location path (e.g. "North", "South", "North West").
+          WorkRequestTypeId: await resolveIncidentTypeId(location, null),
           // WorkRequestPhysicalLocation is mandatory per the Assetic API.
           // Address.Country defaults to "Australia" to satisfy Assetic's country
           // validation. When no real street address is provided, StreetAddress
@@ -734,6 +737,79 @@ function craftToDiscipline(craft: string): string | null {
   return null;
 }
 
+// Assetic Work Request Types use slightly different discipline names to the
+// notional asset discipline strings, so we maintain a separate translation.
+// Keys are the notional-asset discipline values; values are the WR type names.
+const WR_DISCIPLINE_NAME: Record<string, string> = {
+  "Structure": "Structure",
+  "Electrical Services": "Electrical Services",
+  "Hydraulics & Plumbing": "Hydraulics & Plumbing",
+  "Mechanical": "Mechanical",
+  "Refrigeration": "Refrigeration",
+  "Fire System": "Fire Services",
+  "Security": "Security",
+  "Horticultural": "Horticultural",
+  "Generator": "Generator",
+  "Lift": "Lift",
+  "Medical Gases": "Medical Gases",
+  "Bld Mgmt and Ctrl": "Building Management & Control",
+  "Body & Cardiac Protection": "Body & Cardiac Protection",
+};
+
+/**
+ * Look up the Assetic Work Request Type ID (assetic_id) for an Incident of
+ * the given direction and optional craft discipline.
+ *
+ * - directionSource  any string containing direction info: work group name,
+ *                    location path, etc.  e.g. "North - Electrician" or
+ *                    "LGH > North > Level 2"
+ * - craft            optional craft string; when provided the specific
+ *                    discipline type is used (e.g. "North - Electrical Services")
+ *                    instead of the generic direction-only type ("North").
+ *
+ * Returns the numeric assetic_id to pass as WorkRequestTypeId, or null.
+ */
+async function resolveIncidentTypeId(
+  directionSource: string | null,
+  craft: string | null,
+): Promise<number | null> {
+  const src = (directionSource || "").toLowerCase();
+
+  let direction: string;
+  if (/north.?west|\bnw\b/.test(src)) direction = "North West";
+  else if (/\bsouth\b/.test(src)) direction = "South";
+  else if (/\bnorth\b/.test(src)) direction = "North";
+  else return null; // no recognisable direction
+
+  // Build the full WR type name: "North - Electrical Services" or just "North"
+  let typeName = direction;
+  if (craft) {
+    const naDisc = craftToDiscipline(craft);
+    const wrDisc = naDisc ? WR_DISCIPLINE_NAME[naDisc] : null;
+    if (wrDisc) typeName = `${direction} - ${wrDisc}`;
+  }
+
+  const row = await db("assetic_work_request_types")
+    .whereRaw("LTRIM(RTRIM(name)) = ?", [typeName])
+    .where("type_name", "Incident")
+    .select("assetic_id")
+    .first();
+
+  if (row) return Number(row.assetic_id);
+
+  // Fallback: direction-only type if the specific discipline type isn't found
+  if (typeName !== direction) {
+    const fallback = await db("assetic_work_request_types")
+      .whereRaw("LTRIM(RTRIM(name)) = ?", [direction])
+      .where("type_name", "Incident")
+      .select("assetic_id")
+      .first();
+    if (fallback) return Number(fallback.assetic_id);
+  }
+
+  return null;
+}
+
 /**
  * Given an asset name and a craft name, find the most appropriate Notional
  * Asset (NAN/NAS/NANW) for the same site and trade using name-based matching.
@@ -818,7 +894,7 @@ router.post(
     body("assignedTo").optional().isInt(),
     // Accept full datetime-local strings (YYYY-MM-DDTHH:mm) or plain dates
     body("scheduledDate").optional().trim(),
-    body("scheduledFinish").optional().trim(),
+    body("estimatedDuration").optional().isFloat({ min: 0 }),
   ],
   async (req: AuthRequest, res: Response) => {
     const errors = validationResult(req);
@@ -836,7 +912,7 @@ router.post(
         workGroup,
         assignedTo,
         scheduledDate,
-        scheduledFinish,
+        estimatedDuration,
       } = req.body;
 
       // Verify the maintenance request exists
@@ -894,26 +970,41 @@ router.post(
       };
 
       const normScheduledStart = normaliseDateTime(scheduledDate);
-      const normScheduledFinish = normaliseDateTime(scheduledFinish);
+      // Finish is identical to start — a single datetime picker covers both ends.
+      // The worker's estimated hours is tracked separately via EstimatedDuration.
+      const normScheduledFinish = normScheduledStart;
 
       // ── Assetic integration ───────────────────────────────────────────────
       let asseticWorkOrderId: string | null = null;
       let asseticFriendlyId: string | null = null;
       const asseticEnabled = await asseticClient.isEnabled();
 
+      // Estimated duration (hours). Stored here so it's accessible in both the
+      // PREP creation payload and the RFE transition payload below.
+      const durationHours = estimatedDuration
+        ? Number(estimatedDuration)
+        : null;
+
       if (asseticEnabled) {
-        const asseticPayload: any = {
-          // Status PREP = Work Order in Preparation (standard initial state)
+        // ── Step 1: Create the work order in PREP status ──────────────────
+        // We deliberately start in PREP so the record exists in Assetic even if
+        // the subsequent RFE status transition fails. Admins can see the failure
+        // and retry the promotion separately.
+        const prepPayload: any = {
           Status: "PREP",
           BriefDescription: title.slice(0, 250),
           LocationDescription: inheritedAssetLocation || undefined,
         };
 
+        if (durationHours) {
+          // Assetic stores EstimatedDuration in minutes
+          prepPayload.EstimatedDuration = Math.round(durationHours * 60);
+        }
         if (inheritedAssetGuid) {
-          asseticPayload.AssetId = inheritedAssetGuid;
+          prepPayload.AssetId = inheritedAssetGuid;
         }
         if (workGroup) {
-          asseticPayload.WorkOrderWorkGroup = workGroup;
+          prepPayload.WorkOrderWorkGroup = workGroup;
         }
 
         // Build supporting information: prepend location + requestor info,
@@ -940,25 +1031,24 @@ router.post(
         if (description) siParts.push(description);
 
         if (siParts.length) {
-          asseticPayload.SupportingInformation = [
+          prepPayload.SupportingInformation = [
             { Description: siParts.join("\n") },
           ];
         }
         if (normScheduledStart || normScheduledFinish) {
-          asseticPayload.Scheduling = {};
+          prepPayload.Scheduling = {};
           if (normScheduledStart)
-            asseticPayload.Scheduling.ScheduledStart = normScheduledStart;
+            prepPayload.Scheduling.ScheduledStart = normScheduledStart;
           if (normScheduledFinish)
-            asseticPayload.Scheduling.ScheduledFinish = normScheduledFinish;
+            prepPayload.Scheduling.ScheduledFinish = normScheduledFinish;
         }
-        // Link back to the originating work request in Assetic
         if (inheritedWrGuid) {
-          asseticPayload.WorkRequestId = inheritedWrGuid;
+          prepPayload.WorkRequestId = inheritedWrGuid;
         }
 
         try {
           const asseticResult =
-            await asseticClient.createWorkOrder(asseticPayload);
+            await asseticClient.createWorkOrder(prepPayload);
 
           // Response can be a GUID string OR an object with Id
           if (typeof asseticResult === "string") {
@@ -967,9 +1057,11 @@ router.post(
             asseticWorkOrderId = asseticResult.Id || asseticResult.id || null;
           }
 
-          console.log(`Assetic WO created — GUID: ${asseticWorkOrderId}`);
+          console.log(
+            `Assetic WO created (PREP) — GUID: ${asseticWorkOrderId}`,
+          );
 
-          // Fetch the full WO record to get the human-readable FriendlyId
+          // Fetch human-readable FriendlyId
           if (asseticWorkOrderId) {
             try {
               const woDetail =
@@ -994,13 +1086,12 @@ router.post(
             "Assetic work order creation failed";
 
           console.error(
-            `Assetic WO creation failed (HTTP ${httpStatus}):`,
+            `Assetic WO creation (PREP) failed (HTTP ${httpStatus}):`,
             msg,
             "| Raw:",
             JSON.stringify(errData),
           );
 
-          // Log the failure so admins can review and retry
           try {
             await db("failed_work_orders").insert({
               request_id: requestId,
@@ -1015,7 +1106,7 @@ router.post(
               asset_location: inheritedAssetLocation,
               scheduled_start: normScheduledStart,
               scheduled_finish: normScheduledFinish,
-              assetic_payload: JSON.stringify(asseticPayload),
+              assetic_payload: JSON.stringify(prepPayload),
               error_message: msg,
               assetic_error_response: errData ? JSON.stringify(errData) : null,
               assetic_http_status: httpStatus,
@@ -1027,9 +1118,76 @@ router.post(
             console.error("Failed to log failed work order to DB:", dbErr);
           }
 
+          // PREP creation failed entirely — nothing was created in Assetic
           return res.status(502).json({
             error: `Assetic rejected the work order: ${msg}`,
           });
+        }
+
+        // ── Step 2: Transition PREP → RFE ────────────────────────────────
+        // The WO now exists in Assetic. Promote it to RFE (Ready for Execution)
+        // so it appears in the work group's mobile app queue. Failure here is
+        // non-fatal: the local WO is still saved and the failure is logged for
+        // admin review / retry.
+        if (asseticWorkOrderId) {
+          const rfePayload: any = {
+            Id: asseticWorkOrderId,
+            Status: "RFE",
+          };
+          if (durationHours) {
+            rfePayload.EstimatedDuration = Math.round(durationHours * 60);
+            // Labour entry required for RFE — 1 person for the estimated hours
+            rfePayload.Labours = [
+              {
+                QuantityRequired: 1,
+                HoursRequired: durationHours,
+              },
+            ];
+          }
+
+          try {
+            await asseticClient.updateWorkOrder(asseticWorkOrderId, rfePayload);
+            console.log(`Assetic WO ${asseticWorkOrderId} promoted to RFE`);
+          } catch (rfeErr: any) {
+            const errData = rfeErr?.response?.data;
+            const httpStatus = rfeErr?.response?.status ?? null;
+            const msg =
+              extractAsseticErrorMessage(errData) ||
+              rfeErr?.message ||
+              "Assetic RFE status transition failed";
+
+            console.error(
+              `Assetic WO RFE transition failed (HTTP ${httpStatus}):`,
+              msg,
+              "| Raw:",
+              JSON.stringify(errData),
+            );
+
+            // Log for admin review — the WO will still be saved locally and in
+            // Assetic at PREP status; admin can retry the promotion.
+            try {
+              await db("failed_assetic_status_changes").insert({
+                assetic_work_order_guid: asseticWorkOrderId,
+                from_status: "PREP",
+                to_status: "RFE",
+                assetic_payload: JSON.stringify(rfePayload),
+                error_message: msg,
+                assetic_error_response: errData
+                  ? JSON.stringify(errData)
+                  : null,
+                assetic_http_status: httpStatus,
+                status: "pending",
+                created_at: new Date(),
+                updated_at: new Date(),
+              });
+            } catch (dbErr) {
+              console.error(
+                "Failed to log RFE status change failure to DB:",
+                dbErr,
+              );
+            }
+            // Continue — local WO is still created below
+          }
         }
       }
 
@@ -1064,6 +1222,30 @@ router.post(
       await db("maintenance_requests")
         .where("id", requestId)
         .update({ status: "in_progress", updated_at: db.fn.now() });
+
+      // ── Update WR type in Assetic to the specific discipline+direction type ──
+      // Now that we know the craft, we can be more specific than the generic
+      // directional type that was set on initial WR creation (e.g. "North").
+      // Upgrade it to e.g. "North - Electrical Services" if the type exists.
+      if (asseticEnabled && inheritedWrGuid && craft) {
+        try {
+          const dirSource = `${workGroup || ""} ${inheritedAssetLocation || ""}`;
+          const specificTypeId = await resolveIncidentTypeId(dirSource, craft);
+          if (specificTypeId) {
+            await asseticClient.updateWorkRequest(inheritedWrGuid, {
+              WorkRequestTypeId: specificTypeId,
+            });
+            console.log(
+              `WR ${inheritedWrGuid} type updated to incident type ${specificTypeId} (craft: ${craft})`,
+            );
+          }
+        } catch (wrTypeErr: any) {
+          // Non-fatal — the WO is already saved; log and continue
+          console.warn(
+            `Could not update WR incident type (non-fatal): ${wrTypeErr.message}`,
+          );
+        }
+      }
 
       const workOrder = await db("work_orders").where("id", newId).first();
       return res.status(201).json(workOrder);

@@ -88,7 +88,7 @@ const Maintenance: React.FC = () => {
   const [woCraft, setWoCraft] = useState("");
   const [woWorkGroup, setWoWorkGroup] = useState("");
   const [woScheduled, setWoScheduled] = useState("");
-  const [woScheduledFinish, setWoScheduledFinish] = useState("");
+  const [woEstimatedDuration, setWoEstimatedDuration] = useState("");
   const [creatingWo, setCreatingWo] = useState(false);
   const [workGroups, setWorkGroups] = useState<any[]>([]);
 
@@ -140,7 +140,7 @@ const Maintenance: React.FC = () => {
     setWoCraft("");
     setWoWorkGroup("");
     setWoScheduled("");
-    setWoScheduledFinish("");
+    setWoEstimatedDuration("");
     setMessages([]);
     setNewMessage("");
 
@@ -197,7 +197,9 @@ const Maintenance: React.FC = () => {
         craft: woCraft || deriveCraftFromWorkGroup(woWorkGroup) || undefined,
         workGroup: woWorkGroup || undefined,
         scheduledDate: woScheduled || undefined,
-        scheduledFinish: woScheduledFinish || undefined,
+        estimatedDuration: woEstimatedDuration
+          ? Number(woEstimatedDuration)
+          : undefined,
       });
       const updated = await refreshAndReselect(selected.id);
       if (updated?.work_order_id) {
@@ -209,7 +211,7 @@ const Maintenance: React.FC = () => {
       setWoCraft("");
       setWoWorkGroup("");
       setWoScheduled("");
-      setWoScheduledFinish("");
+      setWoEstimatedDuration("");
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to create work order");
     } finally {
@@ -909,27 +911,22 @@ const Maintenance: React.FC = () => {
                             onChange={(e) => setWoScheduled(e.target.value)}
                           />
                         </div>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "10px",
-                          marginBottom: "8px",
-                        }}
-                      >
                         <div
                           className="form-group"
                           style={{ flex: 1, marginBottom: 0 }}
                         >
                           <label style={{ fontSize: "12px" }}>
-                            Scheduled Finish
+                            Est. Duration (hrs)
                           </label>
                           <input
-                            type="datetime-local"
-                            value={woScheduledFinish}
+                            type="number"
+                            min="0.5"
+                            step="0.5"
+                            value={woEstimatedDuration}
                             onChange={(e) =>
-                              setWoScheduledFinish(e.target.value)
+                              setWoEstimatedDuration(e.target.value)
                             }
+                            placeholder="e.g. 2"
                           />
                         </div>
                       </div>
