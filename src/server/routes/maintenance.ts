@@ -735,43 +735,70 @@ function craftToDiscipline(craft: string): string | null {
 }
 
 /**
- * Given an asset GUID and a craft name, attempt to find the most appropriate
- * Notional Asset (NAN/NAS/NANW) for the same building and trade.
+ * Given an asset name and a craft name, find the most appropriate Notional
+ * Asset (NAN/NAS/NANW) for the same site and trade using name-based matching.
+ *
+ * Strategy:
+ *  1. Extract the site code = first word of the original asset name (e.g. "LGH")
+ *  2. Determine the discipline string from the craft keyword
+ *  3. Determine the NAN/NAS/NANW suffix from the direction embedded in the work
+ *     group name ("North - Electrician" → NAN) or the asset location field
+ *  4. Query assetic_assets restricted to that exact suffix
+ *  5. Among candidates, prefer the shortest name (fewest words) — this picks the
+ *     site-level notional asset over sub-building variants
+ *
  * Returns { guid, assetId, name } or null if not found.
  */
 async function resolveNotionalAsset(
   originalAssetGuid: string,
+  originalAssetName: string | null,
   craft: string,
+  workGroup: string | null,
+  location: string | null,
 ): Promise<{ guid: string; assetId: string; name: string } | null> {
   const discipline = craftToDiscipline(craft);
   if (!discipline) return null;
 
-  // 1. Find all FL GUIDs that the original asset belongs to
-  const flRows = await db("assetic_asset_functional_locations")
-    .where("asset_guid", originalAssetGuid)
-    .select("fl_guid");
+  // Site code is the first word of the asset name, e.g. "LGH Level 2 Ward 1" → "LGH"
+  const siteCode = (originalAssetName || "").trim().split(/\s+/)[0];
+  if (!siteCode) return null;
 
-  if (!flRows.length) return null;
-  const flGuids = flRows.map((r: any) => r.fl_guid);
+  // Determine the directional suffix from the work group name first (most reliable),
+  // then fall back to the asset location field.
+  // Work group examples: "North - Electrician", "South Carpenters", "North West - Plumbing"
+  // Location examples: "North", "South", "North West"
+  const dirSource = `${workGroup || ""} ${location || ""}`.trim();
+  let suffix: string;
+  if (/north.?west|\bnw\b/i.test(dirSource)) {
+    suffix = "NANW";
+  } else if (/\bsouth\b/i.test(dirSource)) {
+    suffix = "NAS";
+  } else {
+    // "North" or anything unrecognised defaults to NAN
+    suffix = "NAN";
+  }
 
-  // 2. Find notional assets in those same FLs whose name contains the discipline
-  const notional = await db("assetic_asset_functional_locations as afl")
-    .join("assetic_assets as a", "a.assetic_guid", "afl.asset_guid")
-    .whereIn("afl.fl_guid", flGuids)
-    .where(function () {
-      this.where("a.asset_name", "like", "% NAN")
-        .orWhere("a.asset_name", "like", "% NAS")
-        .orWhere("a.asset_name", "like", "% NANW");
-    })
-    .whereRaw("a.asset_name LIKE ?", [`%${discipline}%`])
+  // Find all notional assets belonging to this site with the matching discipline and direction
+  const candidates = await db("assetic_assets")
+    .where("asset_name", "like", `${siteCode}%`)
+    .whereRaw("asset_name LIKE ?", [`%${discipline}%`])
+    .where("asset_name", "like", `% ${suffix}`)
     .select(
-      "a.assetic_guid as guid",
-      "a.asset_id as assetId",
-      "a.asset_name as name",
-    )
-    .first();
+      "assetic_guid as guid",
+      "asset_id as assetId",
+      "asset_name as name",
+    );
 
-  return notional || null;
+  if (!candidates.length) return null;
+
+  // Prefer the site-level asset (shortest name = fewest words between site code and suffix)
+  // e.g. "LGH Structure NAN" (3 words) beats "LGH Holman Structure NAN" (4 words)
+  candidates.sort(
+    (a: any, b: any) =>
+      a.name.trim().split(/\s+/).length - b.name.trim().split(/\s+/).length,
+  );
+
+  return candidates[0];
 }
 
 /**
@@ -836,7 +863,10 @@ router.post(
         try {
           const notional = await resolveNotionalAsset(
             inheritedAssetGuid,
+            inheritedAssetName,
             craft,
+            workGroup || null,
+            inheritedAssetLocation,
           );
           if (notional) {
             console.log(
