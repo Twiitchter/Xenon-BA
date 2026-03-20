@@ -103,6 +103,7 @@ interface CreateWorkOrderParams {
   description?: string;
   priority?: string;
   craft?: string;
+  workGroup?: string;
   assignedTo?: number;
   scheduledDate?: string;
 }

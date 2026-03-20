@@ -388,7 +388,7 @@ const Maintenance: React.FC = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th style={{ width: "40px" }}>#</th>
+                    <th style={{ width: "60px" }}>WR #</th>
                     <th>Title</th>
                     <th>Submitted By</th>
                     <th style={{ width: "90px" }}>Priority</th>
@@ -413,8 +413,9 @@ const Maintenance: React.FC = () => {
                     >
                       <td
                         style={{ color: "var(--text-muted)", fontSize: "13px" }}
+                        title={`Local ID: ${req.id}`}
                       >
-                        {req.id}
+                        {req.assetic_friendly_id || `WR-${req.id}`}
                       </td>
                       <td style={{ fontWeight: 500 }}>{req.title}</td>
                       <td
@@ -512,7 +513,11 @@ const Maintenance: React.FC = () => {
           {/* Modal header */}
           <div className="modal-header">
             <div>
-              <h3>{selected.title}</h3>
+              <h3>
+                {selected.assetic_friendly_id
+                  ? `${selected.assetic_friendly_id}: ${selected.title}`
+                  : selected.title}
+              </h3>
               <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>
                 Submitted by{" "}
                 <strong style={{ color: "var(--text-secondary)" }}>
