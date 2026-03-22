@@ -175,6 +175,19 @@ class AdminService {
     return response.data;
   }
 
+  async importUsers(csv: string): Promise<{
+    message: string;
+    created: string[];
+    skipped: { email: string; reason: string }[];
+  }> {
+    const response = await axios.post(
+      `${API_URL}/users/import`,
+      { csv },
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
   // ─── Stats / Activity ────────────────────────────────────────────
 
   async getStats() {
