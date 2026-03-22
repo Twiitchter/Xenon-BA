@@ -793,6 +793,143 @@ router.post(
 );
 
 /**
+ * POST /api/admin/users/import
+ * Bulk-create users from a CSV string.
+ * Expected JSON body: { csv: "<csv text>" }
+ * CSV columns (header row required):
+ *   email (required), password (required), username, role,
+ *   first_name, last_name, department, phone, display_name
+ * Passwords are hashed with bcrypt at 10 salt rounds.
+ */
+router.post("/users/import", async (req: AuthRequest, res: Response) => {
+  try {
+    const { csv } = req.body;
+    if (!csv || typeof csv !== "string" || csv.trim() === "") {
+      return res.status(400).json({ error: "csv field is required" });
+    }
+
+    const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) {
+      return res.status(400).json({ error: "CSV must contain a header row and at least one data row" });
+    }
+
+    // Parse CSV helper: handles quoted fields
+    const parseCsvLine = (line: string): string[] => {
+      const fields: string[] = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === "," && !inQuotes) {
+          fields.push(current.trim());
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+      fields.push(current.trim());
+      return fields;
+    };
+
+    const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
+
+    const colIdx = (names: string[]): number => {
+      for (const name of names) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    const emailIdx = colIdx(["email"]);
+    const passwordIdx = colIdx(["password"]);
+
+    if (emailIdx === -1 || passwordIdx === -1) {
+      return res.status(400).json({ error: "CSV must include 'email' and 'password' columns" });
+    }
+
+    const usernameIdx = colIdx(["username"]);
+    const roleIdx = colIdx(["role"]);
+    const firstNameIdx = colIdx(["first_name", "firstname"]);
+    const lastNameIdx = colIdx(["last_name", "lastname"]);
+    const departmentIdx = colIdx(["department"]);
+    const phoneIdx = colIdx(["phone"]);
+    const displayNameIdx = colIdx(["display_name", "displayname"]);
+
+    const created: string[] = [];
+    const skipped: { email: string; reason: string }[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const fields = parseCsvLine(lines[i]);
+      const email = emailIdx !== -1 ? fields[emailIdx] || "" : "";
+      const password = passwordIdx !== -1 ? fields[passwordIdx] || "" : "";
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        skipped.push({ email: email || `row ${i + 1}`, reason: "Invalid or missing email" });
+        continue;
+      }
+      if (!password || password.length < 8) {
+        skipped.push({ email, reason: "Password must be at least 8 characters" });
+        continue;
+      }
+
+      const existing = await db("users").where("email", email).first();
+      if (existing) {
+        skipped.push({ email, reason: "Email already exists" });
+        continue;
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const username = (usernameIdx !== -1 && fields[usernameIdx]) ? fields[usernameIdx] : email.split("@")[0];
+      const role = (roleIdx !== -1 && fields[roleIdx] && ["admin", "manager", "user"].includes(fields[roleIdx])) ? fields[roleIdx] : "user";
+
+      const [inserted] = await db("users")
+        .insert({
+          username,
+          email,
+          password_hash: passwordHash,
+          first_name: (firstNameIdx !== -1 && fields[firstNameIdx]) ? fields[firstNameIdx] : null,
+          last_name: (lastNameIdx !== -1 && fields[lastNameIdx]) ? fields[lastNameIdx] : null,
+          role,
+          auth_provider: "local",
+          is_active: true,
+          department: (departmentIdx !== -1 && fields[departmentIdx]) ? fields[departmentIdx] : null,
+          phone: (phoneIdx !== -1 && fields[phoneIdx]) ? fields[phoneIdx] : null,
+          display_name: (displayNameIdx !== -1 && fields[displayNameIdx]) ? fields[displayNameIdx] : null,
+        })
+        .returning("*");
+
+      let user = inserted;
+      if (typeof user === "number" || !user?.id) {
+        user = await db("users").where("email", email).first();
+      }
+
+      await activityService.log({
+        performed_by: req.user.id,
+      });
+
+      created.push(email);
+    }
+
+    res.status(207).json({
+      message: `Import complete: ${created.length} created, ${skipped.length} skipped`,
+      created,
+      skipped,
+    });
+  } catch (error) {
+    console.error("Error importing users from CSV:", error);
+    res.status(500).json({ error: "Failed to import users" });
+  }
+});
+
+/**
  * PUT /api/admin/users/:id
  * Update a user
  */

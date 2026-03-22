@@ -37,6 +37,12 @@ const EMPTY_FORM = {
   displayName: "",
 };
 
+interface ImportResult {
+  message: string;
+  created: string[];
+  skipped: { email: string; reason: string }[];
+}
+
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +55,9 @@ const Users: React.FC = () => {
   const [locationSelection, setLocationSelection] = useState<LocationSelection>(
     EMPTY_LOCATION_SELECTION,
   );
+  const [showImport, setShowImport] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -96,6 +105,42 @@ const Users: React.FC = () => {
     const floor = building.floors?.find((f: any) => f.id === sel.floorId);
     if (floor) names.prefFloorName = floor.name;
     return names;
+  };
+
+  const downloadTemplate = () => {
+    const header = "email,password,username,role,first_name,last_name,department,phone,display_name";
+    const example = "john.doe@example.com,ChangeMe!8,johnd,user,John,Doe,IT,,";
+    const blob = new Blob([header + "\n" + example + "\n"], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "user_import_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    setError("");
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const csv = ev.target?.result as string;
+        const result = await adminService.importUsers(csv);
+        setImportResult(result);
+        fetchUsers();
+      } catch (err: any) {
+        setError(err?.response?.data?.error || "CSV import failed");
+      } finally {
+        setImporting(false);
+        // Reset file input so the same file can be re-uploaded if needed
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,14 +258,25 @@ const Users: React.FC = () => {
             Manage user accounts, roles and default location
           </p>
         </div>
-        <button
-          onClick={() => {
-            cancelForm();
-            setShowForm(true);
-          }}
-        >
-          + New User
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            className="btn-outline"
+            onClick={() => {
+              setShowImport((v) => !v);
+              setImportResult(null);
+            }}
+          >
+            Import CSV
+          </button>
+          <button
+            onClick={() => {
+              cancelForm();
+              setShowForm(true);
+            }}
+          >
+            + New User
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -237,6 +293,70 @@ const Users: React.FC = () => {
           style={{ padding: "12px", marginBottom: "12px" }}
         >
           {success}
+        </div>
+      )}
+
+      {showImport && (
+        <div className="card" style={{ marginBottom: "20px" }}>
+          <h3 style={{ marginBottom: "12px" }}>Import Users from CSV</h3>
+          <p style={{ color: "var(--text-secondary)", marginBottom: "12px", fontSize: "0.9em" }}>
+            Upload a CSV file to create multiple user accounts at once. Passwords are
+            encrypted with bcrypt (10 rounds). Existing emails are skipped.
+          </p>
+          <p style={{ color: "var(--text-secondary)", marginBottom: "12px", fontSize: "0.85em" }}>
+            Required columns: <strong>email</strong>, <strong>password</strong> (min 8 chars).
+            Optional: username, role (user/manager/admin), first_name, last_name,
+            department, phone, display_name.
+          </p>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <label
+              style={{
+                display: "inline-block",
+                padding: "8px 16px",
+                background: "var(--primary)",
+                color: "#fff",
+                borderRadius: "4px",
+                cursor: importing ? "not-allowed" : "pointer",
+                opacity: importing ? 0.6 : 1,
+              }}
+            >
+              {importing ? "Importing…" : "Choose CSV File"}
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: "none" }}
+                disabled={importing}
+                onChange={handleImportFile}
+              />
+            </label>
+            <button className="btn-outline" onClick={downloadTemplate}>
+              Download Template
+            </button>
+          </div>
+
+          {importResult && (
+            <div style={{ marginTop: "16px" }}>
+              <p style={{ fontWeight: 500 }}>{importResult.message}</p>
+              {importResult.created.length > 0 && (
+                <div style={{ marginTop: "8px" }}>
+                  <strong>Created ({importResult.created.length}):</strong>
+                  <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85em", color: "var(--text-secondary)" }}>
+                    {importResult.created.map((e) => <li key={e}>{e}</li>)}
+                  </ul>
+                </div>
+              )}
+              {importResult.skipped.length > 0 && (
+                <div style={{ marginTop: "8px" }}>
+                  <strong>Skipped ({importResult.skipped.length}):</strong>
+                  <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85em", color: "var(--text-muted)" }}>
+                    {importResult.skipped.map((s, i) => (
+                      <li key={i}>{s.email} — {s.reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
