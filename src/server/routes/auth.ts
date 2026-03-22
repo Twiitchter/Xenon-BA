@@ -230,6 +230,8 @@ router.get("/me", async (req: Request, res: Response) => {
         "role",
         "department",
         "phone",
+        "mobile",
+        "contact_email",
         "display_name",
         "pref_region_id",
         "pref_region_name",
@@ -254,6 +256,8 @@ router.get("/me", async (req: Request, res: Response) => {
       role: user.role || "user",
       department: user.department || null,
       phone: user.phone || null,
+      mobile: user.mobile || null,
+      contactEmail: user.contact_email || null,
       displayName: user.display_name || null,
       prefRegionId: user.pref_region_id || null,
       prefRegionName: user.pref_region_name || null,
@@ -279,6 +283,8 @@ router.put(
   [
     body("department").optional().trim(),
     body("phone").optional().trim(),
+    body("mobile").optional().trim(),
+    body("contactEmail").optional().trim(),
     body("displayName").optional().trim(),
     body("prefRegionId").optional().trim(),
     body("prefRegionName").optional().trim(),
@@ -309,6 +315,8 @@ router.put(
       const {
         department,
         phone,
+        mobile,
+        contactEmail,
         displayName,
         prefRegionId,
         prefRegionName,
@@ -323,6 +331,9 @@ router.put(
       const updateData: any = { updated_at: db.fn.now() };
       if (department !== undefined) updateData.department = department || null;
       if (phone !== undefined) updateData.phone = phone || null;
+      if (mobile !== undefined) updateData.mobile = mobile || null;
+      if (contactEmail !== undefined)
+        updateData.contact_email = contactEmail || null;
       if (displayName !== undefined)
         updateData.display_name = displayName || null;
       if (prefRegionId !== undefined)
@@ -355,6 +366,8 @@ router.put(
           "role",
           "department",
           "phone",
+          "mobile",
+          "contact_email",
           "display_name",
           "pref_region_id",
           "pref_region_name",
@@ -376,6 +389,8 @@ router.put(
         role: updated.role || "user",
         department: updated.department || null,
         phone: updated.phone || null,
+        mobile: updated.mobile || null,
+        contactEmail: updated.contact_email || null,
         displayName: updated.display_name || null,
         prefRegionId: updated.pref_region_id || null,
         prefRegionName: updated.pref_region_name || null,

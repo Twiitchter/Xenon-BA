@@ -426,7 +426,7 @@ const WorkOrders: React.FC = () => {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th style={{ width: "40px" }}>#</th>
+                    <th style={{ width: "60px" }}>WO #</th>
                     <th>Title</th>
                     <th style={{ width: "90px" }}>Priority</th>
                     <th style={{ width: "120px" }}>Status</th>
@@ -450,9 +450,13 @@ const WorkOrders: React.FC = () => {
                       }}
                     >
                       <td
-                        style={{ color: "var(--text-muted)", fontSize: "13px" }}
+                        style={{
+                          color: "var(--text-muted)",
+                          fontSize: "13px",
+                          fontWeight: wo.assetic_friendly_id ? 500 : undefined,
+                        }}
                       >
-                        {wo.id}
+                        {wo.assetic_friendly_id || `#${wo.id}`}
                       </td>
                       <td style={{ fontWeight: 500 }}>{wo.title}</td>
                       <td>
@@ -562,7 +566,9 @@ const WorkOrders: React.FC = () => {
           <div className="modal-header">
             <div>
               <h3>
-                WO #{selectedOrder.id}: {selectedOrder.title}
+                {selectedOrder.assetic_friendly_id
+                  ? `${selectedOrder.assetic_friendly_id}: ${selectedOrder.title}`
+                  : `WO #${selectedOrder.id}: ${selectedOrder.title}`}
               </h3>
               <div
                 style={{
@@ -595,7 +601,12 @@ const WorkOrders: React.FC = () => {
               <button
                 className="btn-ghost"
                 onClick={() =>
-                  generatePdf(buildWorkOrderTemplate(selectedOrder, pdfSection.content.trim() ? pdfSection : undefined))
+                  generatePdf(
+                    buildWorkOrderTemplate(
+                      selectedOrder,
+                      pdfSection.content.trim() ? pdfSection : undefined,
+                    ),
+                  )
                 }
                 title="Download PDF"
                 style={{ fontSize: "13px" }}

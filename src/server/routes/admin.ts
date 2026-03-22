@@ -1436,7 +1436,7 @@ router.get(
         .select(
           "fasc.*",
           "wo.title as work_order_title",
-          "wo.location as work_order_location",
+          "wo.asset_location as work_order_location",
           "wo.work_group as work_order_work_group",
         )
         .orderBy("fasc.created_at", "desc")
@@ -1470,7 +1470,7 @@ router.get(
         .select(
           "fasc.*",
           "wo.title as work_order_title",
-          "wo.location as work_order_location",
+          "wo.asset_location as work_order_location",
           "wo.work_group as work_order_work_group",
         )
         .where("fasc.id", id)

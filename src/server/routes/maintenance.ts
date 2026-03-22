@@ -4,6 +4,7 @@ import { authenticateToken, AuthRequest } from "../middleware/auth";
 import db from "../database";
 import asseticClient from "../services/asseticClient";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
+import settingsService from "../services/settingsService";
 
 const router = Router();
 
@@ -207,6 +208,7 @@ router.get("/requests", async (req: AuthRequest, res: Response) => {
         "mr.*",
         "u.username as requested_by_username",
         db.raw("wo.id as work_order_id"),
+        db.raw("wo.assetic_friendly_id as work_order_friendly_id"),
         db.raw("wo.status as work_order_status"),
         db.raw("wo.craft as work_order_craft"),
       );
@@ -854,6 +856,16 @@ async function resolveResourceIdForIdentity(
   return null;
 }
 
+async function resolveResourceIdFromCandidateIdentities(
+  identities: Array<string | null | undefined>,
+): Promise<string | null> {
+  for (const identity of identities) {
+    const id = await resolveResourceIdForIdentity(identity || null);
+    if (id) return id;
+  }
+  return null;
+}
+
 function parseLabourAssignmentFromRow(row: any): ResolvedLabourAssignment {
   if (!row || typeof row !== "object") return null;
 
@@ -891,54 +903,24 @@ async function resolveLabourAssignment(
   workGroup: string | null,
   craft: string | null,
 ): Promise<ResolvedLabourAssignment> {
-  if (!workGroup) return null;
+  if (!workGroup && !craft) return null;
 
   const esc = (s: string) => s.replace(/'/g, "''");
-  const workGroupFilter = `WorkGroupName~eq~'${esc(workGroup)}'`;
   const craftText = (craft || "").trim().toLowerCase();
 
-  // 1) Fast path: managedresource already models resource↔workgroup assignments.
+  // ManagedResource endpoint and WorkGroupName resource filters are disabled
+  // in this tenant (405), so rely on broad resource lookup with optional
+  // craft text matching.
   let data: any;
+
+  // Query resources directly by work group and optional craft text.
   try {
-    data = await asseticClient.getManagedResources({
-      page: 1,
-      pageSize: 500,
-      filters: workGroupFilter,
-    });
-    const rows: any[] = Array.isArray(data)
-      ? data
-      : data?.ResourceList || data?.Results || data?.results || [];
-
-    let fallback: ResolvedLabourAssignment = null;
-    for (const row of rows) {
-      const assignment = parseLabourAssignmentFromRow(row);
-      if (!assignment) continue;
-      if (!fallback) fallback = assignment;
-
-      if (!craftText) return assignment;
-
-      const rowText = `${
-        row?.CraftName || ""
-      } ${row?.Craft || ""} ${row?.Name || ""} ${row?.DisplayName || ""}`
-        .toLowerCase()
-        .trim();
-      if (rowText.includes(craftText)) return assignment;
+    const params: any = { page: 1, pageSize: 500 };
+    if (craftText) {
+      params.filters = `DisplayName~contains~'${esc(craft || "")}'`;
     }
-    if (fallback) return fallback;
-  } catch {
-    // fall through to resource endpoint fallback
-  }
 
-  // 2) Fallback: query resources directly by work group and optional craft text.
-  try {
-    const filters = craftText
-      ? `${workGroupFilter}~and~DisplayName~contains~'${esc(craft || "")}'`
-      : workGroupFilter;
-    data = await asseticClient.getResources({
-      page: 1,
-      pageSize: 500,
-      filters,
-    });
+    data = await asseticClient.getResources(params);
     const rows: any[] = Array.isArray(data)
       ? data
       : data?.ResourceList || data?.Results || data?.results || [];
@@ -950,6 +932,55 @@ async function resolveLabourAssignment(
     // keep falling through
   }
 
+  return null;
+}
+
+/**
+ * Resolve Work Type for Assetic Work Orders (endpoint: /worktype).
+ * Uses named categories returned by Assetic (e.g. Corrective Maintenance).
+ */
+async function resolveWorkOrderTypeId(): Promise<number | null> {
+  try {
+    const data = await asseticClient.getWorkTypes();
+    const rows: any[] = Array.isArray(data)
+      ? data
+      : data?.ResourceList || data?.Results || data?.results || [];
+    if (!rows.length) return null;
+
+    const byName = (target: string) =>
+      rows.find(
+        (r) =>
+          String(r?.Name || r?.Type || "")
+            .trim()
+            .toLowerCase() === target,
+      );
+    const byCode = (target: string) =>
+      rows.find(
+        (r) =>
+          String(r?.Code || "")
+            .trim()
+            .toLowerCase() === target,
+      );
+
+    // Match the known-good WO contract in this tenant.
+    const cmCorrective = byCode("cmcorrective");
+    if (cmCorrective?.Id != null) return Number(cmCorrective.Id);
+
+    // Reactive portal WOs should default to Corrective Maintenance.
+    const corrective = byName("corrective maintenance");
+    if (corrective?.Id != null) return Number(corrective.Id);
+
+    // Fallbacks if tenant naming differs.
+    const preventative = byName("preventative maintenance");
+    if (preventative?.Id != null) return Number(preventative.Id);
+
+    const first = rows.find((r) => r?.Id != null);
+    if (first?.Id != null) return Number(first.Id);
+  } catch (err: any) {
+    console.warn(
+      `Could not resolve WorkTypeId from /worktype: ${err?.message || err}`,
+    );
+  }
   return null;
 }
 
@@ -1173,22 +1204,68 @@ router.post(
         // back to inheritedAssetLocation if workGroup has no region keyword.
         const dirSource =
           `${workGroup || ""} ${inheritedAssetLocation || ""}`.trim();
-        const woTypeId = await resolveIncidentTypeId(dirSource, craft || null);
+        const woTypeId = await resolveWorkOrderTypeId();
         let labourAssignment = await resolveLabourAssignment(
           workGroup || null,
           craft || null,
         );
 
-        const creatorResourceId = await resolveResourceIdForIdentity(
-          req.user?.email || req.user?.username || null,
+        // Pull classification codes from the linked WR when available.
+        // Some Assetic tenants enforce these at WO create time depending on
+        // the selected WorkOrderType.
+        let wrRequestorId: string | null = null;
+        let wrFailureSubCodeId: any = null;
+        let wrCauseSubCodeId: any = null;
+        let wrRemedyCodeId: any = null;
+        if (inheritedWrGuid) {
+          try {
+            const wrDetail =
+              await asseticClient.getWorkRequest(inheritedWrGuid);
+            wrRequestorId = wrDetail?.RequestorId
+              ? String(wrDetail.RequestorId)
+              : null;
+            wrFailureSubCodeId = wrDetail?.FailureSubCodeId ?? null;
+            wrCauseSubCodeId = wrDetail?.CauseSubCodeId ?? null;
+            wrRemedyCodeId = wrDetail?.RemedyCodeId ?? null;
+          } catch (wrErr: any) {
+            console.warn(
+              `Could not fetch WR ${inheritedWrGuid} for WO subcode defaults: ${wrErr?.message || wrErr}`,
+            );
+          }
+        }
+
+        const configuredApiUsername = await settingsService.get(
+          "assetic_api_username",
+          "",
         );
+        const workerCountRaw = await settingsService.get(
+          "assetic_worker_count",
+          "1",
+        );
+        const workerCount = Math.max(1, Number(workerCountRaw) || 1);
+        const workerUsernames: string[] = [];
+        for (let i = 1; i <= workerCount; i++) {
+          const uname = await settingsService.get(
+            `assetic_worker_${i}_username`,
+            "",
+          );
+          if (uname) workerUsernames.push(uname);
+        }
+
+        const creatorResourceId =
+          await resolveResourceIdFromCandidateIdentities([
+            req.user?.email,
+            req.user?.username,
+            configuredApiUsername,
+            ...workerUsernames,
+          ]);
         if (woTypeId) {
           console.log(
             `Resolved WorkOrderType Id: ${woTypeId} for workGroup "${workGroup}" / craft "${craft}"`,
           );
         } else {
           console.warn(
-            `Could not resolve WorkOrderType for workGroup "${workGroup}" / craft "${craft}" — omitting from payload`,
+            `Could not resolve WorkOrderType Id for workGroup "${workGroup}" / craft "${craft}" — omitting from payload`,
           );
         }
         if (labourAssignment?.resourceId) {
@@ -1202,15 +1279,12 @@ router.post(
         }
 
         if (creatorResourceId) {
-          console.log(`Resolved Creator/Requestor Resource Id: ${creatorResourceId}`);
-          if (!labourAssignment) {
-            // Fallback: use the creator's resource when no group/craft-specific
-            // labour assignment can be resolved.
-            labourAssignment = { resourceId: creatorResourceId };
-          }
+          console.log(
+            `Resolved Creator/Requestor Resource Id: ${creatorResourceId}`,
+          );
         } else {
           console.warn(
-            `Could not resolve Creator/Requestor Resource from identity "${req.user?.email || req.user?.username || ""}"`,
+            `Could not resolve Creator/Requestor Resource from candidate identities (jwt:${req.user?.email || req.user?.username || ""}, assetic:${configuredApiUsername || ""})`,
           );
         }
 
@@ -1222,12 +1296,18 @@ router.post(
 
         if (creatorResourceId) {
           prepPayload.CreatorId = creatorResourceId;
-          prepPayload.RequestorId = creatorResourceId;
+        }
+        if (wrRequestorId || creatorResourceId) {
+          prepPayload.RequestorId = wrRequestorId || creatorResourceId;
         }
 
         if (woTypeId) {
           prepPayload.WorkOrderType = { Id: woTypeId };
         }
+
+        prepPayload.FailureSubCodeId = wrFailureSubCodeId ?? 1;
+        prepPayload.CauseSubCodeId = wrCauseSubCodeId ?? 1;
+        prepPayload.RemedyCodeId = wrRemedyCodeId ?? 1;
 
         if (durationHours) {
           // Assetic stores EstimatedDuration in minutes
@@ -1240,34 +1320,9 @@ router.post(
           prepPayload.WorkOrderWorkGroup = workGroup;
         }
 
-        // Some Assetic configurations require at least one assigned labour resource
-        // aligned to the work group / craft when creating the WO.
-        if (labourAssignment?.resourceId) {
-          const labour: any = {
-            QuantityRequired: 1,
-            HoursRequired: durationHours || 1,
-            MaintenanceResources: [
-              {
-                Resource: { Id: labourAssignment.resourceId },
-                StatusId: 1,
-              },
-            ],
-          };
-
-          if (labourAssignment.plannedGroupCraftId) {
-            labour.PlannedGroupCraftId = labourAssignment.plannedGroupCraftId;
-          }
-          if (labourAssignment.assignedGroupCraftId) {
-            labour.MaintenanceResources[0].AssignedGroupCraftId =
-              labourAssignment.assignedGroupCraftId;
-          }
-          if (labourAssignment.groupCraftId) {
-            labour.MaintenanceResources[0].GroupCraftId =
-              labourAssignment.groupCraftId;
-          }
-
-          prepPayload.Labours = [labour];
-        }
+        // Do not send Labours on PREP create in this tenant. A live successful
+        // Assetic WO for the same asset/workgroup is created without Labours,
+        // and arbitrary resource assignments here lead to validation conflicts.
 
         // Build supporting information: prepend location + requestor info,
         // then append any extra description provided by the admin.
@@ -1299,10 +1354,11 @@ router.post(
         }
         if (normScheduledStart || normScheduledFinish) {
           prepPayload.Scheduling = {};
+          // Assetic PREP creation expects target window values.
           if (normScheduledStart)
-            prepPayload.Scheduling.ScheduledStart = normScheduledStart;
+            prepPayload.Scheduling.TargetStart = normScheduledStart;
           if (normScheduledFinish)
-            prepPayload.Scheduling.ScheduledFinish = normScheduledFinish;
+            prepPayload.Scheduling.TargetFinish = normScheduledFinish;
         }
         if (inheritedWrGuid) {
           prepPayload.WorkRequestId = inheritedWrGuid;
@@ -1312,27 +1368,46 @@ router.post(
           const asseticResult =
             await asseticClient.createWorkOrder(prepPayload);
 
-          // Response can be a GUID string OR an object with Id
+          // Assetic wraps the created WO in { Data: [{ Id, FriendlyIdStr, ... }] }.
+          // Also handle plain GUID string and direct-object formats defensively.
+          let asseticResultObj: any = asseticResult;
+          if (
+            asseticResultObj &&
+            typeof asseticResultObj === "object" &&
+            Array.isArray(asseticResultObj.Data) &&
+            asseticResultObj.Data.length > 0
+          ) {
+            asseticResultObj = asseticResultObj.Data[0];
+          }
+
           if (typeof asseticResult === "string") {
             asseticWorkOrderId = asseticResult.trim().replace(/^"|"$/g, "");
-          } else if (asseticResult && typeof asseticResult === "object") {
-            asseticWorkOrderId = asseticResult.Id || asseticResult.id || null;
+          } else if (asseticResultObj && typeof asseticResultObj === "object") {
+            asseticWorkOrderId =
+              asseticResultObj.Id || asseticResultObj.id || null;
+            // Pull FriendlyIdStr directly from the create response — no extra fetch needed.
+            asseticFriendlyId =
+              asseticResultObj.FriendlyIdStr ||
+              asseticResultObj.FriendlyId?.toString() ||
+              null;
           }
 
           console.log(
-            `Assetic WO created (PREP) — GUID: ${asseticWorkOrderId}`,
+            `Assetic WO created (PREP) — GUID: ${asseticWorkOrderId} | FriendlyId: ${asseticFriendlyId}`,
           );
 
-          // Fetch human-readable FriendlyId
-          if (asseticWorkOrderId) {
+          // If FriendlyIdStr wasn't in the create response, fetch it separately.
+          if (asseticWorkOrderId && !asseticFriendlyId) {
             try {
               const woDetail =
                 await asseticClient.getWorkOrder(asseticWorkOrderId);
               asseticFriendlyId =
-                woDetail?.FriendlyId?.toString() ||
                 woDetail?.FriendlyIdStr ||
+                woDetail?.FriendlyId?.toString() ||
                 null;
-              console.log(`Assetic WO FriendlyId: ${asseticFriendlyId}`);
+              console.log(
+                `Assetic WO FriendlyId (fetched): ${asseticFriendlyId}`,
+              );
             } catch (fetchErr: any) {
               console.warn(
                 `Could not fetch WO detail for friendly ID (non-fatal): ${fetchErr.message}`,

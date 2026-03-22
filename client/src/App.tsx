@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import Users from "./pages/Users";
 import MyProfile from "./pages/MyProfile";
 import FailedRequests from "./pages/FailedRequests";
+import FailedWorkOrders from "./pages/FailedWorkOrders";
 import { authService } from "./services/authService";
 import { ToastProvider } from "./contexts/ToastContext";
 import ToastContainer from "./components/ToastContainer";
@@ -332,6 +333,21 @@ function AppContent() {
                     </svg>
                     Failed Requests
                   </NavLink>
+                  <NavLink to="/admin/failed-work-orders">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M3 3h18v4H3z" />
+                      <path d="M3 11h18v10H3z" />
+                      <path d="M9 15h6" />
+                    </svg>
+                    Failed Work Orders
+                  </NavLink>
                 </div>
               </>
             )}
@@ -447,6 +463,19 @@ function AppContent() {
             element={
               isAuthenticated && isAdmin ? (
                 <FailedRequests />
+              ) : (
+                <Navigate
+                  to={isAuthenticated ? "/my-requests" : "/login"}
+                  replace
+                />
+              )
+            }
+          />
+          <Route
+            path="/admin/failed-work-orders"
+            element={
+              isAuthenticated && isAdmin ? (
+                <FailedWorkOrders />
               ) : (
                 <Navigate
                   to={isAuthenticated ? "/my-requests" : "/login"}

@@ -477,7 +477,8 @@ const Maintenance: React.FC = () => {
                           <span
                             className={`badge ${statusBadgeClass(req.work_order_status || "pending")}`}
                           >
-                            WO #{req.work_order_id}
+                            {req.work_order_friendly_id ||
+                              `WO #${req.work_order_id}`}
                           </span>
                         ) : (
                           <span
@@ -792,7 +793,8 @@ const Maintenance: React.FC = () => {
                         }}
                       >
                         <span style={{ fontWeight: 600 }}>
-                          WO #{selected.work_order_id}
+                          {selected.work_order_friendly_id ||
+                            `WO #${selected.work_order_id}`}
                         </span>
                         <span
                           className={`badge ${statusBadgeClass(selected.work_order_status || "pending")}`}
@@ -848,8 +850,9 @@ const Maintenance: React.FC = () => {
                               ? workGroups.filter((g) => {
                                   const name: string = g.Name || g.name || "";
                                   return (
-                                    directionFromWorkGroup(name).toLowerCase() ===
-                                    region.toLowerCase()
+                                    directionFromWorkGroup(
+                                      name,
+                                    ).toLowerCase() === region.toLowerCase()
                                   );
                                 })
                               : workGroups;

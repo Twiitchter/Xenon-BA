@@ -80,8 +80,9 @@ const NewWorkRequest: React.FC = () => {
         user.displayName ||
         [user.firstName, user.lastName].filter(Boolean).join(" ") ||
         prev.requestorDisplayName,
-      requestorEmail: user.email || prev.requestorEmail,
+      requestorEmail: user.contactEmail || user.email || prev.requestorEmail,
       requestorPhone: user.phone || prev.requestorPhone,
+      requestorMobile: user.mobile || prev.requestorMobile,
     }));
     if (user.prefRegionId) {
       setLocationSelection({
