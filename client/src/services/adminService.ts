@@ -286,6 +286,42 @@ class AdminService {
     });
     return response.data as { message: string };
   }
+
+  // ─── Failed Work Order Status Changes ─────────────────────────────
+
+  async getFailedWorkOrders(params?: { status?: string; limit?: number }) {
+    const response = await axios.get(`${API_URL}/failed-work-orders`, {
+      headers: authService.getAuthHeader(),
+      params,
+    });
+    return response.data as { failed_work_orders: any[] };
+  }
+
+  async updateFailedWorkOrder(id: number, data: Record<string, any>) {
+    const response = await axios.put(`${API_URL}/failed-work-orders/${id}`, data, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { failed_work_order: any };
+  }
+
+  async retryFailedWorkOrder(id: number) {
+    const response = await axios.post(
+      `${API_URL}/failed-work-orders/${id}/retry`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data as {
+      message: string;
+      assetic_work_order_guid: string;
+    };
+  }
+
+  async deleteFailedWorkOrder(id: number) {
+    const response = await axios.delete(`${API_URL}/failed-work-orders/${id}`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { message: string };
+  }
 }
 
 export const adminService = new AdminService();
