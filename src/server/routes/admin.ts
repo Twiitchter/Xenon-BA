@@ -809,9 +809,16 @@ router.post("/users/import", async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "csv field is required" });
     }
 
-    const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const lines = csv
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length < 2) {
-      return res.status(400).json({ error: "CSV must contain a header row and at least one data row" });
+      return res
+        .status(400)
+        .json({
+          error: "CSV must contain a header row and at least one data row",
+        });
     }
 
     // Parse CSV helper: handles quoted fields
@@ -839,7 +846,9 @@ router.post("/users/import", async (req: AuthRequest, res: Response) => {
       return fields;
     };
 
-    const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
+    const headers = parseCsvLine(lines[0]).map((h) =>
+      h.toLowerCase().replace(/\s+/g, "_"),
+    );
 
     const colIdx = (names: string[]): number => {
       for (const name of names) {
@@ -853,7 +862,9 @@ router.post("/users/import", async (req: AuthRequest, res: Response) => {
     const passwordIdx = colIdx(["password"]);
 
     if (emailIdx === -1 || passwordIdx === -1) {
-      return res.status(400).json({ error: "CSV must include 'email' and 'password' columns" });
+      return res
+        .status(400)
+        .json({ error: "CSV must include 'email' and 'password' columns" });
     }
 
     const usernameIdx = colIdx(["username"]);
@@ -873,11 +884,17 @@ router.post("/users/import", async (req: AuthRequest, res: Response) => {
       const password = passwordIdx !== -1 ? fields[passwordIdx] || "" : "";
 
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        skipped.push({ email: email || `row ${i + 1}`, reason: "Invalid or missing email" });
+        skipped.push({
+          email: email || `row ${i + 1}`,
+          reason: "Invalid or missing email",
+        });
         continue;
       }
       if (!password || password.length < 8) {
-        skipped.push({ email, reason: "Password must be at least 8 characters" });
+        skipped.push({
+          email,
+          reason: "Password must be at least 8 characters",
+        });
         continue;
       }
 
@@ -888,22 +905,42 @@ router.post("/users/import", async (req: AuthRequest, res: Response) => {
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
-      const username = (usernameIdx !== -1 && fields[usernameIdx]) ? fields[usernameIdx] : email.split("@")[0];
-      const role = (roleIdx !== -1 && fields[roleIdx] && ["admin", "manager", "user"].includes(fields[roleIdx])) ? fields[roleIdx] : "user";
+      const username =
+        usernameIdx !== -1 && fields[usernameIdx]
+          ? fields[usernameIdx]
+          : email.split("@")[0];
+      const role =
+        roleIdx !== -1 &&
+        fields[roleIdx] &&
+        ["admin", "manager", "user"].includes(fields[roleIdx])
+          ? fields[roleIdx]
+          : "user";
 
       const [inserted] = await db("users")
         .insert({
           username,
           email,
           password_hash: passwordHash,
-          first_name: (firstNameIdx !== -1 && fields[firstNameIdx]) ? fields[firstNameIdx] : null,
-          last_name: (lastNameIdx !== -1 && fields[lastNameIdx]) ? fields[lastNameIdx] : null,
+          first_name:
+            firstNameIdx !== -1 && fields[firstNameIdx]
+              ? fields[firstNameIdx]
+              : null,
+          last_name:
+            lastNameIdx !== -1 && fields[lastNameIdx]
+              ? fields[lastNameIdx]
+              : null,
           role,
           auth_provider: "local",
           is_active: true,
-          department: (departmentIdx !== -1 && fields[departmentIdx]) ? fields[departmentIdx] : null,
-          phone: (phoneIdx !== -1 && fields[phoneIdx]) ? fields[phoneIdx] : null,
-          display_name: (displayNameIdx !== -1 && fields[displayNameIdx]) ? fields[displayNameIdx] : null,
+          department:
+            departmentIdx !== -1 && fields[departmentIdx]
+              ? fields[departmentIdx]
+              : null,
+          phone: phoneIdx !== -1 && fields[phoneIdx] ? fields[phoneIdx] : null,
+          display_name:
+            displayNameIdx !== -1 && fields[displayNameIdx]
+              ? fields[displayNameIdx]
+              : null,
         })
         .returning("*");
 
@@ -913,6 +950,9 @@ router.post("/users/import", async (req: AuthRequest, res: Response) => {
       }
 
       await activityService.log({
+        entity_type: "user",
+        entity_id: user.id,
+        action: "create",
         performed_by: req.user.id,
       });
 
@@ -1644,12 +1684,19 @@ router.put(
             ? assetic_payload
             : JSON.stringify(assetic_payload);
       }
-      if (status !== undefined && ["pending", "resolved", "dismissed"].includes(status)) {
+      if (
+        status !== undefined &&
+        ["pending", "resolved", "dismissed"].includes(status)
+      ) {
         updateFields.status = status;
       }
 
-      await db("failed_assetic_status_changes").where({ id }).update(updateFields);
-      const updated = await db("failed_assetic_status_changes").where({ id }).first();
+      await db("failed_assetic_status_changes")
+        .where({ id })
+        .update(updateFields);
+      const updated = await db("failed_assetic_status_changes")
+        .where({ id })
+        .first();
       res.json({ failed_work_order: updated });
     } catch (error) {
       console.error("Error updating failed work order status change:", error);
@@ -1668,12 +1715,16 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
-      const record = await db("failed_assetic_status_changes").where({ id }).first();
+      const record = await db("failed_assetic_status_changes")
+        .where({ id })
+        .first();
       if (!record) {
         return res.status(404).json({ error: "Not found" });
       }
       if (!record.assetic_work_order_guid) {
-        return res.status(422).json({ error: "No Assetic work order GUID stored — cannot retry." });
+        return res
+          .status(422)
+          .json({ error: "No Assetic work order GUID stored — cannot retry." });
       }
 
       let payload: any;
@@ -1699,7 +1750,10 @@ router.post(
 
       // Attempt the PUT to Assetic
       try {
-        await asseticClient.updateWorkOrder(record.assetic_work_order_guid, payload);
+        await asseticClient.updateWorkOrder(
+          record.assetic_work_order_guid,
+          payload,
+        );
       } catch (asseticErr: any) {
         const errData = asseticErr?.response?.data;
         const httpStatus = asseticErr?.response?.status ?? null;
@@ -1718,7 +1772,9 @@ router.post(
             assetic_http_status: httpStatus,
             updated_at: new Date(),
           });
-        return res.status(502).json({ error: `Assetic rejected the retry: ${msg}` });
+        return res
+          .status(502)
+          .json({ error: `Assetic rejected the retry: ${msg}` });
       }
 
       // Success — mark resolved
@@ -1752,7 +1808,9 @@ router.delete(
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
-      const deleted = await db("failed_assetic_status_changes").where({ id }).delete();
+      const deleted = await db("failed_assetic_status_changes")
+        .where({ id })
+        .delete();
       if (!deleted) {
         return res.status(404).json({ error: "Not found" });
       }

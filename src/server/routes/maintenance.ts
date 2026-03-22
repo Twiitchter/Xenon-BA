@@ -138,6 +138,8 @@ router.get("/my-items", async (req: AuthRequest, res: Response) => {
         "mr.requestor_display_name",
         "mr.created_at",
         "mr.updated_at",
+        "mr.unread_reporter",
+        "mr.unread_staff",
         db.raw("? as item_type", ["request"]),
         "wo.id as work_order_id",
         "wo.status as work_order_status",
@@ -425,7 +427,49 @@ router.post(
         if (requestorEmail) requestor.Email = requestorEmail;
         if (requestorPhone) requestor.Phone = requestorPhone;
         if (requestorMobile) requestor.Mobile = requestorMobile;
-        if (requestorTypeId) requestor.Types = [{ Id: requestorTypeId }];
+
+        // Always use "Customer" type (Type string, not Id integer)
+        requestor.Types = [{ Type: "Customer" }];
+
+        // ── Ensure the reporter exists as an Assetic Resource ────────────────
+        // We use the XeonB user's internal ID as the Assetic ExternalID so we
+        // can reliably find/create the resource across requests.
+        const reporterExternalId = String(req.user.id);
+        try {
+          const existing =
+            await asseticClient.getResourceByExternalId(reporterExternalId);
+          if (!existing) {
+            // Build the resource payload from available requestor details
+            const resourcePayload: any = {
+              ExternalID: reporterExternalId,
+              Status: "Active",
+              Types: [{ Type: "Customer" }],
+            };
+            if (requestorDisplayName)
+              resourcePayload.DisplayName = requestorDisplayName;
+            if (requestorFirstName)
+              resourcePayload.FirstName = requestorFirstName;
+            if (requestorSurname) resourcePayload.Surname = requestorSurname;
+            if (requestorEmail) resourcePayload.Email = requestorEmail;
+            if (requestorPhone) resourcePayload.Phone = requestorPhone;
+            if (requestorMobile) resourcePayload.Mobile = requestorMobile;
+            await asseticClient.createResource(resourcePayload);
+            console.log(
+              `Assetic resource created for user ${reporterExternalId}`,
+            );
+          }
+        } catch (resourceErr: any) {
+          // Non-fatal: log and continue. The WR can still be submitted
+          // even if the resource upsert fails.
+          console.warn(
+            `Assetic resource ensure failed for user ${reporterExternalId} (non-fatal):`,
+            resourceErr?.response?.data || resourceErr?.message,
+          );
+        }
+
+        // Set the ExternalID on the requestor so Assetic can link back to the resource
+        requestor.ExternalID = reporterExternalId;
+
         if (Object.keys(requestor).length > 0) {
           asseticPayload.Requestor = requestor;
         }
@@ -1768,7 +1812,8 @@ router.put(
       // Email notifications (fire-and-forget)
       const statusChanged = status !== undefined && status !== oldStatus;
       const assignmentChanged =
-        assignedTo !== undefined && Number(assignedTo) !== Number(oldAssignedTo);
+        assignedTo !== undefined &&
+        Number(assignedTo) !== Number(oldAssignedTo);
 
       if (statusChanged || assignmentChanged) {
         // Look up requestor email from the linked maintenance request
@@ -1893,13 +1938,25 @@ router.post(
         return res.status(404).json({ error: "Work order not found" });
       }
 
+      const isStaff = req.user.role === "admin" || req.user.role === "staff";
+
       const [inserted] = await db("work_order_messages")
         .insert({
           work_order_id: id,
           sender_id: req.user.id,
           message,
+          is_staff: isStaff,
         })
         .returning("*");
+
+      // Set unread flag for the other party
+      if (isStaff) {
+        await db("work_orders")
+          .where("id", id)
+          .update({ unread_reporter: true });
+      } else {
+        await db("work_orders").where("id", id).update({ unread_staff: true });
+      }
 
       if (!inserted || typeof inserted === "number") {
         const newId =
@@ -1912,6 +1969,149 @@ router.post(
     } catch (error) {
       console.error("Error creating work order message:", error);
       res.status(500).json({ error: "Failed to create message" });
+    }
+  },
+);
+
+// ─── Request Messages ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/maintenance/requests/:id/messages
+ * Get messages for a maintenance request (available even before a work order exists)
+ */
+router.get(
+  "/requests/:id/messages",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const request = await db("maintenance_requests").where("id", id).first();
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+      const messages = await db("request_messages as rm")
+        .leftJoin("users as u", "rm.sender_id", "u.id")
+        .select(
+          "rm.id",
+          "rm.request_id",
+          "rm.sender_id",
+          "rm.message",
+          "rm.is_staff",
+          "rm.created_at",
+          db.raw("COALESCE(u.display_name, u.username) as sender_username"),
+        )
+        .where("rm.request_id", id)
+        .orderBy("rm.created_at", "asc");
+      res.json({ messages });
+    } catch (error) {
+      console.error("Error fetching request messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  },
+);
+
+/**
+ * POST /api/maintenance/requests/:id/messages
+ * Add a message to a maintenance request
+ */
+router.post(
+  "/requests/:id/messages",
+  [body("message").isLength({ min: 1 }).trim()],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+
+      const request = await db("maintenance_requests").where("id", id).first();
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      const isStaff = req.user.role === "admin" || req.user.role === "staff";
+
+      const [inserted] = await db("request_messages")
+        .insert({
+          request_id: id,
+          sender_id: req.user.id,
+          message,
+          is_staff: isStaff,
+        })
+        .returning("*");
+
+      // Set unread flag for the other party
+      if (isStaff) {
+        await db("maintenance_requests")
+          .where("id", id)
+          .update({ unread_reporter: true });
+      } else {
+        await db("maintenance_requests")
+          .where("id", id)
+          .update({ unread_staff: true });
+      }
+
+      res.status(201).json(inserted);
+    } catch (error) {
+      console.error("Error creating request message:", error);
+      res.status(500).json({ error: "Failed to create message" });
+    }
+  },
+);
+
+/**
+ * PUT /api/maintenance/requests/:id/messages/read
+ * Mark request messages as read by the current user
+ */
+router.put(
+  "/requests/:id/messages/read",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const isStaff = req.user.role === "admin" || req.user.role === "staff";
+
+      if (isStaff) {
+        await db("maintenance_requests")
+          .where("id", id)
+          .update({ unread_staff: false });
+      } else {
+        await db("maintenance_requests")
+          .where("id", id)
+          .update({ unread_reporter: false });
+      }
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+      res.status(500).json({ error: "Failed to mark as read" });
+    }
+  },
+);
+
+/**
+ * PUT /api/maintenance/work-orders/:id/messages/read
+ * Mark work-order messages as read by the current user
+ */
+router.put(
+  "/work-orders/:id/messages/read",
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const isStaff = req.user.role === "admin" || req.user.role === "staff";
+
+      if (isStaff) {
+        await db("work_orders").where("id", id).update({ unread_staff: false });
+      } else {
+        await db("work_orders")
+          .where("id", id)
+          .update({ unread_reporter: false });
+      }
+
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error marking WO messages as read:", error);
+      res.status(500).json({ error: "Failed to mark as read" });
     }
   },
 );

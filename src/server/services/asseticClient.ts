@@ -658,6 +658,49 @@ class AsseticClient {
     );
   }
 
+  /**
+   * Look up a resource by its ExternalID.
+   * Returns the first matching resource record, or null if not found.
+   * Uses the Assetic filter syntax: ExternalId~eq~'<id>'
+   */
+  async getResourceByExternalId(externalId: string): Promise<any | null> {
+    return this.call(async (c) => {
+      try {
+        const resp = await c.get("/resource", {
+          params: {
+            "requestParams.filters": `ExternalId~eq~'${externalId}'`,
+            "requestParams.pageSize": 1,
+          },
+        });
+        const data = resp.data;
+        const items: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.ResourceList)
+            ? data.ResourceList
+            : Array.isArray(data?.Items)
+              ? data.Items
+              : Array.isArray(data?.Results)
+                ? data.Results
+                : [];
+        return items.length > 0 ? items[0] : null;
+      } catch (err: any) {
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }
+    }, `GET /resource?ExternalId=${externalId}`);
+  }
+
+  /**
+   * Create a new resource (requestor) in Assetic.
+   * Returns the created resource record.
+   */
+  async createResource(data: any): Promise<any> {
+    return this.call(
+      (c) => c.post("/resource", data).then((r) => r.data),
+      "POST /resource",
+    );
+  }
+
   async getResourceCrafts(resourceId: string, params?: AsseticQueryParams) {
     return this.call(
       (c) =>

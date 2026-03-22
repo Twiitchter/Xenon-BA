@@ -248,6 +248,43 @@ class MaintenanceService {
     return response.data;
   }
 
+  async markWorkOrderMessagesRead(workOrderId: number) {
+    const response = await axios.put(
+      `${API_URL}/maintenance/work-orders/${workOrderId}/messages/read`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  // ─── Request Messages ─────────────────────────────────────────────
+
+  async getRequestMessages(requestId: number) {
+    const response = await axios.get(
+      `${API_URL}/maintenance/requests/${requestId}/messages`,
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  async sendRequestMessage(requestId: number, message: string) {
+    const response = await axios.post(
+      `${API_URL}/maintenance/requests/${requestId}/messages`,
+      { message },
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
+  async markRequestMessagesRead(requestId: number) {
+    const response = await axios.put(
+      `${API_URL}/maintenance/requests/${requestId}/messages/read`,
+      {},
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data;
+  }
+
   // ─── Crafts ───────────────────────────────────────────────────────
 
   async getCrafts() {
