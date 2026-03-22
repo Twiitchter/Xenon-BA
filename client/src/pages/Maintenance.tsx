@@ -148,16 +148,17 @@ const Maintenance: React.FC = () => {
     setMessages([]);
     setNewMessage("");
 
-    if (req.work_order_id) {
-      setMessagesLoading(true);
-      try {
-        const data = await maintenanceService.getMessages(req.work_order_id);
-        setMessages(data.messages || []);
-      } catch {
-        // messages are non-critical
-      } finally {
-        setMessagesLoading(false);
-      }
+    // Always load request-level messages (available before a WO is raised)
+    setMessagesLoading(true);
+    try {
+      const data = await maintenanceService.getRequestMessages(req.id);
+      setMessages(data.messages || []);
+      // Mark as read for staff
+      maintenanceService.markRequestMessagesRead(req.id).catch(() => {});
+    } catch {
+      // messages are non-critical
+    } finally {
+      setMessagesLoading(false);
     }
   };
 
@@ -229,11 +230,11 @@ const Maintenance: React.FC = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selected?.work_order_id || !newMessage.trim()) return;
+    if (!selected || !newMessage.trim()) return;
     try {
-      await maintenanceService.sendMessage(selected.work_order_id, newMessage);
+      await maintenanceService.sendRequestMessage(selected.id, newMessage);
       setNewMessage("");
-      const data = await maintenanceService.getMessages(selected.work_order_id);
+      const data = await maintenanceService.getRequestMessages(selected.id);
       setMessages(data.messages || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to send message");
@@ -939,68 +940,79 @@ const Maintenance: React.FC = () => {
               </div>
             </div>
 
-            {/* Messages — shown once a work order exists */}
-            {selected.work_order_id && (
+            {/* Communication log — always shown */}
+            <div
+              style={{
+                marginTop: "4px",
+                paddingTop: "16px",
+                borderTop: "1px solid var(--border)",
+              }}
+            >
               <div
                 style={{
-                  marginTop: "4px",
-                  paddingTop: "16px",
-                  borderTop: "1px solid var(--border)",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.6px",
+                  marginBottom: "10px",
                 }}
               >
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.6px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  Work Order Messages
+                Communication Log
+              </div>
+              {messagesLoading ? (
+                <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+                  Loading messages…
                 </div>
-                {messagesLoading ? (
-                  <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
-                    Loading messages…
-                  </div>
-                ) : (
-                  <>
-                    <div className="messages-box">
-                      {messages.length === 0 ? (
-                        <p style={{ color: "var(--text-muted)" }}>
-                          No messages yet.
-                        </p>
-                      ) : (
-                        messages.map((msg) => (
-                          <div key={msg.id} className="message-bubble">
-                            <strong>{msg.sender_username || "Unknown"}</strong>
+              ) : (
+                <>
+                  <div className="messages-box">
+                    {messages.length === 0 ? (
+                      <p style={{ color: "var(--text-muted)" }}>
+                        No messages yet.
+                      </p>
+                    ) : (
+                      messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`message-bubble${
+                            msg.is_staff
+                              ? " message-bubble-staff"
+                              : " message-bubble-reporter"
+                          }`}
+                        >
+                          <div className="message-bubble-header">
+                            <strong>
+                              {msg.is_staff
+                                ? msg.sender_username || "Staff"
+                                : msg.sender_username || "Requester"}
+                            </strong>
                             <span className="message-meta">
                               {new Date(msg.created_at).toLocaleString()}
                             </span>
-                            <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
                           </div>
-                        ))
-                      )}
-                    </div>
-                    <form
-                      onSubmit={handleSendMessage}
-                      style={{ display: "flex", gap: "10px" }}
-                    >
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Add a note or message…"
-                        style={{ flex: 1 }}
-                        required
-                      />
-                      <button type="submit">Send</button>
-                    </form>
-                  </>
-                )}
-              </div>
-            )}
+                          <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <form
+                    onSubmit={handleSendMessage}
+                    style={{ display: "flex", gap: "10px" }}
+                  >
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Reply to requester…"
+                      style={{ flex: 1 }}
+                      required
+                    />
+                    <button type="submit">Send</button>
+                  </form>
+                </>
+              )}
+            </div>
           </div>
         </Modal>
       )}
