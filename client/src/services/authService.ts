@@ -70,10 +70,11 @@ class AuthService {
     prefBuildingName?: string;
     prefFloorId?: string;
     prefFloorName?: string;
+    displayName?: string;
     phone?: string;
     mobile?: string;
     contactEmail?: string;
-    displayName?: string;
+    department?: string;
   }) {
     const response = await axios.put(`${API_URL}/auth/profile`, profileData, {
       headers: this.getAuthHeader(),
