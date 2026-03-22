@@ -817,6 +817,43 @@ type ResolvedLabourAssignment = {
   groupCraftId?: string;
 } | null;
 
+async function resolveResourceIdForIdentity(
+  identity: string | null,
+): Promise<string | null> {
+  const value = (identity || "").trim();
+  if (!value) return null;
+
+  const esc = (s: string) => s.replace(/'/g, "''");
+
+  try {
+    // First attempt an exact DisplayName match.
+    let data = await asseticClient.getResources({
+      page: 1,
+      pageSize: 20,
+      filters: `DisplayName~eq~'${esc(value)}'`,
+    });
+    let rows: any[] = Array.isArray(data)
+      ? data
+      : data?.ResourceList || data?.Results || data?.results || [];
+    if (rows[0]?.Id) return String(rows[0].Id);
+
+    // Fallback to contains to handle formatting differences.
+    data = await asseticClient.getResources({
+      page: 1,
+      pageSize: 20,
+      filters: `DisplayName~contains~'${esc(value)}'`,
+    });
+    rows = Array.isArray(data)
+      ? data
+      : data?.ResourceList || data?.Results || data?.results || [];
+    if (rows[0]?.Id) return String(rows[0].Id);
+  } catch {
+    // Non-fatal — caller will handle null and fallback behavior.
+  }
+
+  return null;
+}
+
 function parseLabourAssignmentFromRow(row: any): ResolvedLabourAssignment {
   if (!row || typeof row !== "object") return null;
 
@@ -1137,9 +1174,13 @@ router.post(
         const dirSource =
           `${workGroup || ""} ${inheritedAssetLocation || ""}`.trim();
         const woTypeId = await resolveIncidentTypeId(dirSource, craft || null);
-        const labourAssignment = await resolveLabourAssignment(
+        let labourAssignment = await resolveLabourAssignment(
           workGroup || null,
           craft || null,
+        );
+
+        const creatorResourceId = await resolveResourceIdForIdentity(
+          req.user?.email || req.user?.username || null,
         );
         if (woTypeId) {
           console.log(
@@ -1160,11 +1201,29 @@ router.post(
           );
         }
 
+        if (creatorResourceId) {
+          console.log(`Resolved Creator/Requestor Resource Id: ${creatorResourceId}`);
+          if (!labourAssignment) {
+            // Fallback: use the creator's resource when no group/craft-specific
+            // labour assignment can be resolved.
+            labourAssignment = { resourceId: creatorResourceId };
+          }
+        } else {
+          console.warn(
+            `Could not resolve Creator/Requestor Resource from identity "${req.user?.email || req.user?.username || ""}"`,
+          );
+        }
+
         const prepPayload: any = {
           Status: "PREP",
           BriefDescription: title.slice(0, 250),
           LocationDescription: inheritedAssetLocation || undefined,
         };
+
+        if (creatorResourceId) {
+          prepPayload.CreatorId = creatorResourceId;
+          prepPayload.RequestorId = creatorResourceId;
+        }
 
         if (woTypeId) {
           prepPayload.WorkOrderType = { Id: woTypeId };
