@@ -741,16 +741,16 @@ function craftToDiscipline(craft: string): string | null {
 // notional asset discipline strings, so we maintain a separate translation.
 // Keys are the notional-asset discipline values; values are the WR type names.
 const WR_DISCIPLINE_NAME: Record<string, string> = {
-  "Structure": "Structure",
+  Structure: "Structure",
   "Electrical Services": "Electrical Services",
   "Hydraulics & Plumbing": "Hydraulics & Plumbing",
-  "Mechanical": "Mechanical",
-  "Refrigeration": "Refrigeration",
+  Mechanical: "Mechanical",
+  Refrigeration: "Refrigeration",
   "Fire System": "Fire Services",
-  "Security": "Security",
-  "Horticultural": "Horticultural",
-  "Generator": "Generator",
-  "Lift": "Lift",
+  Security: "Security",
+  Horticultural: "Horticultural",
+  Generator: "Generator",
+  Lift: "Lift",
   "Medical Gases": "Medical Gases",
   "Bld Mgmt and Ctrl": "Building Management & Control",
   "Body & Cardiac Protection": "Body & Cardiac Protection",
@@ -991,6 +991,15 @@ router.post(
         return `${val}T00:00:00`;
       };
 
+      // Convert a normalised datetime string to a JS Date for DB inserts.
+      // Passing a Date object avoids SQL Server rejecting ISO strings with
+      // timezone suffixes (Z, +HH:MM) that the tedious driver cannot convert.
+      const toDbDate = (val: string | null): Date | null => {
+        if (!val) return null;
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+      };
+
       const normScheduledStart = normaliseDateTime(scheduledDate);
       // Finish is identical to start — a single datetime picker covers both ends.
       // The worker's estimated hours is tracked separately via EstimatedDuration.
@@ -1015,11 +1024,32 @@ router.post(
         );
         // the subsequent RFE status transition fails. Admins can see the failure
         // and retry the promotion separately.
+
+        // Resolve the Assetic WorkOrderType (Incident + region + discipline).
+        // Uses workGroup as the primary direction source (most reliable), falls
+        // back to inheritedAssetLocation if workGroup has no region keyword.
+        const dirSource =
+          `${workGroup || ""} ${inheritedAssetLocation || ""}`.trim();
+        const woTypeId = await resolveIncidentTypeId(dirSource, craft || null);
+        if (woTypeId) {
+          console.log(
+            `Resolved WorkOrderType Id: ${woTypeId} for workGroup "${workGroup}" / craft "${craft}"`,
+          );
+        } else {
+          console.warn(
+            `Could not resolve WorkOrderType for workGroup "${workGroup}" / craft "${craft}" — omitting from payload`,
+          );
+        }
+
         const prepPayload: any = {
           Status: "PREP",
           BriefDescription: title.slice(0, 250),
           LocationDescription: inheritedAssetLocation || undefined,
         };
+
+        if (woTypeId) {
+          prepPayload.WorkOrderType = { Id: woTypeId };
+        }
 
         if (durationHours) {
           // Assetic stores EstimatedDuration in minutes
@@ -1129,8 +1159,8 @@ router.post(
               assetic_asset_guid: inheritedAssetGuid,
               asset_name: inheritedAssetName,
               asset_location: inheritedAssetLocation,
-              scheduled_start: normScheduledStart,
-              scheduled_finish: normScheduledFinish,
+              scheduled_start: toDbDate(normScheduledStart),
+              scheduled_finish: toDbDate(normScheduledFinish),
               assetic_payload: JSON.stringify(prepPayload),
               error_message: msg,
               assetic_error_response: errData ? JSON.stringify(errData) : null,
@@ -1233,8 +1263,8 @@ router.post(
           title,
           description: description || null,
           priority: inheritedPriority,
-          scheduled_date: normScheduledStart,
-          scheduled_finish: normScheduledFinish,
+          scheduled_date: toDbDate(normScheduledStart),
+          scheduled_finish: toDbDate(normScheduledFinish),
           assetic_work_order_id: asseticWorkOrderId,
           assetic_friendly_id: asseticFriendlyId,
           // Asset fields carried from the maintenance request
