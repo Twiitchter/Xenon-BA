@@ -87,7 +87,6 @@ const Maintenance: React.FC = () => {
   // Triage edit state
   const [editStatus, setEditStatus] = useState("");
   const [editPriority, setEditPriority] = useState("");
-  const [editCategory, setEditCategory] = useState("");
   const [updating, setUpdating] = useState(false);
 
   // Work order creation state
@@ -142,7 +141,6 @@ const Maintenance: React.FC = () => {
     setSelected(req);
     setEditStatus(req.status || "open");
     setEditPriority(req.priority || "medium");
-    setEditCategory(req.category || "");
     setWoCraft("");
     setWoWorkGroup("");
     setWoScheduled("");
@@ -181,7 +179,6 @@ const Maintenance: React.FC = () => {
       await maintenanceService.updateRequest(selected.id, {
         status: editStatus,
         priority: editPriority,
-        category: editCategory,
       });
       await refreshAndReselect(selected.id);
     } catch (err: any) {
@@ -590,17 +587,17 @@ const Maintenance: React.FC = () => {
                 >
                   {!selected.work_order_id &&
                     (selected.status === "in_progress"
-                      ? "▶ In progress but no work order yet — create a Work Order below to formally assign a craft/trade."
-                      : "◎ New report — review the issue, set priority and category, then create a Work Order when ready.")}
+                      ? "▶ In progress — create a Work Order below to assign a craft/trade."
+                      : "◎ New report — review the issue and create a Work Order when ready.")}
                   {selected.work_order_id &&
                     selected.work_order_status === "pending" &&
-                    "⏳ Work order raised — assign a craft/trade, schedule the work, then update the status when it starts."}
+                    "⏳ Work order raised — assign a craft/trade and schedule the work."}
                   {selected.work_order_id &&
                     selected.work_order_status === "in_progress" &&
-                    "🔧 Work is underway — use the messages thread below to communicate updates and notes."}
+                    "🔧 Work underway — use the messages thread below for updates."}
                   {selected.work_order_id &&
                     selected.work_order_status === "completed" &&
-                    "✓ Work complete — review and close this request, or add a final note."}
+                    "✓ Work complete — review and close this request."}
                 </div>
               )}
 
@@ -735,16 +732,6 @@ const Maintenance: React.FC = () => {
                       <option value="cancelled">Cancelled</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="form-group" style={{ marginBottom: "10px" }}>
-                  <label style={{ fontSize: "12px" }}>Category</label>
-                  <input
-                    type="text"
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                    placeholder="e.g. Plumbing, Electrical, HVAC"
-                  />
                 </div>
 
                 <button
