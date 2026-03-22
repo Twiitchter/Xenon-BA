@@ -3,6 +3,25 @@ import { authService } from "./authService";
 
 const API_URL = "/api/admin";
 
+// ─── PDF Template Types ───────────────────────────────────────────────────────
+
+export interface PdfSectionConfig {
+  id: string;
+  enabled: boolean;
+  customTitle: string | null;
+}
+
+export interface PdfCustomSection {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface PdfTemplateConfig {
+  sections: PdfSectionConfig[];
+  customSections: PdfCustomSection[];
+}
+
 export interface AdminHierarchyBuilding {
   id: string;
   name: string;
@@ -321,6 +340,31 @@ class AdminService {
       headers: authService.getAuthHeader(),
     });
     return response.data as { message: string };
+  }
+
+  // ─── PDF Templates ───────────────────────────────────────────────
+
+  async getPdfTemplates() {
+    const response = await axios.get(`${API_URL}/pdf-templates`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { templates: Record<string, PdfTemplateConfig> };
+  }
+
+  async getPdfTemplate(type: "work_order" | "work_request") {
+    const response = await axios.get(`${API_URL}/pdf-templates/${type}`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { template_type: string; config: PdfTemplateConfig };
+  }
+
+  async updatePdfTemplate(type: "work_order" | "work_request", config: PdfTemplateConfig) {
+    const response = await axios.put(
+      `${API_URL}/pdf-templates/${type}`,
+      { config },
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data as { message: string; template_type: string; config: PdfTemplateConfig };
   }
 }
 

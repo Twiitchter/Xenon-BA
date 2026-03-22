@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
-import { generatePdf, buildWorkRequestTemplate } from "../services/pdfService";
+import { generatePdf, buildWorkRequestTemplate, type PdfTemplateConfig } from "../services/pdfService";
 import Modal from "../components/Modal";
 import FilterPresetsPanel from "../components/FilterPresetsPanel";
 
@@ -104,9 +104,13 @@ const Maintenance: React.FC = () => {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  // PDF template config (fetched from server)
+  const [pdfTemplateConfig, setPdfTemplateConfig] = useState<PdfTemplateConfig | undefined>(undefined);
+
   useEffect(() => {
     fetchRequests();
     fetchWorkGroups();
+    fetchPdfTemplateConfig();
   }, []);
 
   const fetchWorkGroups = async () => {
@@ -115,6 +119,15 @@ const Maintenance: React.FC = () => {
       setWorkGroups(data.workGroups || []);
     } catch {
       // non-critical
+    }
+  };
+
+  const fetchPdfTemplateConfig = async () => {
+    try {
+      const data = await maintenanceService.getPdfTemplateConfig("work_request");
+      setPdfTemplateConfig(data.config as PdfTemplateConfig);
+    } catch {
+      // non-critical: PDF will fall back to default template
     }
   };
 
@@ -563,7 +576,7 @@ const Maintenance: React.FC = () => {
             >
               <button
                 className="btn-ghost"
-                onClick={() => generatePdf(buildWorkRequestTemplate(selected))}
+                onClick={() => generatePdf(buildWorkRequestTemplate(selected, pdfTemplateConfig))}
                 title="Download PDF"
                 style={{ fontSize: "13px" }}
               >

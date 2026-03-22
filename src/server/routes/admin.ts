@@ -9,6 +9,7 @@ import asseticClient from "../services/asseticClient";
 import asseticApiLogger from "../services/asseticApiLogger";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import asseticAssetSyncService from "../services/asseticAssetSyncService";
+import { VALID_TEMPLATE_TYPES, DEFAULT_PDF_TEMPLATES, type TemplateType } from "../services/pdfTemplateDefaults";
 
 const router = Router();
 
@@ -1625,5 +1626,105 @@ router.delete(
     }
   },
 );
+
+// ═══════════════════════════════════════════════════════════════════════
+// PDF TEMPLATES
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/admin/pdf-templates
+ * Return configs for all PDF template types.
+ */
+router.get("/pdf-templates", async (_req: AuthRequest, res: Response) => {
+  try {
+    const rows = await db("pdf_templates").select("template_type", "template_config", "updated_at", "updated_by");
+    const result: Record<string, object> = {};
+
+    for (const type of VALID_TEMPLATE_TYPES) {
+      const row = rows.find((r) => r.template_type === type);
+      result[type] = row ? row.template_config : DEFAULT_PDF_TEMPLATES[type];
+    }
+
+    res.json({ templates: result });
+  } catch (error) {
+    console.error("Error fetching PDF templates:", error);
+    res.status(500).json({ error: "Failed to fetch PDF templates" });
+  }
+});
+
+/**
+ * GET /api/admin/pdf-templates/:type
+ * Return the config for a single PDF template type.
+ */
+router.get("/pdf-templates/:type", async (req: AuthRequest, res: Response) => {
+  try {
+    const type = req.params.type as TemplateType;
+    if (!VALID_TEMPLATE_TYPES.includes(type)) {
+      return res.status(400).json({ error: "Invalid template type" });
+    }
+
+    const row = await db("pdf_templates").where({ template_type: type }).first();
+    const config = row ? row.template_config : DEFAULT_PDF_TEMPLATES[type];
+
+    res.json({ template_type: type, config });
+  } catch (error) {
+    console.error("Error fetching PDF template:", error);
+    res.status(500).json({ error: "Failed to fetch PDF template" });
+  }
+});
+
+/**
+ * PUT /api/admin/pdf-templates/:type
+ * Create or replace the config for a single PDF template type.
+ * Body: { config: { sections: [...], customSections: [...] } }
+ */
+router.put("/pdf-templates/:type", async (req: AuthRequest, res: Response) => {
+  try {
+    const type = req.params.type as TemplateType;
+    if (!VALID_TEMPLATE_TYPES.includes(type)) {
+      return res.status(400).json({ error: "Invalid template type" });
+    }
+
+    const { config } = req.body;
+    if (!config || typeof config !== "object") {
+      return res.status(400).json({ error: "config object required" });
+    }
+    if (!Array.isArray(config.sections)) {
+      return res.status(400).json({ error: "config.sections must be an array" });
+    }
+    if (!Array.isArray(config.customSections)) {
+      return res.status(400).json({ error: "config.customSections must be an array" });
+    }
+
+    const existing = await db("pdf_templates").where({ template_type: type }).first();
+    if (existing) {
+      await db("pdf_templates").where({ template_type: type }).update({
+        template_config: JSON.stringify(config),
+        updated_at: new Date(),
+        updated_by: req.user.id,
+      });
+    } else {
+      await db("pdf_templates").insert({
+        template_type: type,
+        template_config: JSON.stringify(config),
+        updated_at: new Date(),
+        updated_by: req.user.id,
+      });
+    }
+
+    await activityService.log({
+      entity_type: "pdf_template",
+      entity_id: 0,
+      action: "updated",
+      details: { template_type: type },
+      performed_by: req.user.id,
+    });
+
+    res.json({ message: "PDF template updated", template_type: type, config });
+  } catch (error) {
+    console.error("Error updating PDF template:", error);
+    res.status(500).json({ error: "Failed to update PDF template" });
+  }
+});
 
 export default router;
