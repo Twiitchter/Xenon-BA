@@ -19,6 +19,15 @@ const MyProfile: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const [hierarchyLoading, setHierarchyLoading] = useState(true);
 
+  const [displayName, setDisplayName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [department, setDepartment] = useState("");
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactSuccessMsg, setContactSuccessMsg] = useState("");
+  const [contactErrorMsg, setContactErrorMsg] = useState("");
+
   useEffect(() => {
     void loadData();
   }, []);
@@ -35,16 +44,24 @@ const MyProfile: React.FC = () => {
         setHierarchy(hier);
       }
 
-      if (user?.prefRegionId) {
-        setLocationSelection({
-          regionId: user.prefRegionId || "",
-          siteId: user.prefSiteId || "",
-          buildingId: user.prefBuildingId || "",
-          floorId: user.prefFloorId || "",
-        });
+      if (user) {
+        setDisplayName(user.displayName || "");
+        setPhone(user.phone || "");
+        setMobile(user.mobile || "");
+        setContactEmail(user.contactEmail || "");
+        setDepartment(user.department || "");
+
+        if (user.prefRegionId) {
+          setLocationSelection({
+            regionId: user.prefRegionId || "",
+            siteId: user.prefSiteId || "",
+            buildingId: user.prefBuildingId || "",
+            floorId: user.prefFloorId || "",
+          });
+        }
       }
     } catch {
-      setErrorMsg("Failed to load location data.");
+      setErrorMsg("Failed to load profile data.");
     } finally {
       setHierarchyLoading(false);
     }
@@ -69,6 +86,27 @@ const MyProfile: React.FC = () => {
       buildingName: building?.name || "",
       floorName: floor?.name || "",
     };
+  };
+
+  const handleContactSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactSaving(true);
+    setContactSuccessMsg("");
+    setContactErrorMsg("");
+    try {
+      await authService.updateProfile({
+        displayName: displayName || undefined,
+        phone: phone || undefined,
+        mobile: mobile || undefined,
+        contactEmail: contactEmail || undefined,
+        department: department || undefined,
+      });
+      setContactSuccessMsg("Contact information saved successfully.");
+    } catch {
+      setContactErrorMsg("Failed to save contact information. Please try again.");
+    } finally {
+      setContactSaving(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -128,6 +166,151 @@ const MyProfile: React.FC = () => {
     <div className="container">
       <div className="page-header">
         <h2>My Settings</h2>
+      </div>
+
+      <div className="card">
+        <h3>Contact Information</h3>
+        <p
+          style={{
+            color: "var(--text-muted)",
+            marginBottom: "16px",
+            fontSize: "14px",
+          }}
+        >
+          Update your contact details. These may be used when submitting work
+          requests or for notifications.
+        </p>
+        <form onSubmit={handleContactSave}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+            }}
+          >
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "4px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                Display Name
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your display name"
+                maxLength={255}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "4px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                Department
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="Your department"
+                maxLength={255}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "4px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                Phone
+              </label>
+              <input
+                type="tel"
+                className="form-input"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Phone number"
+                maxLength={50}
+              />
+            </div>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "4px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                Mobile
+              </label>
+              <input
+                type="tel"
+                className="form-input"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                placeholder="Mobile number"
+                maxLength={50}
+              />
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "4px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                Contact Email
+              </label>
+              <input
+                type="email"
+                className="form-input"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="Contact email address"
+                maxLength={255}
+              />
+            </div>
+          </div>
+
+          {contactSuccessMsg && (
+            <div className="alert alert-success" style={{ marginTop: "16px" }}>
+              {contactSuccessMsg}
+            </div>
+          )}
+          {contactErrorMsg && (
+            <div className="alert alert-error" style={{ marginTop: "16px" }}>
+              {contactErrorMsg}
+            </div>
+          )}
+
+          <div style={{ marginTop: "24px" }}>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={contactSaving}
+            >
+              {contactSaving ? "Saving…" : "Save Contact Information"}
+            </button>
+          </div>
+        </form>
       </div>
 
       <div className="card">
