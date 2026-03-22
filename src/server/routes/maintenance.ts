@@ -810,6 +810,112 @@ async function resolveIncidentTypeId(
   return null;
 }
 
+type ResolvedLabourAssignment = {
+  resourceId: string;
+  plannedGroupCraftId?: string;
+  assignedGroupCraftId?: string;
+  groupCraftId?: string;
+} | null;
+
+function parseLabourAssignmentFromRow(row: any): ResolvedLabourAssignment {
+  if (!row || typeof row !== "object") return null;
+
+  // Different Assetic endpoints return different shapes; accept the common ones.
+  const resourceId =
+    row?.Resource?.Id ??
+    row?.ResourceId ??
+    row?.MaintenanceResourceId ??
+    row?.Id ??
+    null;
+  if (resourceId == null) return null;
+
+  return {
+    resourceId: String(resourceId),
+    plannedGroupCraftId:
+      row?.PlannedGroupCraftId != null
+        ? String(row.PlannedGroupCraftId)
+        : undefined,
+    assignedGroupCraftId:
+      row?.AssignedGroupCraftId != null
+        ? String(row.AssignedGroupCraftId)
+        : undefined,
+    groupCraftId:
+      row?.GroupCraftId != null ? String(row.GroupCraftId) : undefined,
+  };
+}
+
+/**
+ * Resolve the best labour assignment for a work group and craft.
+ *
+ * Some Assetic tenants require Resource plus group-craft linkage.
+ * Prefer direct work-group-scoped lookups to avoid long, sequential scans.
+ */
+async function resolveLabourAssignment(
+  workGroup: string | null,
+  craft: string | null,
+): Promise<ResolvedLabourAssignment> {
+  if (!workGroup) return null;
+
+  const esc = (s: string) => s.replace(/'/g, "''");
+  const workGroupFilter = `WorkGroupName~eq~'${esc(workGroup)}'`;
+  const craftText = (craft || "").trim().toLowerCase();
+
+  // 1) Fast path: managedresource already models resource↔workgroup assignments.
+  let data: any;
+  try {
+    data = await asseticClient.getManagedResources({
+      page: 1,
+      pageSize: 500,
+      filters: workGroupFilter,
+    });
+    const rows: any[] = Array.isArray(data)
+      ? data
+      : data?.ResourceList || data?.Results || data?.results || [];
+
+    let fallback: ResolvedLabourAssignment = null;
+    for (const row of rows) {
+      const assignment = parseLabourAssignmentFromRow(row);
+      if (!assignment) continue;
+      if (!fallback) fallback = assignment;
+
+      if (!craftText) return assignment;
+
+      const rowText = `${
+        row?.CraftName || ""
+      } ${row?.Craft || ""} ${row?.Name || ""} ${row?.DisplayName || ""}`
+        .toLowerCase()
+        .trim();
+      if (rowText.includes(craftText)) return assignment;
+    }
+    if (fallback) return fallback;
+  } catch {
+    // fall through to resource endpoint fallback
+  }
+
+  // 2) Fallback: query resources directly by work group and optional craft text.
+  try {
+    const filters = craftText
+      ? `${workGroupFilter}~and~DisplayName~contains~'${esc(craft || "")}'`
+      : workGroupFilter;
+    data = await asseticClient.getResources({
+      page: 1,
+      pageSize: 500,
+      filters,
+    });
+    const rows: any[] = Array.isArray(data)
+      ? data
+      : data?.ResourceList || data?.Results || data?.results || [];
+    if (rows.length) {
+      const assignment = parseLabourAssignmentFromRow(rows[0]);
+      if (assignment) return assignment;
+    }
+  } catch {
+    // keep falling through
+  }
+
+  return null;
+}
+
 /**
  * Given an asset name and a craft name, find the most appropriate Notional
  * Asset (NAN/NAS/NANW) for the same site and trade using name-based matching.
@@ -1031,6 +1137,10 @@ router.post(
         const dirSource =
           `${workGroup || ""} ${inheritedAssetLocation || ""}`.trim();
         const woTypeId = await resolveIncidentTypeId(dirSource, craft || null);
+        const labourAssignment = await resolveLabourAssignment(
+          workGroup || null,
+          craft || null,
+        );
         if (woTypeId) {
           console.log(
             `Resolved WorkOrderType Id: ${woTypeId} for workGroup "${workGroup}" / craft "${craft}"`,
@@ -1038,6 +1148,15 @@ router.post(
         } else {
           console.warn(
             `Could not resolve WorkOrderType for workGroup "${workGroup}" / craft "${craft}" — omitting from payload`,
+          );
+        }
+        if (labourAssignment?.resourceId) {
+          console.log(
+            `Resolved Labour Resource Id: ${labourAssignment.resourceId} for workGroup "${workGroup}" / craft "${craft}"`,
+          );
+        } else {
+          console.warn(
+            `Could not resolve Labour Resource for workGroup "${workGroup}" / craft "${craft}"`,
           );
         }
 
@@ -1060,6 +1179,35 @@ router.post(
         }
         if (workGroup) {
           prepPayload.WorkOrderWorkGroup = workGroup;
+        }
+
+        // Some Assetic configurations require at least one assigned labour resource
+        // aligned to the work group / craft when creating the WO.
+        if (labourAssignment?.resourceId) {
+          const labour: any = {
+            QuantityRequired: 1,
+            HoursRequired: durationHours || 1,
+            MaintenanceResources: [
+              {
+                Resource: { Id: labourAssignment.resourceId },
+                StatusId: 1,
+              },
+            ],
+          };
+
+          if (labourAssignment.plannedGroupCraftId) {
+            labour.PlannedGroupCraftId = labourAssignment.plannedGroupCraftId;
+          }
+          if (labourAssignment.assignedGroupCraftId) {
+            labour.MaintenanceResources[0].AssignedGroupCraftId =
+              labourAssignment.assignedGroupCraftId;
+          }
+          if (labourAssignment.groupCraftId) {
+            labour.MaintenanceResources[0].GroupCraftId =
+              labourAssignment.groupCraftId;
+          }
+
+          prepPayload.Labours = [labour];
         }
 
         // Build supporting information: prepend location + requestor info,
@@ -1198,13 +1346,37 @@ router.post(
           };
           if (durationHours) {
             rfePayload.EstimatedDuration = Math.round(durationHours * 60);
-            // Labour entry required for RFE — 1 person for the estimated hours
-            rfePayload.Labours = [
-              {
-                QuantityRequired: 1,
-                HoursRequired: durationHours,
-              },
-            ];
+          }
+
+          if (durationHours || labourAssignment?.resourceId) {
+            // Labour entry for RFE: one resource, one quantity, with the selected
+            // work-group-matched resource when available.
+            const labour: any = {
+              QuantityRequired: 1,
+              HoursRequired: durationHours || 1,
+            };
+            if (labourAssignment?.resourceId) {
+              labour.MaintenanceResources = [
+                {
+                  Resource: { Id: labourAssignment.resourceId },
+                  StatusId: 1,
+                },
+              ];
+
+              if (labourAssignment.plannedGroupCraftId) {
+                labour.PlannedGroupCraftId =
+                  labourAssignment.plannedGroupCraftId;
+              }
+              if (labourAssignment.assignedGroupCraftId) {
+                labour.MaintenanceResources[0].AssignedGroupCraftId =
+                  labourAssignment.assignedGroupCraftId;
+              }
+              if (labourAssignment.groupCraftId) {
+                labour.MaintenanceResources[0].GroupCraftId =
+                  labourAssignment.groupCraftId;
+              }
+            }
+            rfePayload.Labours = [labour];
           }
 
           try {

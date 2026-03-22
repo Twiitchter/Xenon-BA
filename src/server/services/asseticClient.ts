@@ -658,6 +658,28 @@ class AsseticClient {
     );
   }
 
+  async getResourceCrafts(resourceId: string, params?: AsseticQueryParams) {
+    return this.call(
+      (c) =>
+        c
+          .get(`/resource/${resourceId}/craft`, {
+            params: toAsseticParams(params),
+          })
+          .then((r) => r.data),
+      `GET /resource/${resourceId}/craft`,
+    );
+  }
+
+  async getManagedResources(params?: AsseticQueryParams) {
+    return this.call(
+      (c) =>
+        c
+          .get("/managedresource", { params: toAsseticParams(params) })
+          .then((r) => r.data),
+      "GET /managedresource",
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // DOCUMENTS
   // ═══════════════════════════════════════════════════════════════════
