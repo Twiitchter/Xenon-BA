@@ -9,6 +9,7 @@ import asseticClient from "../services/asseticClient";
 import asseticApiLogger from "../services/asseticApiLogger";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import asseticAssetSyncService from "../services/asseticAssetSyncService";
+import emailService from "../services/emailService";
 
 const router = Router();
 
@@ -1759,6 +1760,33 @@ router.delete(
     } catch (error) {
       console.error("Error deleting failed work order status change:", error);
       res.status(500).json({ error: "Failed to delete record" });
+    }
+  },
+);
+
+/**
+ * POST /api/admin/settings/test-email
+ * Send a test email to verify email configuration.
+ */
+router.post(
+  "/settings/test-email",
+  [body("to").isEmail()],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { to } = req.body;
+      await emailService.sendTestEmail(to);
+      res.json({ success: true, message: `Test email sent to ${to}` });
+    } catch (error: any) {
+      console.error("Test email failed:", error);
+      res.json({
+        success: false,
+        message: error?.message || "Failed to send test email",
+      });
     }
   },
 );

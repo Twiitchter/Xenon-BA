@@ -39,6 +39,8 @@ const Settings: React.FC = () => {
   const [syncLogs, setSyncLogs] = useState<any[]>([]);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncTriggering, setSyncTriggering] = useState<string | null>(null);
+  const [testEmailAddress, setTestEmailAddress] = useState("");
+  const [testingEmail, setTestingEmail] = useState(false);
 
   useEffect(() => {
     void fetchSettings();
@@ -278,6 +280,29 @@ const Settings: React.FC = () => {
       .replace(/^(assetic_|sso_|email_|app_)/, "")
       .replace(/_/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const handleTestEmail = async () => {
+    if (!testEmailAddress) {
+      setError("Please enter a recipient email address");
+      return;
+    }
+    setTestingEmail(true);
+    setError("");
+    setSuccess("");
+    try {
+      await handleSave();
+      const result = await adminService.testEmail(testEmailAddress);
+      if (result.success) {
+        setSuccess(result.message);
+      } else {
+        setError(`Test email failed: ${result.message}`);
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Test email failed");
+    } finally {
+      setTestingEmail(false);
+    }
+  };
 
   return (
     <div className="container">
@@ -804,6 +829,62 @@ const Settings: React.FC = () => {
                 </>
               );
             })()
+          ) : activeCategory === "email" ? (
+            /* ── Email settings with test button ── */
+            <>
+              {categorySettings.map((setting) => (
+                <div
+                  className="form-group"
+                  key={setting.setting_key}
+                  style={{ marginBottom: "16px" }}
+                >
+                  <label>{formatKey(setting.setting_key)}</label>
+                  {setting.description && (
+                    <div className="settings-muted">{setting.description}</div>
+                  )}
+                  {renderInput(setting)}
+                </div>
+              ))}
+
+              <div
+                style={{
+                  borderTop: "1px solid var(--border, #444)",
+                  marginTop: "20px",
+                  paddingTop: "16px",
+                }}
+              >
+                <h4 style={{ margin: "0 0 8px" }}>Send Test Email</h4>
+                <p className="settings-muted">
+                  Save your settings then send a test email to verify the
+                  configuration.
+                </p>
+                <div
+                  style={{ display: "flex", gap: "10px", alignItems: "center" }}
+                >
+                  <input
+                    type="email"
+                    placeholder="Recipient email address"
+                    value={testEmailAddress}
+                    onChange={(e) => setTestEmailAddress(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn-outline"
+                    onClick={handleTestEmail}
+                    disabled={testingEmail}
+                    type="button"
+                  >
+                    {testingEmail ? "Sending..." : "Send Test"}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                <button onClick={handleSave} disabled={saving}>
+                  {saving ? "Saving..." : "Save Settings"}
+                </button>
+              </div>
+            </>
           ) : (
             /* ── Normal category: show all settings inline ── */
             <>
