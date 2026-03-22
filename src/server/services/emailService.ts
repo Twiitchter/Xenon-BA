@@ -545,20 +545,19 @@ class EmailService {
     }
 
     const provider = await settingsService.get("email_provider", "smtp");
-    const recipient = Array.isArray(to) ? to : to;
 
     if (provider === "api") {
-      await this.sendViaApi(from, recipient, "Email Configuration Test", html);
+      await this.sendViaApi(from, to, "Email Configuration Test", html);
     } else {
       const transporter = await this.getTransporter();
       await transporter.sendMail({
         from,
-        to: recipient,
+        to,
         subject: "Email Configuration Test",
         html,
       });
     }
-    await this.logEmail(recipient, "Email Configuration Test", html, "sent", null);
+    await this.logEmail(to, "Email Configuration Test", html, "sent", null);
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────

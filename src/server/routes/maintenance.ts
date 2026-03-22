@@ -568,17 +568,17 @@ router.post(
         .returning("*");
 
       // For MySQL/MSSQL that don't support RETURNING, fetch the inserted row
-      let result = inserted;
+      let newRequest = inserted;
       if (!inserted || typeof inserted === "number") {
         const id = typeof inserted === "number" ? inserted : (inserted as any);
-        result = await db("maintenance_requests").where("id", id).first();
+        newRequest = await db("maintenance_requests").where("id", id).first();
       }
 
       // Send email notification for new work request (fire-and-forget)
       void emailService
         .notifyNewWorkRequest({
-          requestId: result.id ?? (result as any).id,
-          friendlyId: result.assetic_friendly_id ?? null,
+          requestId: newRequest.id ?? (newRequest as any).id,
+          friendlyId: newRequest.assetic_friendly_id ?? null,
           title,
           description: description || null,
           priority: priority || "medium",
@@ -590,7 +590,7 @@ router.post(
           console.error("[Email] notifyNewWorkRequest failed:", err?.message),
         );
 
-      res.status(201).json(result);
+      res.status(201).json(newRequest);
     } catch (error) {
       console.error("Error creating maintenance request:", error);
       res.status(500).json({ error: "Failed to create maintenance request" });
@@ -1766,9 +1766,9 @@ router.put(
       const updated = await db("work_orders").where("id", id).first();
 
       // Email notifications (fire-and-forget)
-      const statusChanged = status && status !== oldStatus;
+      const statusChanged = status !== undefined && status !== oldStatus;
       const assignmentChanged =
-        assignedTo && Number(assignedTo) !== Number(oldAssignedTo);
+        assignedTo !== undefined && Number(assignedTo) !== Number(oldAssignedTo);
 
       if (statusChanged || assignmentChanged) {
         // Look up requestor email from the linked maintenance request
