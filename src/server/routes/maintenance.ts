@@ -5,6 +5,7 @@ import db from "../database";
 import asseticClient from "../services/asseticClient";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import settingsService from "../services/settingsService";
+import emailService from "../services/emailService";
 
 const router = Router();
 
@@ -567,13 +568,29 @@ router.post(
         .returning("*");
 
       // For MySQL/MSSQL that don't support RETURNING, fetch the inserted row
+      let result = inserted;
       if (!inserted || typeof inserted === "number") {
         const id = typeof inserted === "number" ? inserted : (inserted as any);
-        const row = await db("maintenance_requests").where("id", id).first();
-        return res.status(201).json(row);
+        result = await db("maintenance_requests").where("id", id).first();
       }
 
-      res.status(201).json(inserted);
+      // Send email notification for new work request (fire-and-forget)
+      void emailService
+        .notifyNewWorkRequest({
+          requestId: result.id ?? (result as any).id,
+          friendlyId: result.assetic_friendly_id ?? null,
+          title,
+          description: description || null,
+          priority: priority || "medium",
+          location: location || null,
+          requestorName: requestorDisplayName || null,
+          requestorEmail: requestorEmail || null,
+        })
+        .catch((err: any) =>
+          console.error("[Email] notifyNewWorkRequest failed:", err?.message),
+        );
+
+      res.status(201).json(result);
     } catch (error) {
       console.error("Error creating maintenance request:", error);
       res.status(500).json({ error: "Failed to create maintenance request" });
@@ -1616,6 +1633,60 @@ router.post(
       }
 
       const workOrder = await db("work_orders").where("id", newId).first();
+
+      // Send email notifications for WO creation (fire-and-forget)
+      const notifData = {
+        workOrderId: newId,
+        friendlyId: asseticFriendlyId,
+        title,
+        description: description || null,
+        priority: inheritedPriority,
+        location: inheritedAssetLocation,
+        craft: craft || null,
+        workGroup: workGroup || null,
+        requestorName: reqCheck.requestor_display_name || null,
+        requestorEmail: reqCheck.requestor_email || null,
+        assigneeName: null as string | null,
+        assigneeEmail: null as string | null,
+        wrFriendlyId: reqCheck.assetic_friendly_id || null,
+      };
+
+      // Look up assignee email if assigned
+      if (assignedTo) {
+        try {
+          const assignee = await db("users")
+            .where("id", assignedTo)
+            .select("email", "first_name", "last_name", "username")
+            .first();
+          if (assignee) {
+            notifData.assigneeEmail = assignee.email;
+            notifData.assigneeName =
+              [assignee.first_name, assignee.last_name]
+                .filter(Boolean)
+                .join(" ") || assignee.username;
+          }
+        } catch {
+          // non-fatal
+        }
+      }
+
+      void emailService
+        .notifyWorkOrderCreated(notifData)
+        .catch((err: any) =>
+          console.error("[Email] notifyWorkOrderCreated failed:", err?.message),
+        );
+
+      if (notifData.assigneeEmail) {
+        void emailService
+          .notifyWorkOrderAssigned(notifData)
+          .catch((err: any) =>
+            console.error(
+              "[Email] notifyWorkOrderAssigned failed:",
+              err?.message,
+            ),
+          );
+      }
+
       return res.status(201).json(workOrder);
     } catch (error) {
       console.error("Error creating work order:", error);
@@ -1663,11 +1734,14 @@ router.put(
 
       const existing = await db("work_orders")
         .where("id", id)
-        .select("id", "request_id")
+        .select("id", "request_id", "status", "assigned_to")
         .first();
       if (!existing) {
         return res.status(404).json({ error: "Work order not found" });
       }
+
+      const oldStatus = existing.status;
+      const oldAssignedTo = existing.assigned_to;
 
       const updateData: any = { updated_at: db.fn.now() };
       if (title) updateData.title = title;
@@ -1690,6 +1764,72 @@ router.put(
       }
 
       const updated = await db("work_orders").where("id", id).first();
+
+      // Email notifications (fire-and-forget)
+      const statusChanged = status && status !== oldStatus;
+      const assignmentChanged =
+        assignedTo && Number(assignedTo) !== Number(oldAssignedTo);
+
+      if (statusChanged || assignmentChanged) {
+        // Look up requestor email from the linked maintenance request
+        void (async () => {
+          try {
+            const mr = await db("maintenance_requests")
+              .where("id", existing.request_id)
+              .select(
+                "requestor_display_name",
+                "requestor_email",
+                "assetic_friendly_id",
+              )
+              .first();
+
+            const notifData = {
+              workOrderId: updated.id,
+              friendlyId: updated.assetic_friendly_id || null,
+              title: updated.title,
+              description: updated.description || null,
+              priority: updated.priority,
+              location: updated.asset_location || null,
+              craft: updated.craft || null,
+              workGroup: updated.work_group || null,
+              requestorName: mr?.requestor_display_name || null,
+              requestorEmail: mr?.requestor_email || null,
+              assigneeName: null as string | null,
+              assigneeEmail: null as string | null,
+              wrFriendlyId: mr?.assetic_friendly_id || null,
+            };
+
+            if (statusChanged) {
+              await emailService.notifyWorkOrderStatusChanged(
+                notifData,
+                oldStatus,
+                status,
+              );
+            }
+
+            if (assignmentChanged) {
+              const assignee = await db("users")
+                .where("id", assignedTo)
+                .select("email", "first_name", "last_name", "username")
+                .first();
+              if (assignee) {
+                notifData.assigneeEmail = assignee.email;
+                notifData.assigneeName =
+                  [assignee.first_name, assignee.last_name]
+                    .filter(Boolean)
+                    .join(" ") || assignee.username;
+                await emailService.notifyWorkOrderAssigned(notifData);
+              }
+            }
+          } catch (err: any) {
+            console.error(
+              "[Email] WO update notification failed:",
+              err?.message,
+            );
+          }
+        })();
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating work order:", error);

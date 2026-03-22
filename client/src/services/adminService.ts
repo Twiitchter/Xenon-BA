@@ -322,6 +322,17 @@ class AdminService {
     });
     return response.data as { message: string };
   }
+
+  // ─── Email ────────────────────────────────────────────────────────
+
+  async testEmail(to: string) {
+    const response = await axios.post(
+      `${API_URL}/settings/test-email`,
+      { to },
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data as { success: boolean; message: string };
+  }
 }
 
 export const adminService = new AdminService();
