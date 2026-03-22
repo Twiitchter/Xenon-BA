@@ -3,6 +3,10 @@ import { maintenanceService } from "../services/maintenanceService";
 import { generatePdf, buildWorkOrderTemplate } from "../services/pdfService";
 import Modal from "../components/Modal";
 import FilterPresetsPanel from "../components/FilterPresetsPanel";
+import WorkOrderPDFEditor, {
+  loadWorkOrderPDFSection,
+  type WorkOrderPDFSection,
+} from "../components/WorkOrderPDFEditor";
 
 const priorityBadgeClass = (p: string) => {
   const map: Record<string, string> = {
@@ -102,6 +106,12 @@ const WorkOrders: React.FC = () => {
   const [updating, setUpdating] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // PDF custom section state
+  const [pdfEditorOpen, setPdfEditorOpen] = useState(false);
+  const [pdfSection, setPdfSection] = useState<WorkOrderPDFSection>(() =>
+    loadWorkOrderPDFSection(),
+  );
 
   useEffect(() => {
     fetchWorkOrders();
@@ -585,12 +595,20 @@ const WorkOrders: React.FC = () => {
               <button
                 className="btn-ghost"
                 onClick={() =>
-                  generatePdf(buildWorkOrderTemplate(selectedOrder))
+                  generatePdf(buildWorkOrderTemplate(selectedOrder, pdfSection.content.trim() ? pdfSection : undefined))
                 }
                 title="Download PDF"
                 style={{ fontSize: "13px" }}
               >
                 ↓ PDF
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => setPdfEditorOpen(true)}
+                title="Edit PDF custom section"
+                style={{ fontSize: "13px" }}
+              >
+                ⚙ PDF
               </button>
               <button
                 className="btn-ghost"
@@ -855,6 +873,13 @@ const WorkOrders: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+      {/* ── PDF Custom Section Editor ── */}
+      {pdfEditorOpen && (
+        <WorkOrderPDFEditor
+          onClose={() => setPdfEditorOpen(false)}
+          onSave={(section) => setPdfSection(section)}
+        />
       )}
     </div>
   );
