@@ -4,12 +4,16 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   maxWidth?: string;
+  /** When true, clicking the backdrop and pressing Escape will NOT close the modal.
+   *  Use for complex forms where accidental dismissal would lose user input. */
+  disableBackdropClose?: boolean;
 }
 
 const Modal: React.FC<ModalProps> = ({
   onClose,
   children,
   maxWidth = "860px",
+  disableBackdropClose = false,
 }) => {
   // Track whether the mousedown originated on the backdrop itself.
   // When the browser's native datetime-local picker closes, it fires a click
@@ -18,21 +22,27 @@ const Modal: React.FC<ModalProps> = ({
   const mouseDownOnBackdrop = useRef(false);
 
   useEffect(() => {
+    if (disableBackdropClose) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, disableBackdropClose]);
 
   return (
     <div
       className="modal-backdrop"
       onMouseDown={(e) => {
-        mouseDownOnBackdrop.current = e.target === e.currentTarget;
+        mouseDownOnBackdrop.current =
+          !disableBackdropClose && e.target === e.currentTarget;
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget && mouseDownOnBackdrop.current) {
+        if (
+          !disableBackdropClose &&
+          e.target === e.currentTarget &&
+          mouseDownOnBackdrop.current
+        ) {
           onClose();
         }
       }}

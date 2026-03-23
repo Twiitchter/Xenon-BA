@@ -645,7 +645,7 @@ const Maintenance: React.FC = () => {
       {/* admin-page-layout */}
       {/* ── Detail Modal ── */}
       {selected && (
-        <Modal onClose={() => setSelected(null)}>
+        <Modal onClose={() => setSelected(null)} disableBackdropClose>
           {/* Modal header */}
           <div className="modal-header">
             <div>

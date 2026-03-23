@@ -672,7 +672,7 @@ const WorkOrders: React.FC = () => {
       </datalist>
       {/* ── Work Order Modal ── */}
       {selectedOrder && (
-        <Modal onClose={() => setSelectedOrder(null)}>
+        <Modal onClose={() => setSelectedOrder(null)} disableBackdropClose>
           {/* Header */}
           <div className="modal-header">
             <div>

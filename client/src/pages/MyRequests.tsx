@@ -456,7 +456,7 @@ const MyRequests: React.FC = () => {
 
       {/* Detail modal */}
       {selectedItem && (
-        <Modal onClose={() => setSelectedItem(null)}>
+        <Modal onClose={() => setSelectedItem(null)} disableBackdropClose>
           {/* Modal header */}
           <div className="modal-header">
             <div>

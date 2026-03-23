@@ -535,7 +535,7 @@ const Users: React.FC = () => {
       )}
 
       {showForm && (
-        <Modal onClose={cancelForm} maxWidth="680px">
+        <Modal onClose={cancelForm} maxWidth="680px" disableBackdropClose>
           <h3 style={{ marginBottom: "16px" }}>
             {editingUser ? "Edit User" : "Create User"}
           </h3>
