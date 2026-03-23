@@ -640,6 +640,93 @@ class AsseticClient {
     }, `GET /workgroup/${workgroupId}/craft`);
   }
 
+  /**
+   * Query work orders for a specific work group, returning only those that
+   * have at least one Labour entry populated.  Used to discover the correct
+   * PlannedGroupCraftId for a given work group / craft combination by reading
+   * it from an existing work order — the same approach used in the Assetic
+   * Postman collection.
+   *
+   * Two-pass strategy:
+   *  1. Filter by WorkOrderWorkGroup name exactly — fast and precise.
+   *  2. If pass 1 yields no Labour-bearing WOs, fetch the most recent
+   *     RFE/INPRG WOs from the whole system and match by workgroup
+   *     client-side.  This handles new/sandbox environments where the
+   *     specific workgroup may have no historical WOs yet.
+   */
+  async getWorkOrdersForWorkGroup(
+    workGroupName: string,
+    pageSize = 20,
+  ): Promise<any[]> {
+    return this.call(async (c) => {
+      const esc = (s: string) => s.replace(/'/g, "''");
+
+      // ── Pass 1: filter by workgroup name ───────────────────────────
+      try {
+        const resp = await c.get("/workorder", {
+          params: {
+            "requestParams.filters": `WorkOrderWorkGroup~eq~'${esc(workGroupName)}'`,
+            "requestParams.pageSize": pageSize,
+            "requestParams.sorts": "CreatedDateTime-desc",
+          },
+        });
+        const data = resp.data;
+        const items: any[] = Array.isArray(data)
+          ? data
+          : data?.ResourceList ||
+            data?.Data ||
+            data?.Results ||
+            data?.results ||
+            [];
+        const withLabours = items.filter(
+          (wo) => Array.isArray(wo.Labours) && wo.Labours.length > 0,
+        );
+        console.log(
+          `[getWorkOrdersForWorkGroup] pass1 workgroup="${workGroupName}": ` +
+            `${items.length} WOs found, ${withLabours.length} with Labours`,
+        );
+        if (withLabours.length > 0) return withLabours;
+      } catch {
+        // fall through to pass 2
+      }
+
+      // ── Pass 2: broad recent-WO scan ───────────────────────────────
+      // Fetch recent RFE + INPRG WOs without a workgroup filter and
+      // match the workgroup name in the payload client-side.
+      try {
+        const resp = await c.get("/workorder", {
+          params: {
+            "requestParams.filters": `Status~eq~'RFE'`,
+            "requestParams.pageSize": 50,
+            "requestParams.sorts": "CreatedDateTime-desc",
+          },
+        });
+        const data = resp.data;
+        const items: any[] = Array.isArray(data)
+          ? data
+          : data?.ResourceList ||
+            data?.Data ||
+            data?.Results ||
+            data?.results ||
+            [];
+        const wgLower = workGroupName.toLowerCase();
+        const withLabours = items.filter(
+          (wo) =>
+            Array.isArray(wo.Labours) &&
+            wo.Labours.length > 0 &&
+            (wo.WorkOrderWorkGroup ?? "").toLowerCase() === wgLower,
+        );
+        console.log(
+          `[getWorkOrdersForWorkGroup] pass2 RFE scan: ` +
+            `${items.length} RFE WOs, ${withLabours.length} with Labours for workgroup="${workGroupName}"`,
+        );
+        return withLabours;
+      } catch {
+        return [];
+      }
+    }, `GET /workorder?WorkOrderWorkGroup=${workGroupName}`);
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // FUNCTIONAL LOCATIONS  (for building / floor / room drill-down)
   // ═══════════════════════════════════════════════════════════════════

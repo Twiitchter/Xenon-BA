@@ -973,59 +973,104 @@ async function resolveLabourAssignment(
       : "";
   const craftSearch = (craft || craftFromWg || "").trim().toLowerCase();
 
-  // ── 1. Work group GroupCrafts lookup ─────────────────────────────────────
+  // ── 0. Query existing work orders with the same work group ───────────────
+  //    The Assetic Postman collection retrieves PlannedGroupCraftId by reading
+  //    it from ResourceList[i].Labours[0].PlannedGroupCraftId on existing WOs.
+  //    We do the same: find a WO whose labour's Craft suffix-matches our craft.
   if (workGroup) {
     try {
-      const wg = await asseticClient.getWorkgroupByName(workGroup);
-      const wgId = wg?.Id ?? wg?.id;
+      const existingWOs = await asseticClient.getWorkOrdersForWorkGroup(
+        workGroup,
+        20,
+      );
 
-      if (wgId) {
-        // Work group found — get its craft slots
-        const crafts: any[] = await asseticClient.getWorkgroupCrafts(wgId, {
-          page: 1,
-          pageSize: 50,
-        });
+      // Flatten all labours across all WOs, tagging each with the WO Id/Status.
+      type LabourCandidate = {
+        woId: string;
+        woStatus: string;
+        labour: any;
+        resources: any[];
+        firstResource: any;
+        groupCraftId: string | undefined;
+        plannedGroupCraftId: string | undefined;
+        resourceId: string | null;
+        craftMatch: boolean;
+      };
+      const candidates: LabourCandidate[] = [];
 
-        if (crafts.length) {
-          // Find the best matching craft slot; fall back to first
-          let matched = crafts[0];
-          if (craftSearch) {
-            const byName = crafts.find((c: any) =>
-              (c.Craft ?? c.CraftName ?? c.Name ?? "")
-                .toLowerCase()
-                .includes(craftSearch),
-            );
-            if (byName) matched = byName;
-          }
+      for (const wo of existingWOs) {
+        const labours: any[] = Array.isArray(wo.Labours) ? wo.Labours : [];
+        for (const labour of labours) {
+          const resources: any[] = Array.isArray(labour.MaintenanceResources)
+            ? labour.MaintenanceResources
+            : [];
+          const firstResource = resources[0];
+          const rawGroupCraftId =
+            firstResource?.GroupCraftId ?? firstResource?.AssignedGroupCraftId;
+          const groupCraftId = rawGroupCraftId
+            ? String(rawGroupCraftId)
+            : undefined;
 
-          const groupCraftId =
-            matched.Id ?? matched.GroupCraftId ?? matched.PlannedGroupCraftId;
-          // Try to also pick up a resource from the craft slot itself
-          const resourceId = matched.ResourceId ?? matched.Resource?.Id ?? null;
+          const plannedGroupCraftId =
+            (labour.PlannedGroupCraftId
+              ? String(labour.PlannedGroupCraftId)
+              : undefined) ?? groupCraftId;
 
-          console.log(
-            `Labour assignment via workgroup craft: groupCraftId=${groupCraftId}` +
-              ` resourceId=${resourceId ?? "(none)"} craft="${matched.Craft ?? matched.CraftName ?? ""}"`,
-          );
+          if (!plannedGroupCraftId) continue; // no usable craft ID → skip
 
-          return {
-            resourceId: resourceId ? String(resourceId) : null!,
-            plannedGroupCraftId: groupCraftId
-              ? String(groupCraftId)
-              : undefined,
-            groupCraftId: groupCraftId ? String(groupCraftId) : undefined,
-            assignedGroupCraftId: groupCraftId
-              ? String(groupCraftId)
-              : undefined,
-          } as ResolvedLabourAssignment;
+          const resourceId = firstResource?.Resource?.Id
+            ? String(firstResource.Resource.Id)
+            : null;
+          const labourCraft = (labour.Craft ?? "").trim().toLowerCase();
+          const craftMatch =
+            !craftSearch ||
+            labourCraft === craftSearch ||
+            labourCraft.includes(craftSearch);
+
+          candidates.push({
+            woId: wo.Id,
+            woStatus: wo.Status ?? "",
+            labour,
+            resources,
+            firstResource,
+            groupCraftId,
+            plannedGroupCraftId,
+            resourceId,
+            craftMatch,
+          });
         }
+      }
+
+      // Prefer craft-matched candidates; fall back to the first available.
+      const best =
+        candidates.find((c) => c.craftMatch) ?? candidates[0] ?? null;
+
+      if (best) {
+        console.log(
+          `[resolveLabourAssignment] Found via existing WO ${best.woId} (status=${best.woStatus}):` +
+            ` plannedGroupCraftId=${best.plannedGroupCraftId}` +
+            ` groupCraftId=${best.groupCraftId ?? "(none)"}` +
+            ` resourceId=${best.resourceId ?? "(none)"}` +
+            ` craft="${best.labour.Craft ?? ""}"` +
+            ` craftMatch=${best.craftMatch}`,
+        );
+        return {
+          resourceId: best.resourceId,
+          plannedGroupCraftId: best.plannedGroupCraftId,
+          groupCraftId: best.groupCraftId,
+          assignedGroupCraftId: best.groupCraftId,
+        };
       }
     } catch (e: any) {
       console.warn(
-        `[resolveLabourAssignment] WorkGroup craft lookup failed (non-fatal): ${e?.message}`,
+        `[resolveLabourAssignment] Existing WO lookup failed (non-fatal): ${e?.message}`,
       );
     }
   }
+
+  // ── (step 1 removed) ──────────────────────────────────────────────────────
+  // The /workgroup/{id}/craft sub-endpoint is not supported on this Assetic
+  // tenant (returns 404).  Skip directly to the resource-craft lookup.
 
   // ── 2. Resource + resource-craft lookup ──────────────────────────────────
   let resourceId: string | null = null;
@@ -1071,8 +1116,10 @@ async function resolveLabourAssignment(
           matched.Id ?? matched.GroupCraftId ?? matched.PlannedGroupCraftId;
 
         console.log(
-          `Labour assignment via resource craft: resourceId=${resourceId}` +
-            ` groupCraftId=${groupCraftId} craft="${matched.Craft ?? matched.CraftName ?? ""}"`,
+          `[resolveLabourAssignment] Step 2 resource craft: resourceId=${resourceId}` +
+            ` groupCraftId=${groupCraftId ?? "(none)"}` +
+            ` craft="${matched.Craft ?? matched.CraftName ?? matched.Name ?? ""}"` +
+            ` (raw keys: ${Object.keys(matched).join(",")})`,
         );
 
         return {
@@ -1082,11 +1129,16 @@ async function resolveLabourAssignment(
           assignedGroupCraftId: groupCraftId ? String(groupCraftId) : undefined,
         };
       }
-    } catch {
-      // non-fatal
+    } catch (e: any) {
+      console.warn(
+        `[resolveLabourAssignment] Step 2 craft lookup failed: ${e?.message}`,
+      );
     }
 
-    // Return with just the resourceId if craft lookup failed
+    console.warn(
+      `[resolveLabourAssignment] Step 2: resourceId=${resourceId} found but no craft rows returned` +
+        ` — submitting Labour with resource only (no PlannedGroupCraftId)`,
+    );
     return { resourceId };
   }
 
@@ -1784,6 +1836,25 @@ router.post(
       await db("maintenance_requests")
         .where("id", requestId)
         .update({ status: "in_progress", updated_at: db.fn.now() });
+
+      // ── Link the originating Work Request to this Work Order in Assetic ──
+      // Setting WorkOrderId on the WR record is what causes Assetic to display
+      // the WO in the "Linked Work Requests" section on the WO detail view.
+      if (asseticEnabled && inheritedWrGuid && asseticWorkOrderId) {
+        try {
+          await asseticClient.updateWorkRequest(inheritedWrGuid, {
+            WorkOrderId: asseticWorkOrderId,
+          });
+          console.log(
+            `Linked WR ${inheritedWrGuid} → WO ${asseticWorkOrderId} (WorkOrderId set on WR)`,
+          );
+        } catch (linkErr: any) {
+          // Non-fatal — the WO is already created; log and continue
+          console.warn(
+            `Could not link WR to WO (non-fatal): ${linkErr?.message || linkErr}`,
+          );
+        }
+      }
 
       // ── Update WR type in Assetic to the specific discipline+direction type ──
       // Now that we know the craft, we can be more specific than the generic
