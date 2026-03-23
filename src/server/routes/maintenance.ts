@@ -7,6 +7,7 @@ import asseticLocationHierarchyService from "../services/asseticLocationHierarch
 import settingsService from "../services/settingsService";
 import { DEFAULT_PDF_TEMPLATES, type TemplateType } from "../services/pdfTemplateDefaults";
 import emailService from "../services/emailService";
+import { ensureAsseticResource } from "../services/asseticResourceService";
 
 const router = Router();
 
@@ -433,32 +434,19 @@ router.post(
         requestor.Types = [{ Type: "Customer" }];
 
         // ── Ensure the reporter exists as an Assetic Resource ────────────────
-        // We use the XeonB user's internal ID as the Assetic ExternalID so we
-        // can reliably find/create the resource across requests.
+        // Uses a DB-cached resource ID to avoid a redundant GET /resource API
+        // call on every submission.  On first submission the service does the
+        // GET/POST round-trip and caches the result for future requests.
         const reporterExternalId = String(req.user.id);
         try {
-          const existing =
-            await asseticClient.getResourceByExternalId(reporterExternalId);
-          if (!existing) {
-            // Build the resource payload from available requestor details
-            const resourcePayload: any = {
-              ExternalID: reporterExternalId,
-              Status: "Active",
-              Types: [{ Type: "Customer" }],
-            };
-            if (requestorDisplayName)
-              resourcePayload.DisplayName = requestorDisplayName;
-            if (requestorFirstName)
-              resourcePayload.FirstName = requestorFirstName;
-            if (requestorSurname) resourcePayload.Surname = requestorSurname;
-            if (requestorEmail) resourcePayload.Email = requestorEmail;
-            if (requestorPhone) resourcePayload.Phone = requestorPhone;
-            if (requestorMobile) resourcePayload.Mobile = requestorMobile;
-            await asseticClient.createResource(resourcePayload);
-            console.log(
-              `Assetic resource created for user ${reporterExternalId}`,
-            );
-          }
+          await ensureAsseticResource(req.user.id, {
+            displayName: requestorDisplayName,
+            firstName: requestorFirstName,
+            surname: requestorSurname,
+            email: requestorEmail,
+            phone: requestorPhone,
+            mobile: requestorMobile,
+          });
         } catch (resourceErr: any) {
           // Non-fatal: log and continue. The WR can still be submitted
           // even if the resource upsert fails.
