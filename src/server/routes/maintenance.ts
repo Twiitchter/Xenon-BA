@@ -1731,6 +1731,13 @@ router.post(
           );
       }
 
+      // Notify matching contractors
+      void emailService
+        .notifyContractors(notifData)
+        .catch((err: any) =>
+          console.error("[Email] notifyContractors failed:", err?.message),
+        );
+
       return res.status(201).json(workOrder);
     } catch (error) {
       console.error("Error creating work order:", error);

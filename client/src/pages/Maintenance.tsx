@@ -44,6 +44,14 @@ const directionFromWorkGroup = (name: string): string => {
 const regionFromLocation = (location: string): string =>
   location ? location.split(" > ")[0].trim() : "";
 
+const WO_STATUS_MESSAGES = [
+  "Creating work order…",
+  "Registering resource in Assetic…",
+  "Assigning work order…",
+  "Syncing with Assetic…",
+  "Finalising details…",
+];
+
 const Maintenance: React.FC = () => {
   const [allRequests, setAllRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -95,6 +103,7 @@ const Maintenance: React.FC = () => {
   const [woScheduled, setWoScheduled] = useState("");
   const [woEstimatedDuration, setWoEstimatedDuration] = useState("");
   const [creatingWo, setCreatingWo] = useState(false);
+  const [woStatusMsg, setWoStatusMsg] = useState("");
   const [workGroups, setWorkGroups] = useState<any[]>([]);
 
   // Messages
@@ -192,6 +201,12 @@ const Maintenance: React.FC = () => {
   const handleCreateWorkOrder = async () => {
     if (!selected) return;
     setCreatingWo(true);
+    setWoStatusMsg(WO_STATUS_MESSAGES[0]);
+    let msgIdx = 0;
+    const msgTimer = setInterval(() => {
+      msgIdx = (msgIdx + 1) % WO_STATUS_MESSAGES.length;
+      setWoStatusMsg(WO_STATUS_MESSAGES[msgIdx]);
+    }, 2200);
     try {
       await maintenanceService.createWorkOrder({
         requestId: selected.id,
@@ -224,7 +239,9 @@ const Maintenance: React.FC = () => {
         : "";
       setError(baseMsg + assetInfo);
     } finally {
+      clearInterval(msgTimer);
       setCreatingWo(false);
+      setWoStatusMsg("");
     }
   };
 
@@ -930,9 +947,24 @@ const Maintenance: React.FC = () => {
                           background: "rgba(34,197,94,0.15)",
                           color: "#4ade80",
                           border: "1px solid rgba(34,197,94,0.3)",
+                          minHeight: "46px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px",
+                          flexDirection: "column",
                         }}
                       >
-                        {creatingWo ? "Creating…" : "↑ Create Work Order"}
+                        {creatingWo ? (
+                          <>
+                            <span className="wo-spinner" />
+                            <span style={{ fontSize: "12px", opacity: 0.85 }}>
+                              {woStatusMsg}
+                            </span>
+                          </>
+                        ) : (
+                          "↑ Create Work Order"
+                        )}
                       </button>
                     </>
                   )}

@@ -1248,3 +1248,21 @@ nav a:hover {
   font-size: 13px;
   box-sizing: border-box;
 }
+
+/* ── WO creation loading spinner ──────────────────────────── */
+.wo-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(74, 222, 128, 0.25);
+  border-top-color: #4ade80;
+  border-radius: 50%;
+  animation: wo-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes wo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

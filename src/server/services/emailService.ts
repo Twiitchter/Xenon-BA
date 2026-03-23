@@ -652,6 +652,101 @@ class EmailService {
       console.error("Failed to log email:", error);
     }
   }
+
+  /**
+   * Notify contractors whose trades match the work order craft.
+   * Only contractors with receives_work_orders=true and is_active=true are notified.
+   * Each contractor's custom email_template is rendered with work order variables;
+   * if no template is set the standard system template is used.
+   *
+   * Available template variables:
+   *   {{work_order_id}}, {{title}}, {{description}}, {{location}}, {{priority}},
+   *   {{craft}}, {{work_group}}, {{requestor_name}}, {{portal_url}}, {{app_name}}
+   */
+  async notifyContractors(data: WONotificationData): Promise<void> {
+    try {
+      const contractors = await db("contractors")
+        .where("receives_work_orders", true)
+        .where("is_active", true);
+
+      if (!contractors.length) return;
+
+      const appName = await settingsService.get("app_name", "Facilities Management Portal");
+      const portalUrl = await settingsService.get("email_portal_url", "");
+      const craft = (data.craft || "").toLowerCase();
+
+      for (const contractor of contractors) {
+        // Parse trades (stored as JSONB array)
+        let trades: string[] = [];
+        try {
+          trades = Array.isArray(contractor.trades)
+            ? contractor.trades
+            : JSON.parse(contractor.trades || "[]");
+        } catch {
+          trades = [];
+        }
+
+        // Match if no trades listed (catch-all) OR craft overlaps with trade list
+        const matches =
+          trades.length === 0 ||
+          trades.some(
+            (t: string) =>
+              t.toLowerCase() === craft ||
+              craft.includes(t.toLowerCase()) ||
+              t.toLowerCase().includes(craft),
+          );
+
+        if (!matches) continue;
+
+        const subject = `New Work Order: ${data.title}`;
+        let html: string;
+
+        if (contractor.email_template) {
+          const vars: Record<string, string> = {
+            "{{work_order_id}}": data.friendlyId || String(data.workOrderId),
+            "{{title}}": data.title || "",
+            "{{description}}": data.description || "",
+            "{{location}}": data.location || "",
+            "{{priority}}": data.priority || "",
+            "{{craft}}": data.craft || "",
+            "{{work_group}}": data.workGroup || "",
+            "{{requestor_name}}": data.requestorName || "",
+            "{{portal_url}}": portalUrl
+              ? `${portalUrl}/work-orders/${data.workOrderId}`
+              : "",
+            "{{app_name}}": appName,
+          };
+          let body = contractor.email_template as string;
+          for (const [key, val] of Object.entries(vars)) {
+            body = body.split(key).join(val);
+          }
+          // Wrap in a simple layout if not already HTML
+          html = body.trimStart().startsWith("<")
+            ? body
+            : `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#333;padding:24px">
+${body.replace(/\n/g, "<br>")}
+<hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb">
+<p style="font-size:12px;color:#94a3b8">This is an automated message from ${appName}. Please do not reply.</p>
+</body></html>`;
+        } else {
+          html = await this.buildTemplate(`New Work Order: ${data.title}`, [
+            { label: "WO #", value: data.friendlyId || String(data.workOrderId) },
+            { label: "Title", value: data.title },
+            { label: "Priority", value: data.priority },
+            ...(data.craft ? [{ label: "Trade / Craft", value: data.craft }] : []),
+            ...(data.workGroup ? [{ label: "Work Group", value: data.workGroup }] : []),
+            ...(data.location ? [{ label: "Location", value: data.location }] : []),
+            ...(data.description ? [{ label: "Description", value: data.description }] : []),
+          ], data.workOrderId);
+        }
+
+        await this.sendEmail({ to: contractor.email, subject, html });
+      }
+    } catch (err) {
+      console.error("[Email] notifyContractors error:", err);
+    }
+  }
 }
 
 export default new EmailService();
+

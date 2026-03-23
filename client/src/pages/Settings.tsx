@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AdminHierarchyResponse, adminService } from "../services/adminService";
+import { AdminHierarchyResponse, adminService, Contractor } from "../services/adminService";
 
 interface SettingItem {
   id: number;
@@ -10,7 +10,7 @@ interface SettingItem {
   description: string | null;
 }
 
-const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email"];
+const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email", "contractors"];
 const categoryLabels: Record<string, string> = {
   general: "General",
   assetic: "Assetic API",
@@ -18,6 +18,7 @@ const categoryLabels: Record<string, string> = {
   sync: "Asset Sync",
   sso: "SSO / Authentication",
   email: "Email",
+  contractors: "Contractors",
 };
 
 const Settings: React.FC = () => {
@@ -42,9 +43,24 @@ const Settings: React.FC = () => {
   const [testEmailAddress, setTestEmailAddress] = useState("");
   const [testingEmail, setTestingEmail] = useState(false);
 
+  // ─── Contractors ───────────────────────────────────────────────────────────
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [contractorLoading, setContractorLoading] = useState(false);
+  const [contractorSaving, setContractorSaving] = useState(false);
+  const [editingContractor, setEditingContractor] = useState<Partial<Contractor> | null>(null);
+  const [isNewContractor, setIsNewContractor] = useState(false);
+  // tradesInput is a comma-separated string for the UI
+  const [tradesInput, setTradesInput] = useState("");
+
   useEffect(() => {
     void fetchSettings();
   }, []);
+
+  useEffect(() => {
+    if (activeCategory === "contractors") {
+      void fetchContractors();
+    }
+  }, [activeCategory]);
 
   const categorySettings = useMemo(
     () =>
@@ -301,6 +317,82 @@ const Settings: React.FC = () => {
       setError(err?.response?.data?.error || "Test email failed");
     } finally {
       setTestingEmail(false);
+    }
+  };
+
+  // ─── Contractor helpers ────────────────────────────────────────────────────
+
+  const fetchContractors = async () => {
+    setContractorLoading(true);
+    try {
+      const data = await adminService.getContractors();
+      setContractors(data.contractors);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Failed to load contractors");
+    } finally {
+      setContractorLoading(false);
+    }
+  };
+
+  const openNewContractor = () => {
+    setEditingContractor({
+      name: "",
+      email: "",
+      phone: "",
+      company: "",
+      trades: [],
+      receives_work_orders: false,
+      is_active: true,
+      email_template: "",
+      notes: "",
+    });
+    setTradesInput("");
+    setIsNewContractor(true);
+  };
+
+  const openEditContractor = (c: Contractor) => {
+    setEditingContractor({ ...c });
+    setTradesInput((c.trades || []).join(", "));
+    setIsNewContractor(false);
+  };
+
+  const handleSaveContractor = async () => {
+    if (!editingContractor) return;
+    setContractorSaving(true);
+    setError("");
+    try {
+      const trades = tradesInput
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      const payload = { ...editingContractor, trades };
+      if (isNewContractor) {
+        await adminService.createContractor(
+          payload as Omit<Contractor, "id" | "created_at" | "updated_at">,
+        );
+      } else {
+        await adminService.updateContractor(editingContractor.id!, payload);
+      }
+      setEditingContractor(null);
+      await fetchContractors();
+      setSuccess(isNewContractor ? "Contractor added" : "Contractor updated");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Failed to save contractor");
+    } finally {
+      setContractorSaving(false);
+    }
+  };
+
+  const handleDeleteContractor = async (id: number) => {
+    if (!confirm("Delete this contractor? This cannot be undone.")) return;
+    try {
+      await adminService.deleteContractor(id);
+      setContractors((prev) => prev.filter((c) => c.id !== id));
+      setSuccess("Contractor deleted");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Failed to delete contractor");
     }
   };
 
@@ -829,6 +921,372 @@ const Settings: React.FC = () => {
                 </>
               );
             })()
+          ) : activeCategory === "contractors" ? (
+            /* ── Contractors ── */
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "16px",
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0 }}>Contractors</h3>
+                  <p className="settings-muted" style={{ margin: "4px 0 0" }}>
+                    Manage external contractors who can receive work order
+                    notifications by email. Assign trades to filter which work
+                    orders they are notified about (leave empty to receive all).
+                  </p>
+                </div>
+                <button
+                  onClick={openNewContractor}
+                  style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+                >
+                  + Add Contractor
+                </button>
+              </div>
+
+              {/* Inline add/edit form */}
+              {editingContractor && (
+                <div
+                  style={{
+                    border: "1px solid var(--border, #444)",
+                    borderRadius: "8px",
+                    padding: "16px 20px",
+                    marginBottom: "20px",
+                    background: "var(--bg-tertiary, #1e1e1e)",
+                  }}
+                >
+                  <h4 style={{ margin: "0 0 14px" }}>
+                    {isNewContractor ? "New Contractor" : "Edit Contractor"}
+                  </h4>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px",
+                    }}
+                  >
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Name *</label>
+                      <input
+                        type="text"
+                        value={editingContractor.name || ""}
+                        onChange={(e) =>
+                          setEditingContractor((p) => ({
+                            ...p!,
+                            name: e.target.value,
+                          }))
+                        }
+                        placeholder="Full name"
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Email *</label>
+                      <input
+                        type="email"
+                        value={editingContractor.email || ""}
+                        onChange={(e) =>
+                          setEditingContractor((p) => ({
+                            ...p!,
+                            email: e.target.value,
+                          }))
+                        }
+                        placeholder="contractor@example.com"
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Phone</label>
+                      <input
+                        type="text"
+                        value={editingContractor.phone || ""}
+                        onChange={(e) =>
+                          setEditingContractor((p) => ({
+                            ...p!,
+                            phone: e.target.value,
+                          }))
+                        }
+                        placeholder="+61 4xx xxx xxx"
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Company</label>
+                      <input
+                        type="text"
+                        value={editingContractor.company || ""}
+                        onChange={(e) =>
+                          setEditingContractor((p) => ({
+                            ...p!,
+                            company: e.target.value,
+                          }))
+                        }
+                        placeholder="ABC Maintenance Pty Ltd"
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Trades (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={tradesInput}
+                        onChange={(e) => setTradesInput(e.target.value)}
+                        placeholder="Carpenter, Painter, Plumber — blank = all trades"
+                      />
+                      <div className="settings-muted" style={{ marginTop: 3 }}>
+                        Leave blank to receive work orders for any trade.
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "20px",
+                        alignItems: "center",
+                        paddingTop: "6px",
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!editingContractor.receives_work_orders}
+                          onChange={(e) =>
+                            setEditingContractor((p) => ({
+                              ...p!,
+                              receives_work_orders: e.target.checked,
+                            }))
+                          }
+                        />
+                        Receives WO notifications
+                      </label>
+                      {!isNewContractor && (
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!editingContractor.is_active}
+                            onChange={(e) =>
+                              setEditingContractor((p) => ({
+                                ...p!,
+                                is_active: e.target.checked,
+                              }))
+                            }
+                          />
+                          Active
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: "12px" }}>
+                    <label>Email Template</label>
+                    <div className="settings-muted" style={{ marginBottom: 4 }}>
+                      Optional custom HTML/text body. Leave blank to use the
+                      default system template. Available variables:{" "}
+                      <code>
+                        {"{{work_order_id}} {{title}} {{description}} {{location}} {{priority}} {{craft}} {{work_group}} {{requestor_name}} {{portal_url}} {{app_name}}"}
+                      </code>
+                    </div>
+                    <textarea
+                      rows={6}
+                      value={editingContractor.email_template || ""}
+                      onChange={(e) =>
+                        setEditingContractor((p) => ({
+                          ...p!,
+                          email_template: e.target.value,
+                        }))
+                      }
+                      placeholder="Hi {{requestor_name}},&#10;&#10;A new work order ({{work_order_id}}) has been raised: {{title}}&#10;&#10;Location: {{location}}&#10;Trade: {{craft}}"
+                      style={{ width: "100%", boxSizing: "border-box" }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: "8px" }}>
+                    <label>Notes</label>
+                    <textarea
+                      rows={2}
+                      value={editingContractor.notes || ""}
+                      onChange={(e) =>
+                        setEditingContractor((p) => ({
+                          ...p!,
+                          notes: e.target.value,
+                        }))
+                      }
+                      placeholder="Internal notes about this contractor"
+                      style={{ width: "100%", boxSizing: "border-box" }}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                    <button
+                      onClick={handleSaveContractor}
+                      disabled={contractorSaving}
+                    >
+                      {contractorSaving
+                        ? "Saving…"
+                        : isNewContractor
+                          ? "Add Contractor"
+                          : "Save Changes"}
+                    </button>
+                    <button
+                      className="btn-outline"
+                      onClick={() => setEditingContractor(null)}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Contractor list */}
+              {contractorLoading ? (
+                <div className="loading">Loading contractors…</div>
+              ) : contractors.length === 0 ? (
+                <div
+                  style={{
+                    padding: "24px",
+                    textAlign: "center",
+                    color: "var(--text-muted)",
+                    border: "1px dashed var(--border, #444)",
+                    borderRadius: "8px",
+                  }}
+                >
+                  No contractors yet. Click{" "}
+                  <strong>+ Add Contractor</strong> to get started.
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr
+                      style={{
+                        borderBottom: "1px solid var(--border, #444)",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      <th style={{ textAlign: "left", padding: "6px 8px" }}>
+                        Name / Company
+                      </th>
+                      <th style={{ textAlign: "left", padding: "6px 8px" }}>
+                        Email
+                      </th>
+                      <th style={{ textAlign: "left", padding: "6px 8px" }}>
+                        Trades
+                      </th>
+                      <th style={{ textAlign: "center", padding: "6px 8px" }}>
+                        WO Alerts
+                      </th>
+                      <th style={{ textAlign: "center", padding: "6px 8px" }}>
+                        Active
+                      </th>
+                      <th style={{ padding: "6px 8px" }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contractors.map((c) => (
+                      <tr
+                        key={c.id}
+                        style={{
+                          borderBottom: "1px solid var(--border, #33333388)",
+                        }}
+                      >
+                        <td style={{ padding: "8px" }}>
+                          <div style={{ fontWeight: 600 }}>{c.name}</div>
+                          {c.company && (
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {c.company}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "8px", fontSize: "13px" }}>
+                          {c.email}
+                          {c.phone && (
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              {c.phone}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "8px", fontSize: "12px" }}>
+                          {c.trades?.length
+                            ? c.trades.join(", ")
+                            : <span style={{ color: "var(--text-muted)" }}>All trades</span>}
+                        </td>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
+                          <span
+                            className={
+                              c.receives_work_orders ? "badge badge-success" : "badge badge-muted"
+                            }
+                          >
+                            {c.receives_work_orders ? "Yes" : "No"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "8px", textAlign: "center" }}>
+                          <span
+                            className={
+                              c.is_active ? "badge badge-success" : "badge badge-muted"
+                            }
+                          >
+                            {c.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td
+                          style={{
+                            padding: "8px",
+                            display: "flex",
+                            gap: "6px",
+                            justifyContent: "flex-end",
+                          }}
+                        >
+                          <button
+                            className="btn-outline"
+                            style={{ fontSize: "12px", padding: "4px 10px" }}
+                            onClick={() => openEditContractor(c)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn-outline"
+                            style={{
+                              fontSize: "12px",
+                              padding: "4px 10px",
+                              color: "var(--color-error, #f87171)",
+                              borderColor: "var(--color-error, #f87171)",
+                            }}
+                            onClick={() => handleDeleteContractor(c.id)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
           ) : activeCategory === "email" ? (
             /* ── Email settings with test button ── */
             <>

@@ -1849,4 +1849,118 @@ router.post(
   },
 );
 
+// ─── Contractors ──────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/contractors
+ */
+router.get("/contractors", async (req: AuthRequest, res: Response) => {
+  try {
+    const contractors = await db("contractors").orderBy("name");
+    res.json({ contractors });
+  } catch (error) {
+    console.error("Error fetching contractors:", error);
+    res.status(500).json({ error: "Failed to fetch contractors" });
+  }
+});
+
+/**
+ * POST /api/admin/contractors
+ */
+router.post(
+  "/contractors",
+  [
+    body("name").isLength({ min: 1 }).trim(),
+    body("email").isEmail().normalizeEmail(),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return res.status(400).json({ errors: errors.array() });
+    try {
+      const {
+        name,
+        email,
+        phone,
+        company,
+        trades,
+        receives_work_orders,
+        email_template,
+        notes,
+      } = req.body;
+      const [contractor] = await db("contractors")
+        .insert({
+          name,
+          email,
+          phone: phone || null,
+          company: company || null,
+          trades: JSON.stringify(Array.isArray(trades) ? trades : []),
+          receives_work_orders: !!receives_work_orders,
+          email_template: email_template || null,
+          notes: notes || null,
+        })
+        .returning("*");
+      res.status(201).json({ contractor });
+    } catch (error) {
+      console.error("Error creating contractor:", error);
+      res.status(500).json({ error: "Failed to create contractor" });
+    }
+  },
+);
+
+/**
+ * PUT /api/admin/contractors/:id
+ */
+router.put("/contractors/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      email,
+      phone,
+      company,
+      trades,
+      receives_work_orders,
+      is_active,
+      email_template,
+      notes,
+    } = req.body;
+    const [contractor] = await db("contractors")
+      .where("id", id)
+      .update({
+        name,
+        email,
+        phone: phone || null,
+        company: company || null,
+        trades: JSON.stringify(Array.isArray(trades) ? trades : []),
+        receives_work_orders: !!receives_work_orders,
+        is_active: is_active !== undefined ? !!is_active : true,
+        email_template: email_template || null,
+        notes: notes || null,
+        updated_at: new Date(),
+      })
+      .returning("*");
+    if (!contractor)
+      return res.status(404).json({ error: "Contractor not found" });
+    res.json({ contractor });
+  } catch (error) {
+    console.error("Error updating contractor:", error);
+    res.status(500).json({ error: "Failed to update contractor" });
+  }
+});
+
+/**
+ * DELETE /api/admin/contractors/:id
+ */
+router.delete("/contractors/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    await db("contractors").where("id", id).delete();
+    res.json({ message: "Contractor deleted" });
+  } catch (error) {
+    console.error("Error deleting contractor:", error);
+    res.status(500).json({ error: "Failed to delete contractor" });
+  }
+});
+
 export default router;
