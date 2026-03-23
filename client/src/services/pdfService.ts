@@ -42,6 +42,23 @@ export interface PdfTemplate {
   filename?: string;
 }
 
+// ── Template configuration (overrides from settings) ─────────────────────────
+
+export interface PdfTemplateConfig {
+  /** Override the header background colour (hex, e.g. "#0F3460") */
+  headerColour?: string;
+  /** Override the organisation name */
+  organisation?: string;
+  /** Override the document title */
+  title?: string;
+  /** Override the footer text */
+  footer?: string;
+  /** Extra section title appended after all fields */
+  extraSectionTitle?: string;
+  /** Extra section content */
+  extraSectionContent?: string;
+}
+
 // ── Colour palette ───────────────────────────────────────────────────────────
 
 const BRAND_DARK = [15, 52, 96] as const; // deep navy
@@ -70,9 +87,20 @@ function formatValue(v: string | number | null | undefined): string {
   return String(v);
 }
 
-// ── Core generator ───────────────────────────────────────────────────────────
+/** Parse a hex colour string (e.g. "#0F3460") into an [r,g,b] tuple */
+function parseHexColour(hex: string): readonly [number, number, number] {
+  const h = hex.replace(/^#/, "");
+  if (h.length !== 6) return BRAND_DARK;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return BRAND_DARK;
+  return [r, g, b] as const;
+}
 
-export function generatePdf(template: PdfTemplate): void {
+// ── Core generator (internal) ────────────────────────────────────────────────
+
+function buildPdfDoc(template: PdfTemplate, config?: PdfTemplateConfig): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   const PAGE_W = 210;
@@ -83,6 +111,11 @@ export function generatePdf(template: PdfTemplate): void {
 
   let y = 0;
 
+  // Resolve header colour from config or use default
+  const headerColour = config?.headerColour
+    ? parseHexColour(config.headerColour)
+    : BRAND_DARK;
+
   // ── Page background ────────────────────────────────────────────────────────
   const drawPageBackground = () => {
     setFill(doc, PAGE_BG);
@@ -92,7 +125,7 @@ export function generatePdf(template: PdfTemplate): void {
   // ── Header band ───────────────────────────────────────────────────────────
   const drawHeader = () => {
     // Dark header bar
-    setFill(doc, BRAND_DARK);
+    setFill(doc, headerColour);
     doc.rect(0, 0, PAGE_W, 28, "F");
 
     // Teal accent strip
@@ -140,7 +173,7 @@ export function generatePdf(template: PdfTemplate): void {
   const drawFooter = (pageNum: number, totalPages: number) => {
     const footerY = PAGE_H - FOOTER_H;
 
-    setFill(doc, BRAND_DARK);
+    setFill(doc, headerColour);
     doc.rect(0, footerY - 1, PAGE_W, FOOTER_H + 1, "F");
 
     doc.setFont("helvetica", "normal");
@@ -163,7 +196,7 @@ export function generatePdf(template: PdfTemplate): void {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    setTextColor(doc, BRAND_DARK);
+    setTextColor(doc, headerColour);
     doc.text(title, MARGIN + 5, y + 5);
     y += 10;
 
@@ -270,13 +303,31 @@ export function generatePdf(template: PdfTemplate): void {
     drawFooter(p, totalPages);
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────────
+  return doc;
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+/** Generate a PDF and trigger a browser download */
+export function generatePdf(
+  template: PdfTemplate,
+  config?: PdfTemplateConfig,
+): void {
+  const doc = buildPdfDoc(template, config);
   const clean = (s: string) => s.replace(/[^a-z0-9_\-]/gi, "_");
   const filename = template.filename
     ? `${clean(template.filename)}.pdf`
     : `${clean(template.title)}.pdf`;
-
   doc.save(filename);
+}
+
+/** Generate a PDF and return it as a Blob (for live preview) */
+export function generatePdfBlob(
+  template: PdfTemplate,
+  config?: PdfTemplateConfig,
+): Blob {
+  const doc = buildPdfDoc(template, config);
+  return doc.output("blob");
 }
 
 // ── Pre-built template factories ─────────────────────────────────────────────
@@ -285,6 +336,7 @@ export function generatePdf(template: PdfTemplate): void {
 export function buildWorkOrderTemplate(
   wo: any,
   extraSection?: { title: string; content: string },
+  config?: PdfTemplateConfig,
 ): PdfTemplate {
   const fmt = (v: any) => (v ? String(v) : undefined);
   const fmtDate = (v: any) => {
@@ -307,12 +359,24 @@ export function buildWorkOrderTemplate(
     wo.assetic_work_request_id ||
     (wo.request_id ? `WR-${wo.request_id}` : null);
 
+  const titleText = config?.title || "Work Order";
+  const orgText = config?.organisation || "XeonB Maintenance Portal";
+  const footerText = config?.footer
+    ? `${config.footer} — ${woId}`
+    : `Work Order ${woId} — XeonB Maintenance Portal`;
+
+  // Merge extra section from config if not provided directly
+  const resolvedExtra = extraSection ||
+    (config?.extraSectionContent?.trim()
+      ? { title: config.extraSectionTitle || "Additional Notes", content: config.extraSectionContent }
+      : undefined);
+
   return {
-    title: "Work Order",
+    title: titleText,
     subtitle: woId,
-    organisation: "XeonB Maintenance Portal",
+    organisation: orgText,
     filename: `Work_Order_${woId}`,
-    footer: `Work Order ${woId} — XeonB Maintenance Portal`,
+    footer: footerText,
     sections: [
       {
         title: "Work Order Details",
@@ -370,14 +434,14 @@ export function buildWorkOrderTemplate(
             },
           ]
         : []),
-      ...(extraSection && extraSection.content.trim()
+      ...(resolvedExtra && resolvedExtra.content.trim()
         ? [
             {
-              title: extraSection.title || "Additional Notes",
+              title: resolvedExtra.title || "Additional Notes",
               fields: [
                 {
-                  label: extraSection.title || "Additional Notes",
-                  value: extraSection.content,
+                  label: resolvedExtra.title || "Additional Notes",
+                  value: resolvedExtra.content,
                   fullWidth: true,
                 },
               ],
@@ -472,4 +536,35 @@ export function buildWorkRequestTemplate(req: any): PdfTemplate {
         : []),
     ],
   };
+}
+
+// ── Sample data for live preview ─────────────────────────────────────────────
+
+/** Builds a sample work order template using dummy data for the settings live preview */
+export function buildSampleWorkOrderTemplate(
+  config: PdfTemplateConfig,
+): PdfTemplate {
+  const sampleWo = {
+    id: 42,
+    assetic_work_order_id: "WO-00000042",
+    assetic_work_request_id: "WR-00000018",
+    request_id: 18,
+    title: "HVAC Repair — Level 3 West Wing",
+    status: "in_progress",
+    priority: "high",
+    craft: "Mechanical",
+    work_group: "North West - HVAC Technician",
+    assigned_to_username: "John Smith",
+    scheduled_date: new Date().toISOString(),
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+    description:
+      "Air conditioning unit not functioning properly on level 3. Multiple complaints from staff about temperature. Unit model: Daikin FXMQ-P7. Requires inspection and likely compressor repair.",
+    asset_name: "AHU-L3-WEST-01",
+    assetic_asset_guid: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    asset_location: "Level 3, West Wing, Plant Room 3A",
+    request_title: "Office too hot — Level 3 West",
+  };
+
+  return buildWorkOrderTemplate(sampleWo, undefined, config);
 }

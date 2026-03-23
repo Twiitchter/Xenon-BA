@@ -1,5 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminHierarchyResponse, adminService } from "../services/adminService";
+import {
+  generatePdfBlob,
+  buildSampleWorkOrderTemplate,
+  type PdfTemplateConfig,
+} from "../services/pdfService";
 
 interface SettingItem {
   id: number;
@@ -10,7 +15,7 @@ interface SettingItem {
   description: string | null;
 }
 
-const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email"];
+const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email", "pdf"];
 const categoryLabels: Record<string, string> = {
   general: "General",
   assetic: "Assetic API",
@@ -18,6 +23,7 @@ const categoryLabels: Record<string, string> = {
   sync: "Asset Sync",
   sso: "SSO / Authentication",
   email: "Email",
+  pdf: "PDF Template",
 };
 
 const Settings: React.FC = () => {
@@ -41,6 +47,10 @@ const Settings: React.FC = () => {
   const [syncTriggering, setSyncTriggering] = useState<string | null>(null);
   const [testEmailAddress, setTestEmailAddress] = useState("");
   const [testingEmail, setTestingEmail] = useState(false);
+
+  // PDF Template preview
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const pdfPreviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void fetchSettings();
@@ -76,6 +86,58 @@ const Settings: React.FC = () => {
     const timer = setInterval(() => void fetchSyncStatus(), 3000);
     return () => clearInterval(timer);
   }, [activeCategory, syncStatus?.isRunning]);
+
+  // ── PDF Preview helpers ──────────────────────────────────────────────────
+  const buildPdfConfig = useCallback((): PdfTemplateConfig => ({
+    title: editedValues["pdf_template_title"] || "Work Order",
+    organisation: editedValues["pdf_template_organisation"] || "XeonB Maintenance Portal",
+    headerColour: editedValues["pdf_template_header_colour"] || "#0F3460",
+    footer: editedValues["pdf_template_footer"] || "XeonB Maintenance Portal",
+    extraSectionTitle: editedValues["pdf_template_extra_section_title"] || "",
+    extraSectionContent: editedValues["pdf_template_extra_section_content"] || "",
+  }), [editedValues]);
+
+  const regeneratePdfPreview = useCallback(() => {
+    try {
+      const config = buildPdfConfig();
+      const template = buildSampleWorkOrderTemplate(config);
+      const blob = generatePdfBlob(template, config);
+      const url = URL.createObjectURL(blob);
+      setPdfPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    } catch {
+      // Preview generation failed silently
+    }
+  }, [buildPdfConfig]);
+
+  // Regenerate preview when PDF settings change (debounced)
+  const pdfKeys = [
+    "pdf_template_title",
+    "pdf_template_organisation",
+    "pdf_template_header_colour",
+    "pdf_template_footer",
+    "pdf_template_extra_section_title",
+    "pdf_template_extra_section_content",
+  ];
+  const pdfValuesFingerprint = pdfKeys.map((k) => editedValues[k] ?? "").join("|");
+
+  useEffect(() => {
+    if (activeCategory !== "pdf") return;
+    if (pdfPreviewTimer.current) clearTimeout(pdfPreviewTimer.current);
+    pdfPreviewTimer.current = setTimeout(regeneratePdfPreview, 400);
+    return () => {
+      if (pdfPreviewTimer.current) clearTimeout(pdfPreviewTimer.current);
+    };
+  }, [activeCategory, pdfValuesFingerprint, regeneratePdfPreview]);
+
+  // Clean up blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -829,6 +891,214 @@ const Settings: React.FC = () => {
                 </>
               );
             })()
+          ) : activeCategory === "pdf" ? (
+            /* ── PDF Template Editor with live preview ── */
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              {/* Left: editor fields */}
+              <div>
+                <h3 style={{ marginTop: 0 }}>Edit PDF Template</h3>
+                <p className="settings-muted" style={{ marginBottom: "16px" }}>
+                  Customise the default work order PDF template. Changes are
+                  reflected in the live preview.
+                </p>
+
+                {/* Active toggle */}
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>Active</label>
+                  <div className="settings-muted">Enable or disable the custom PDF template</div>
+                  <select
+                    value={editedValues["pdf_template_active"] ?? "true"}
+                    onChange={(e) =>
+                      setEditedValues((prev) => ({
+                        ...prev,
+                        pdf_template_active: e.target.value,
+                      }))
+                    }
+                    style={{ maxWidth: "160px" }}
+                  >
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                  </select>
+                </div>
+
+                {/* Title */}
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>Title</label>
+                  <div className="settings-muted">Document title shown at the top of the PDF</div>
+                  <input
+                    type="text"
+                    value={editedValues["pdf_template_title"] ?? "Work Order"}
+                    onChange={(e) =>
+                      setEditedValues((prev) => ({
+                        ...prev,
+                        pdf_template_title: e.target.value,
+                      }))
+                    }
+                    placeholder="Work Order"
+                  />
+                </div>
+
+                {/* Organisation */}
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>Organisation</label>
+                  <div className="settings-muted">Organisation name shown in the header band</div>
+                  <input
+                    type="text"
+                    value={editedValues["pdf_template_organisation"] ?? "XeonB Maintenance Portal"}
+                    onChange={(e) =>
+                      setEditedValues((prev) => ({
+                        ...prev,
+                        pdf_template_organisation: e.target.value,
+                      }))
+                    }
+                    placeholder="XeonB Maintenance Portal"
+                  />
+                </div>
+
+                {/* Header Colour */}
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>Header Colour</label>
+                  <div className="settings-muted">Header and footer background colour</div>
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <input
+                      type="color"
+                      value={editedValues["pdf_template_header_colour"] ?? "#0F3460"}
+                      onChange={(e) =>
+                        setEditedValues((prev) => ({
+                          ...prev,
+                          pdf_template_header_colour: e.target.value,
+                        }))
+                      }
+                      style={{ width: "48px", height: "36px", padding: "2px", cursor: "pointer" }}
+                    />
+                    <input
+                      type="text"
+                      value={editedValues["pdf_template_header_colour"] ?? "#0F3460"}
+                      onChange={(e) =>
+                        setEditedValues((prev) => ({
+                          ...prev,
+                          pdf_template_header_colour: e.target.value,
+                        }))
+                      }
+                      placeholder="#0F3460"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>Footer Text</label>
+                  <div className="settings-muted">Text shown at the bottom of each page</div>
+                  <input
+                    type="text"
+                    value={editedValues["pdf_template_footer"] ?? "XeonB Maintenance Portal"}
+                    onChange={(e) =>
+                      setEditedValues((prev) => ({
+                        ...prev,
+                        pdf_template_footer: e.target.value,
+                      }))
+                    }
+                    placeholder="XeonB Maintenance Portal"
+                  />
+                </div>
+
+                <hr style={{ border: "none", borderTop: "1px solid var(--border, #444)", margin: "20px 0 16px" }} />
+
+                {/* Extra section */}
+                <h4 style={{ margin: "0 0 4px" }}>Custom Section</h4>
+                <p className="settings-muted" style={{ marginBottom: "12px" }}>
+                  An optional section appended to every work order PDF. Use it
+                  for standing instructions, safety notes, or sign-off areas.
+                </p>
+
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>Section Title</label>
+                  <input
+                    type="text"
+                    value={editedValues["pdf_template_extra_section_title"] ?? ""}
+                    onChange={(e) =>
+                      setEditedValues((prev) => ({
+                        ...prev,
+                        pdf_template_extra_section_title: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. Additional Notes, Safety Instructions…"
+                    maxLength={80}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label>Section Content</label>
+                  <textarea
+                    value={editedValues["pdf_template_extra_section_content"] ?? ""}
+                    onChange={(e) =>
+                      setEditedValues((prev) => ({
+                        ...prev,
+                        pdf_template_extra_section_content: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter the text that will appear in this section on every work order PDF. Leave blank to omit."
+                    rows={5}
+                    style={{ resize: "vertical" }}
+                  />
+                  <div className="settings-muted" style={{ marginTop: "4px" }}>
+                    Leave blank to omit this section from generated PDFs.
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                  <button onClick={handleSave} disabled={saving}>
+                    {saving ? "Saving..." : "Update Template"}
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    onClick={regeneratePdfPreview}
+                    type="button"
+                  >
+                    Refresh Preview
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: live preview */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "14px" }}>👁</span>
+                  <h4 style={{ margin: 0 }}>Live Preview (Sample Data)</h4>
+                </div>
+                {pdfPreviewUrl ? (
+                  <iframe
+                    src={pdfPreviewUrl}
+                    title="PDF Preview"
+                    style={{
+                      width: "100%",
+                      height: "calc(100vh - 200px)",
+                      minHeight: "500px",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      background: "#525659",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "400px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      color: "var(--text-muted)",
+                      background: "var(--bg-secondary)",
+                    }}
+                  >
+                    Loading preview…
+                  </div>
+                )}
+              </div>
+            </div>
           ) : activeCategory === "email" ? (
             /* ── Email settings with test button ── */
             <>
