@@ -1231,6 +1231,18 @@ router.post(
       // so that ScheduledFinish can be derived from start + duration.
       const durationHours = estimatedDuration ? Number(estimatedDuration) : 1;
 
+      // Map our internal priority strings to Assetic numeric PriorityId.
+      // Assetic scale: 2=Emergency, 3=Urgent, 4=High, 5=Low.
+      // Work Orders default to 5 (Low) — the work group will triage from there.
+      const PRIORITY_MAP: Record<string, number> = {
+        critical: 2,
+        high: 3,
+        medium: 4,
+        low: 5,
+      };
+      const asseticPriorityId =
+        PRIORITY_MAP[inheritedPriority.toLowerCase()] ?? 5;
+
       const normScheduledStart = normaliseDateTime(scheduledDate);
       // Compute finish as start + estimated duration so the Execution window
       // reflects the actual planned work time.
@@ -1365,9 +1377,10 @@ router.post(
         prepPayload.CauseSubCodeId = wrCauseSubCodeId ?? 1;
         prepPayload.RemedyCodeId = wrRemedyCodeId ?? 1;
 
-        // Assetic stores EstimatedDuration in minutes (always send so Assetic
-        // doesn't fall back to its own default — default here is 1 hr = 60 min)
-        prepPayload.EstimatedDuration = Math.round(durationHours * 60);
+        // Assetic stores EstimatedDuration in hours — send directly.
+        prepPayload.EstimatedDuration = durationHours;
+        // Set priority (5 = Low by default).
+        prepPayload.PriorityId = asseticPriorityId;
         if (inheritedAssetGuid) {
           prepPayload.AssetId = inheritedAssetGuid;
         }
@@ -1407,13 +1420,15 @@ router.post(
             { Description: siParts.join("\n") },
           ];
         }
-        if (normScheduledStart || normScheduledFinish) {
-          prepPayload.Scheduling = {};
-          // Assetic PREP creation expects target window values.
-          if (normScheduledStart)
-            prepPayload.Scheduling.TargetStart = normScheduledStart;
-          if (normScheduledFinish)
-            prepPayload.Scheduling.TargetFinish = normScheduledFinish;
+        if (normScheduledStart) {
+          // Send both the Target window (planning) and Scheduled window (execution)
+          // in the PREP payload so they are set from creation.
+          prepPayload.Scheduling = {
+            TargetStart: normScheduledStart,
+            TargetFinish: normScheduledFinish || normScheduledStart,
+            ScheduledStart: normScheduledStart,
+            ScheduledFinish: normScheduledFinish || normScheduledStart,
+          };
         }
         if (inheritedWrGuid) {
           prepPayload.WorkRequestId = inheritedWrGuid;
@@ -1533,8 +1548,9 @@ router.post(
             Id: asseticWorkOrderId,
             Status: "RFE",
           };
-          // Always set EstimatedDuration (Assetic stores in minutes)
-          rfePayload.EstimatedDuration = Math.round(durationHours * 60);
+          // Always set EstimatedDuration (hours) and Priority.
+          rfePayload.EstimatedDuration = durationHours;
+          rfePayload.PriorityId = asseticPriorityId;
 
           // Set the Execution scheduling window (ScheduledStart/ScheduledFinish)
           // derived from the scheduled date + estimated duration.

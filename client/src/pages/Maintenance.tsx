@@ -1060,7 +1060,7 @@ const Maintenance: React.FC = () => {
                             onChange={(e) =>
                               setWoEstimatedDuration(e.target.value)
                             }
-                            placeholder="e.g. 2"
+                            placeholder="Default: 1"
                           />
                         </div>
                       </div>
