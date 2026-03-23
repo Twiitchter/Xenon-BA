@@ -159,22 +159,6 @@ function AppContent() {
                     </svg>
                     Work Orders
                   </NavLink>
-                  <NavLink to="/work-groups">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    Work Groups
-                  </NavLink>
                 </>
               ) : (
                 <>
@@ -320,7 +304,7 @@ function AppContent() {
                     </svg>
                     Settings
                   </NavLink>
-                  <NavLink to="/admin/failed-requests">
+                  <NavLink to="/work-groups">
                     <svg
                       width="16"
                       height="16"
@@ -329,26 +313,12 @@ function AppContent() {
                       stroke="currentColor"
                       strokeWidth="2"
                     >
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
-                    Failed Requests
-                  </NavLink>
-                  <NavLink to="/admin/failed-work-orders">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M3 3h18v4H3z" />
-                      <path d="M3 11h18v10H3z" />
-                      <path d="M9 15h6" />
-                    </svg>
-                    Failed Work Orders
+                    Work Groups
                   </NavLink>
                 </div>
               </>
@@ -356,7 +326,7 @@ function AppContent() {
 
             <div className="nav-section">
               <div className="nav-section-title">Appearance</div>
-              <ThemeSelector compact />
+              <ThemeSelector dropdown />
             </div>
           </nav>
 
@@ -375,25 +345,26 @@ function AppContent() {
                 </div>
                 <div className="sidebar-user-role">{user?.role || "user"}</div>
               </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="btn-ghost"
-              title="Sign out"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
+              <button
+                onClick={handleLogout}
+                className="btn-ghost"
+                title="Sign out"
+                style={{ marginLeft: "auto" }}
               >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       )}

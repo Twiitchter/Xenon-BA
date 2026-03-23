@@ -5,7 +5,10 @@ import db from "../database";
 import asseticClient from "../services/asseticClient";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import settingsService from "../services/settingsService";
-import { DEFAULT_PDF_TEMPLATES, type TemplateType } from "../services/pdfTemplateDefaults";
+import {
+  DEFAULT_PDF_TEMPLATES,
+  type TemplateType,
+} from "../services/pdfTemplateDefaults";
 import emailService from "../services/emailService";
 import { ensureAsseticResource } from "../services/asseticResourceService";
 
@@ -1224,21 +1227,24 @@ router.post(
         return isNaN(d.getTime()) ? null : d;
       };
 
+      // Default duration to 1 hour when not supplied. Stored before scheduling
+      // so that ScheduledFinish can be derived from start + duration.
+      const durationHours = estimatedDuration ? Number(estimatedDuration) : 1;
+
       const normScheduledStart = normaliseDateTime(scheduledDate);
-      // Finish is identical to start — a single datetime picker covers both ends.
-      // The worker's estimated hours is tracked separately via EstimatedDuration.
-      const normScheduledFinish = normScheduledStart;
+      // Compute finish as start + estimated duration so the Execution window
+      // reflects the actual planned work time.
+      const normScheduledFinish = (() => {
+        if (!normScheduledStart) return null;
+        const d = new Date(normScheduledStart);
+        d.setTime(d.getTime() + durationHours * 3_600_000);
+        return d.toISOString().slice(0, 19);
+      })();
 
       // ── Assetic integration ───────────────────────────────────────────────
       let asseticWorkOrderId: string | null = null;
       let asseticFriendlyId: string | null = null;
       const asseticEnabled = await asseticClient.isEnabled();
-
-      // Estimated duration (hours). Stored here so it's accessible in both the
-      // PREP creation payload and the RFE transition payload below.
-      const durationHours = estimatedDuration
-        ? Number(estimatedDuration)
-        : null;
 
       if (asseticEnabled) {
         // ── Step 1: Create the work order in PREP status ──────────────────
@@ -1359,10 +1365,9 @@ router.post(
         prepPayload.CauseSubCodeId = wrCauseSubCodeId ?? 1;
         prepPayload.RemedyCodeId = wrRemedyCodeId ?? 1;
 
-        if (durationHours) {
-          // Assetic stores EstimatedDuration in minutes
-          prepPayload.EstimatedDuration = Math.round(durationHours * 60);
-        }
+        // Assetic stores EstimatedDuration in minutes (always send so Assetic
+        // doesn't fall back to its own default — default here is 1 hr = 60 min)
+        prepPayload.EstimatedDuration = Math.round(durationHours * 60);
         if (inheritedAssetGuid) {
           prepPayload.AssetId = inheritedAssetGuid;
         }
@@ -1528,16 +1533,23 @@ router.post(
             Id: asseticWorkOrderId,
             Status: "RFE",
           };
-          if (durationHours) {
-            rfePayload.EstimatedDuration = Math.round(durationHours * 60);
+          // Always set EstimatedDuration (Assetic stores in minutes)
+          rfePayload.EstimatedDuration = Math.round(durationHours * 60);
+
+          // Set the Execution scheduling window (ScheduledStart/ScheduledFinish)
+          // derived from the scheduled date + estimated duration.
+          if (normScheduledStart) {
+            rfePayload.Scheduling = {
+              ScheduledStart: normScheduledStart,
+              ScheduledFinish: normScheduledFinish || normScheduledStart,
+            };
           }
 
-          if (durationHours || labourAssignment?.resourceId) {
-            // Labour entry for RFE: one resource, one quantity, with the selected
-            // work-group-matched resource when available.
+          // Always add a labour entry for duration/resource tracking
+          {
             const labour: any = {
               QuantityRequired: 1,
-              HoursRequired: durationHours || 1,
+              HoursRequired: durationHours,
             };
             if (labourAssignment?.resourceId) {
               labour.MaintenanceResources = [
@@ -2475,8 +2487,12 @@ router.get(
         return res.status(400).json({ error: "Invalid template type" });
       }
 
-      const row = await db("pdf_templates").where({ template_type: type }).first();
-      const config = row ? row.template_config : DEFAULT_PDF_TEMPLATES[type as TemplateType];
+      const row = await db("pdf_templates")
+        .where({ template_type: type })
+        .first();
+      const config = row
+        ? row.template_config
+        : DEFAULT_PDF_TEMPLATES[type as TemplateType];
 
       res.json({ template_type: type, config });
     } catch (error) {

@@ -58,7 +58,9 @@ const statusBadge = (status: string) => {
   );
 };
 
-const FailedRequests: React.FC = () => {
+const FailedRequests: React.FC<{ embedded?: boolean }> = ({
+  embedded = false,
+}) => {
   const [records, setRecords] = useState<FailedRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -242,15 +244,17 @@ const FailedRequests: React.FC = () => {
     </div>
   );
 
-  return (
-    <div className="container">
-      <div className="page-header">
-        <h2>Failed Work Requests</h2>
-        <p style={{ color: "var(--text-secondary)" }}>
-          Work requests that failed to submit to Assetic. Edit and retry, or
-          dismiss.
-        </p>
-      </div>
+  const content = (
+    <>
+      {!embedded && (
+        <div className="page-header">
+          <h2>Failed Work Requests</h2>
+          <p style={{ color: "var(--text-secondary)" }}>
+            Work requests that failed to submit to Assetic. Edit and retry, or
+            dismiss.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="error card" style={{ marginBottom: 16 }}>
@@ -707,8 +711,10 @@ const FailedRequests: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
+
+  return embedded ? content : <div className="container">{content}</div>;
 };
 
 export default FailedRequests;

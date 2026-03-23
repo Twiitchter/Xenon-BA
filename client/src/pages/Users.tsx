@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { adminService } from "../services/adminService";
 import { maintenanceService } from "../services/maintenanceService";
+import Modal from "../components/Modal";
 import LocationHierarchyPicker, {
   EMPTY_LOCATION_SELECTION,
   LocationSelection,
@@ -43,6 +44,17 @@ interface ImportResult {
   skipped: { email: string; reason: string }[];
 }
 
+const ROLE_CHIPS = [
+  { value: "admin", label: "Admin", color: "#ef4444" },
+  { value: "manager", label: "Manager", color: "#f59e0b" },
+  { value: "user", label: "User", color: "#0ea5e9" },
+];
+
+const STATUS_CHIPS = [
+  { value: "active", label: "Active", color: "#22c55e" },
+  { value: "inactive", label: "Inactive", color: "#64748b" },
+];
+
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +70,46 @@ const Users: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+
+  // Filter state
+  const [search, setSearch] = useState("");
+  const [filterRoles, setFilterRoles] = useState<string[]>([]);
+  const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const filteredUsers = useMemo(() => {
+    let list = users;
+    if (search) {
+      const s = search.toLowerCase();
+      list = list.filter(
+        (u) =>
+          u.username.toLowerCase().includes(s) ||
+          u.email.toLowerCase().includes(s) ||
+          (u.display_name || "").toLowerCase().includes(s) ||
+          (u.department || "").toLowerCase().includes(s),
+      );
+    }
+    if (filterRoles.length)
+      list = list.filter((u) => filterRoles.includes(u.role));
+    if (filterStatuses.length)
+      list = list.filter((u) =>
+        filterStatuses.includes(u.is_active ? "active" : "inactive"),
+      );
+    return list;
+  }, [users, search, filterRoles, filterStatuses]);
+
+  const toggleRole = (v: string) =>
+    setFilterRoles((f) =>
+      f.includes(v) ? f.filter((x) => x !== v) : [...f, v],
+    );
+  const toggleStatus = (v: string) =>
+    setFilterStatuses((f) =>
+      f.includes(v) ? f.filter((x) => x !== v) : [...f, v],
+    );
+  const activeFilterCount = [
+    filterRoles.length > 0,
+    filterStatuses.length > 0,
+  ].filter(Boolean).length;
 
   useEffect(() => {
     fetchUsers();
@@ -108,9 +160,12 @@ const Users: React.FC = () => {
   };
 
   const downloadTemplate = () => {
-    const header = "email,password,username,role,first_name,last_name,department,phone,display_name";
+    const header =
+      "email,password,username,role,first_name,last_name,department,phone,display_name";
     const example = "john.doe@example.com,ChangeMe!8,johnd,user,John,Doe,IT,,";
-    const blob = new Blob([header + "\n" + example + "\n"], { type: "text/csv" });
+    const blob = new Blob([header + "\n" + example + "\n"], {
+      type: "text/csv",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -251,32 +306,115 @@ const Users: React.FC = () => {
 
   return (
     <div className="container">
-      <div className="page-header">
-        <div>
-          <h2>Users</h2>
-          <p style={{ color: "var(--text-secondary)" }}>
-            Manage user accounts, roles and default location
-          </p>
+      {/* ── Unified header card ── */}
+      <div className="card filter-header-card">
+        <div className="filter-topbar">
+          <div>
+            <h2 style={{ margin: 0 }}>Users</h2>
+            <p
+              style={{
+                margin: "2px 0 0",
+                fontSize: 13,
+                color: "var(--text-muted)",
+              }}
+            >
+              Manage user accounts, roles and default location
+            </p>
+          </div>
+          <div className="filter-topbar-controls">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search users…"
+              className="filter-search"
+            />
+            <button
+              className={`filter-toggle-btn${
+                filtersOpen ? " filter-toggle-open" : ""
+              }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              ⚙ Filters
+              {activeFilterCount > 0 && (
+                <span className="filter-badge">{activeFilterCount}</span>
+              )}
+            </button>
+            <button
+              className="btn-outline"
+              onClick={() => {
+                setShowImport((v) => !v);
+                setImportResult(null);
+              }}
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={() => {
+                cancelForm();
+                setShowForm(true);
+              }}
+            >
+              + New User
+            </button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            className="btn-outline"
-            onClick={() => {
-              setShowImport((v) => !v);
-              setImportResult(null);
-            }}
-          >
-            Import CSV
-          </button>
-          <button
-            onClick={() => {
-              cancelForm();
-              setShowForm(true);
-            }}
-          >
-            + New User
-          </button>
-        </div>
+        {filtersOpen && (
+          <div className="filter-expand">
+            <div className="filter-chip-row">
+              <label>Role</label>
+              <div className="filter-chip-group">
+                {ROLE_CHIPS.map(({ value, label, color }) => {
+                  const on = filterRoles.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      className="filter-chip"
+                      style={
+                        on
+                          ? {
+                              background: color,
+                              borderColor: color,
+                              color: "#fff",
+                            }
+                          : {}
+                      }
+                      onClick={() => toggleRole(value)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="filter-chip-row" style={{ marginBottom: 0 }}>
+              <label>Status</label>
+              <div className="filter-chip-group">
+                {STATUS_CHIPS.map(({ value, label, color }) => {
+                  const on = filterStatuses.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      className="filter-chip"
+                      style={
+                        on
+                          ? {
+                              background: color,
+                              borderColor: color,
+                              color: "#fff",
+                            }
+                          : {}
+                      }
+                      onClick={() => toggleStatus(value)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -299,16 +437,36 @@ const Users: React.FC = () => {
       {showImport && (
         <div className="card" style={{ marginBottom: "20px" }}>
           <h3 style={{ marginBottom: "12px" }}>Import Users from CSV</h3>
-          <p style={{ color: "var(--text-secondary)", marginBottom: "12px", fontSize: "0.9em" }}>
-            Upload a CSV file to create multiple user accounts at once. Passwords are
-            encrypted with bcrypt (10 rounds). Existing emails are skipped.
+          <p
+            style={{
+              color: "var(--text-secondary)",
+              marginBottom: "12px",
+              fontSize: "0.9em",
+            }}
+          >
+            Upload a CSV file to create multiple user accounts at once.
+            Passwords are encrypted with bcrypt (10 rounds). Existing emails are
+            skipped.
           </p>
-          <p style={{ color: "var(--text-secondary)", marginBottom: "12px", fontSize: "0.85em" }}>
-            Required columns: <strong>email</strong>, <strong>password</strong> (min 8 chars).
-            Optional: username, role (user/manager/admin), first_name, last_name,
-            department, phone, display_name.
+          <p
+            style={{
+              color: "var(--text-secondary)",
+              marginBottom: "12px",
+              fontSize: "0.85em",
+            }}
+          >
+            Required columns: <strong>email</strong>, <strong>password</strong>{" "}
+            (min 8 chars). Optional: username, role (user/manager/admin),
+            first_name, last_name, department, phone, display_name.
           </p>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <label
               style={{
                 display: "inline-block",
@@ -340,17 +498,33 @@ const Users: React.FC = () => {
               {importResult.created.length > 0 && (
                 <div style={{ marginTop: "8px" }}>
                   <strong>Created ({importResult.created.length}):</strong>
-                  <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85em", color: "var(--text-secondary)" }}>
-                    {importResult.created.map((e) => <li key={e}>{e}</li>)}
+                  <ul
+                    style={{
+                      margin: "4px 0 0 16px",
+                      fontSize: "0.85em",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {importResult.created.map((e) => (
+                      <li key={e}>{e}</li>
+                    ))}
                   </ul>
                 </div>
               )}
               {importResult.skipped.length > 0 && (
                 <div style={{ marginTop: "8px" }}>
                   <strong>Skipped ({importResult.skipped.length}):</strong>
-                  <ul style={{ margin: "4px 0 0 16px", fontSize: "0.85em", color: "var(--text-muted)" }}>
+                  <ul
+                    style={{
+                      margin: "4px 0 0 16px",
+                      fontSize: "0.85em",
+                      color: "var(--text-muted)",
+                    }}
+                  >
                     {importResult.skipped.map((s, i) => (
-                      <li key={i}>{s.email} — {s.reason}</li>
+                      <li key={i}>
+                        {s.email} — {s.reason}
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -361,7 +535,7 @@ const Users: React.FC = () => {
       )}
 
       {showForm && (
-        <div className="card" style={{ marginBottom: "20px" }}>
+        <Modal onClose={cancelForm} maxWidth="680px">
           <h3 style={{ marginBottom: "16px" }}>
             {editingUser ? "Edit User" : "Create User"}
           </h3>
@@ -480,58 +654,65 @@ const Users: React.FC = () => {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
 
-      <div className="card">
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
-          <div className="loading">Loading users...</div>
-        ) : users.length === 0 ? (
+          <div className="loading" style={{ padding: 40, textAlign: "center" }}>
+            Loading users...
+          </div>
+        ) : filteredUsers.length === 0 ? (
           <p
             style={{
               color: "var(--text-muted)",
               textAlign: "center",
-              padding: "20px",
+              padding: "30px",
             }}
           >
-            No users found
+            {users.length === 0
+              ? "No users found"
+              : "No users match the filters"}
           </p>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Email</th>
+                <th>User</th>
                 <th>Role</th>
                 <th>Department</th>
                 <th>Default Location</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style={{ width: 120 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {filteredUsers.map((u) => (
                 <tr key={u.id}>
                   <td>
-                    <strong>{u.display_name || u.username}</strong>
-                    {u.display_name && (
-                      <div
-                        style={{
-                          color: "var(--text-muted)",
-                          fontSize: "0.8em",
-                        }}
-                      >
-                        {u.username}
-                      </div>
-                    )}
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                      {u.display_name || u.username}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        marginTop: 1,
+                      }}
+                    >
+                      {u.display_name ? u.username + " · " : ""}
+                      {u.email}
+                    </div>
                   </td>
-                  <td>{u.email}</td>
                   <td>{roleBadge(u.role)}</td>
-                  <td>{u.department || "—"}</td>
+                  <td style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    {u.department || "—"}
+                  </td>
                   <td
                     style={{
-                      fontSize: "0.85em",
-                      color: "var(--text-secondary)",
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                      maxWidth: 240,
                     }}
                   >
                     {prefLocationSummary(u)}
@@ -544,21 +725,24 @@ const Users: React.FC = () => {
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: "flex", gap: "6px" }}>
+                    <div style={{ display: "flex", gap: 4 }}>
                       <button
                         className="btn-ghost"
+                        style={{ padding: "3px 8px", fontSize: 12 }}
                         onClick={() => handleEdit(u)}
                       >
                         Edit
                       </button>
                       <button
                         className="btn-ghost"
+                        style={{ padding: "3px 8px", fontSize: 12 }}
                         onClick={() => handleToggleActive(u)}
                       >
                         {u.is_active ? "Disable" : "Enable"}
                       </button>
                       <button
                         className="btn-ghost btn-danger-ghost"
+                        style={{ padding: "3px 8px", fontSize: 12 }}
                         onClick={() => handleDelete(u)}
                       >
                         Delete

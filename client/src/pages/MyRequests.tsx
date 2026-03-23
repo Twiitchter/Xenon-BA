@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { maintenanceService } from "../services/maintenanceService";
 import Modal from "../components/Modal";
 
@@ -45,12 +45,31 @@ interface AttachmentRecord {
   created_at: string;
 }
 
+const STATUS_CHIPS = [
+  { value: "open", label: "Open", color: "#0ea5e9" },
+  { value: "pending", label: "Pending", color: "#94a3b8" },
+  { value: "in_progress", label: "In Progress", color: "#f59e0b" },
+  { value: "completed", label: "Completed", color: "#22c55e" },
+  { value: "cancelled", label: "Cancelled", color: "#64748b" },
+];
+
+const PRIORITY_CHIPS = [
+  { value: "critical", label: "Critical", color: "#ef4444" },
+  { value: "high", label: "High", color: "#f59e0b" },
+  { value: "medium", label: "Medium", color: "#0ea5e9" },
+  { value: "low", label: "Low", color: "#94a3b8" },
+];
+
 const MyRequests: React.FC = () => {
-  const navigate = useNavigate();
   const [items, setItems] = useState<MyItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [filters, setFilters] = useState({ status: "", priority: "" });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    statuses: [] as string[],
+    priorities: [] as string[],
+    search: "",
+  });
 
   // Detail view state
   const [selectedItem, setSelectedItem] = useState<MyItem | null>(null);
@@ -67,7 +86,7 @@ const MyRequests: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const data = await maintenanceService.getMyItems(filters);
+      const data = await maintenanceService.getMyItems({});
       setItems(data.items || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch your requests");
@@ -76,9 +95,51 @@ const MyRequests: React.FC = () => {
     }
   };
 
-  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
+  const filteredItems = useMemo(() => {
+    let list = items;
+    if (filters.search) {
+      const s = filters.search.toLowerCase();
+      list = list.filter(
+        (i) =>
+          (i.title || "").toLowerCase().includes(s) ||
+          (i.description || "").toLowerCase().includes(s) ||
+          (i.location || "").toLowerCase().includes(s),
+      );
+    }
+    if (filters.statuses.length) {
+      list = list.filter((i) => filters.statuses.includes(i.display_status));
+    }
+    if (filters.priorities.length) {
+      list = list.filter((i) => filters.priorities.includes(i.priority));
+    }
+    return list;
+  }, [items, filters.search, filters.statuses, filters.priorities]);
+
+  const toggleStatus = (s: string) =>
+    setFilters((f) => ({
+      ...f,
+      statuses: f.statuses.includes(s)
+        ? f.statuses.filter((x) => x !== s)
+        : [...f.statuses, s],
+    }));
+
+  const togglePriority = (p: string) =>
+    setFilters((f) => ({
+      ...f,
+      priorities: f.priorities.includes(p)
+        ? f.priorities.filter((x) => x !== p)
+        : [...f.priorities, p],
+    }));
+
+  const hasActiveFilters = !!(
+    filters.statuses.length ||
+    filters.priorities.length ||
+    filters.search
+  );
+  const activeFilterCount = [
+    filters.statuses.length > 0,
+    filters.priorities.length > 0,
+  ].filter(Boolean).length;
 
   const openDetail = async (item: MyItem) => {
     setSelectedItem(item);
@@ -160,55 +221,129 @@ const MyRequests: React.FC = () => {
 
   return (
     <div className="container">
-      <div className="page-header">
-        <h2>My Requests & Work Orders</h2>
-        <Link to="/new-request" className="button">
-          + New Request
-        </Link>
-      </div>
+      {/* ── Unified header card: title + search + collapsible filters ── */}
+      <div className="card filter-header-card">
+        <div className="filter-topbar">
+          <h2>My Requests &amp; Work Orders</h2>
+          <div className="filter-topbar-controls">
+            <Link
+              to="/new-request"
+              className="button"
+              style={{ fontSize: "13px", padding: "6px 14px" }}
+            >
+              + New Request
+            </Link>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value })
+              }
+              placeholder="Search requests…"
+              className="filter-search"
+            />
+            <button
+              className={`filter-toggle-btn${
+                filtersOpen ? " filter-toggle-open" : ""
+              }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
+              onClick={() => setFiltersOpen((o) => !o)}
+            >
+              ⚙ Filters
+              {activeFilterCount > 0 && (
+                <span className="filter-badge">{activeFilterCount}</span>
+              )}
+            </button>
+            <button onClick={fetchMyItems}>Refresh</button>
+            {hasActiveFilters && (
+              <button
+                className="btn-ghost"
+                onClick={() =>
+                  setFilters({ statuses: [], priorities: [], search: "" })
+                }
+              >
+                Clear
+              </button>
+            )}
+          </div>
 
-      <div className="card">
-        <h3>Filters</h3>
-        <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label>Status</label>
-            <select
-              name="status"
-              value={filters.status}
-              onChange={handleFilterChange}
-            >
-              <option value="">All</option>
-              <option value="open">Open</option>
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          <div className="form-group" style={{ flex: 1 }}>
-            <label>Priority</label>
-            <select
-              name="priority"
-              value={filters.priority}
-              onChange={handleFilterChange}
-            >
-              <option value="">All</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-          </div>
-          <button onClick={fetchMyItems}>Apply Filters</button>
+          {filtersOpen && (
+            <div className="filter-expand">
+              <div className="filter-chip-row">
+                <label>Status</label>
+                <div className="filter-chip-group">
+                  {STATUS_CHIPS.map(({ value, label, color }) => {
+                    const on = filters.statuses.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        className="filter-chip"
+                        style={
+                          on
+                            ? {
+                                background: color,
+                                borderColor: color,
+                                color: "#fff",
+                              }
+                            : {}
+                        }
+                        onClick={() => toggleStatus(value)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="filter-chip-row" style={{ marginBottom: 0 }}>
+                <label>Priority</label>
+                <div className="filter-chip-group">
+                  {PRIORITY_CHIPS.map(({ value, label, color }) => {
+                    const on = filters.priorities.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        className="filter-chip"
+                        style={
+                          on
+                            ? {
+                                background: color,
+                                borderColor: color,
+                                color: "#fff",
+                              }
+                            : {}
+                        }
+                        onClick={() => togglePriority(value)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+        {/* filter-topbar */}
       </div>
+      {/* filter-header-card */}
 
       {error && <div className="error card">{error}</div>}
 
       <div className="card">
+        {items.length > 0 && filteredItems.length !== items.length && (
+          <div
+            style={{
+              fontSize: "12px",
+              color: "var(--text-muted)",
+              marginBottom: "6px",
+            }}
+          >
+            Showing {filteredItems.length} of {items.length} requests
+          </div>
+        )}
         {loading ? (
           <div className="loading">Loading your requests...</div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div
             style={{
               textAlign: "center",
@@ -216,7 +351,9 @@ const MyRequests: React.FC = () => {
               color: "var(--text-muted)",
             }}
           >
-            You haven't submitted any requests yet.
+            {items.length === 0
+              ? "You haven't submitted any requests yet."
+              : "No requests match the selected filters."}
           </div>
         ) : (
           <table>
@@ -234,7 +371,7 @@ const MyRequests: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <tr key={`${item.item_type}-${item.id}`}>
                   <td>
                     <span
@@ -390,7 +527,6 @@ const MyRequests: React.FC = () => {
 
             {/* Two-column: left = request info | right = communication log */}
             <div style={{ display: "flex", gap: "0", minHeight: "340px" }}>
-
               {/* ── LEFT COLUMN: request details ── */}
               <div
                 style={{
@@ -480,7 +616,9 @@ const MyRequests: React.FC = () => {
                   {selectedItem.location && (
                     <div>
                       <strong>Location:</strong>
-                      <p style={{ marginTop: "4px" }}>{selectedItem.location}</p>
+                      <p style={{ marginTop: "4px" }}>
+                        {selectedItem.location}
+                      </p>
                     </div>
                   )}
                   {selectedItem.assigned_to_username && (
@@ -518,7 +656,9 @@ const MyRequests: React.FC = () => {
                     }}
                   >
                     <h4 style={{ marginBottom: "10px" }}>Attachments</h4>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    <div
+                      style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                    >
                       {attachments.map((att) => (
                         <div
                           key={att.id}

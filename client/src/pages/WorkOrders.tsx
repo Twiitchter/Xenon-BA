@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
-import { generatePdf, buildWorkOrderTemplate, type PdfTemplateConfig } from "../services/pdfService";
+import {
+  generatePdf,
+  buildWorkOrderTemplate,
+  type PdfTemplateConfig,
+} from "../services/pdfService";
 import Modal from "../components/Modal";
 import FilterPresetsPanel from "../components/FilterPresetsPanel";
 
@@ -34,15 +38,29 @@ const deriveCraftFromWorkGroup = (name: string): string => {
   return idx >= 0 ? name.slice(idx + 3).trim() : "";
 };
 
+const STATUS_CHIPS = [
+  { value: "pending", label: "Pending", color: "#94a3b8" },
+  { value: "in_progress", label: "In Progress", color: "#f59e0b" },
+  { value: "completed", label: "Completed", color: "#22c55e" },
+  { value: "cancelled", label: "Cancelled", color: "#64748b" },
+];
+
+const PRIORITY_CHIPS = [
+  { value: "critical", label: "Critical", color: "#ef4444" },
+  { value: "high", label: "High", color: "#f59e0b" },
+  { value: "medium", label: "Medium", color: "#0ea5e9" },
+  { value: "low", label: "Low", color: "#94a3b8" },
+];
+
 const WorkOrders: React.FC = () => {
   const [allWorkOrders, setAllWorkOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({
-    status: "",
+    statuses: [] as string[],
     craft: "",
     workGroup: "",
-    priority: "",
+    priorities: [] as string[],
     search: "",
     dateFrom: "",
     dateTo: "",
@@ -63,8 +81,11 @@ const WorkOrders: React.FC = () => {
           (w.assigned_to_username || "").toLowerCase().includes(s),
       );
     }
-    if (filters.priority) {
-      list = list.filter((w) => w.priority === filters.priority);
+    if (filters.statuses.length) {
+      list = list.filter((w) => filters.statuses.includes(w.status));
+    }
+    if (filters.priorities.length) {
+      list = list.filter((w) => filters.priorities.includes(w.priority));
     }
     if (filters.workGroup) {
       const wg = filters.workGroup.toLowerCase();
@@ -82,7 +103,8 @@ const WorkOrders: React.FC = () => {
   }, [
     allWorkOrders,
     filters.search,
-    filters.priority,
+    filters.statuses,
+    filters.priorities,
     filters.workGroup,
     filters.dateFrom,
     filters.dateTo,
@@ -104,7 +126,9 @@ const WorkOrders: React.FC = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // PDF template config (fetched from server)
-  const [pdfTemplateConfig, setPdfTemplateConfig] = useState<PdfTemplateConfig | undefined>(undefined);
+  const [pdfTemplateConfig, setPdfTemplateConfig] = useState<
+    PdfTemplateConfig | undefined
+  >(undefined);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -118,7 +142,6 @@ const WorkOrders: React.FC = () => {
     setError("");
     try {
       const data = await maintenanceService.getWorkOrders({
-        status: activeFilters.status || undefined,
         craft: activeFilters.craft || undefined,
       });
       setAllWorkOrders(data.workOrders || []);
@@ -191,7 +214,6 @@ const WorkOrders: React.FC = () => {
         scheduledDate: editScheduled || undefined,
       });
       const data = await maintenanceService.getWorkOrders({
-        status: filters.status || undefined,
         craft: filters.craft || undefined,
       });
       setAllWorkOrders(data.workOrders || []);
@@ -239,163 +261,203 @@ const WorkOrders: React.FC = () => {
     }
   };
 
+  const toggleStatus = (s: string) =>
+    setFilters((f) => ({
+      ...f,
+      statuses: f.statuses.includes(s)
+        ? f.statuses.filter((x) => x !== s)
+        : [...f.statuses, s],
+    }));
+
+  const togglePriority = (p: string) =>
+    setFilters((f) => ({
+      ...f,
+      priorities: f.priorities.includes(p)
+        ? f.priorities.filter((x) => x !== p)
+        : [...f.priorities, p],
+    }));
+
   const hasActiveFilters = !!(
-    filters.status ||
+    filters.statuses.length ||
     filters.craft ||
     filters.workGroup ||
-    filters.priority ||
+    filters.priorities.length ||
     filters.search ||
     filters.dateFrom ||
     filters.dateTo
   );
   const activeFilterCount = [
-    filters.status,
+    filters.statuses.length > 0,
     filters.craft,
     filters.workGroup,
-    filters.priority,
+    filters.priorities.length > 0,
     filters.dateFrom,
     filters.dateTo,
   ].filter(Boolean).length;
 
   return (
     <div className="container" style={{ maxWidth: "1600px" }}>
-      {/* ── Filter topbar ── */}
-      <div className="filter-topbar">
-        <h2>Work Orders</h2>
-        <div className="filter-topbar-controls">
-          <input
-            type="text"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            placeholder="Search work orders…"
-            className="filter-search"
-          />
-          <button
-            className={`filter-toggle-btn${
-              filtersOpen ? " filter-toggle-open" : ""
-            }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
-            onClick={() => setFiltersOpen((o) => !o)}
-          >
-            ⚙ Filters
-            {activeFilterCount > 0 && (
-              <span className="filter-badge">{activeFilterCount}</span>
-            )}
-          </button>
-          <button onClick={() => fetchWorkOrders(filters)}>Refresh</button>
-          {hasActiveFilters && (
+      {/* ── Unified header card: title + search + collapsible filters ── */}
+      <div className="card filter-header-card">
+        <div className="filter-topbar">
+          <h2>Work Orders</h2>
+          <div className="filter-topbar-controls">
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value })
+              }
+              placeholder="Search work orders…"
+              className="filter-search"
+            />
             <button
-              className="btn-ghost"
-              onClick={() => {
-                const cleared = {
-                  status: "",
-                  craft: "",
-                  workGroup: "",
-                  priority: "",
-                  search: "",
-                  dateFrom: "",
-                  dateTo: "",
-                };
-                setFilters(cleared);
-                fetchWorkOrders(cleared);
-              }}
+              className={`filter-toggle-btn${
+                filtersOpen ? " filter-toggle-open" : ""
+              }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
+              onClick={() => setFiltersOpen((o) => !o)}
             >
-              Clear
+              ⚙ Filters
+              {activeFilterCount > 0 && (
+                <span className="filter-badge">{activeFilterCount}</span>
+              )}
             </button>
-          )}
-        </div>
-      </div>
-      {/* ── Expandable filter panel ── */}
-      {filtersOpen && (
-        <div className="filter-panel card">
-          <div className="filter-grid">
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => {
-                  const f = { ...filters, status: e.target.value };
-                  setFilters(f);
-                  fetchWorkOrders(f);
+            <button onClick={() => fetchWorkOrders(filters)}>Refresh</button>
+            {hasActiveFilters && (
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  const cleared = {
+                    statuses: [] as string[],
+                    craft: "",
+                    workGroup: "",
+                    priorities: [] as string[],
+                    search: "",
+                    dateFrom: "",
+                    dateTo: "",
+                  };
+                  setFilters(cleared);
+                  fetchWorkOrders(cleared);
                 }}
               >
-                <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Priority</label>
-              <select
-                value={filters.priority}
-                onChange={(e) =>
-                  setFilters({ ...filters, priority: e.target.value })
-                }
-              >
-                <option value="">All Priorities</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Craft / Trade</label>
-              <input
-                type="text"
-                value={filters.craft}
-                onChange={(e) => {
-                  const f = { ...filters, craft: e.target.value };
-                  setFilters(f);
-                  fetchWorkOrders(f);
-                }}
-                placeholder="Filter by craft…"
-                list="craft-options"
-              />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Work Group</label>
-              <select
-                value={filters.workGroup}
-                onChange={(e) =>
-                  setFilters({ ...filters, workGroup: e.target.value })
-                }
-              >
-                <option value="">All Work Groups</option>
-                {workGroups.map((g) => (
-                  <option
-                    key={g.Id || g.id || g.Name || g.name}
-                    value={g.Name || g.name || ""}
-                  >
-                    {g.Name || g.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Date From</label>
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) =>
-                  setFilters({ ...filters, dateFrom: e.target.value })
-                }
-              />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Date To</label>
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) =>
-                  setFilters({ ...filters, dateTo: e.target.value })
-                }
-              />
-            </div>
+                Clear
+              </button>
+            )}
           </div>
         </div>
-      )}
+        {/* ── Expandable filter panel ── */}
+        {filtersOpen && (
+          <div className="filter-expand">
+            <div className="filter-chip-row">
+              <label>Status</label>
+              <div className="filter-chip-group">
+                {STATUS_CHIPS.map(({ value, label, color }) => {
+                  const on = filters.statuses.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      className="filter-chip"
+                      style={
+                        on
+                          ? {
+                              background: color,
+                              borderColor: color,
+                              color: "#fff",
+                            }
+                          : {}
+                      }
+                      onClick={() => toggleStatus(value)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="filter-chip-row">
+              <label>Priority</label>
+              <div className="filter-chip-group">
+                {PRIORITY_CHIPS.map(({ value, label, color }) => {
+                  const on = filters.priorities.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      className="filter-chip"
+                      style={
+                        on
+                          ? {
+                              background: color,
+                              borderColor: color,
+                              color: "#fff",
+                            }
+                          : {}
+                      }
+                      onClick={() => togglePriority(value)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="filter-grid" style={{ marginTop: 4 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Craft / Trade</label>
+                <input
+                  type="text"
+                  value={filters.craft}
+                  onChange={(e) => {
+                    const f = { ...filters, craft: e.target.value };
+                    setFilters(f);
+                    fetchWorkOrders(f);
+                  }}
+                  placeholder="Filter by craft…"
+                  list="craft-options"
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Work Group</label>
+                <select
+                  value={filters.workGroup}
+                  onChange={(e) =>
+                    setFilters({ ...filters, workGroup: e.target.value })
+                  }
+                >
+                  <option value="">All Work Groups</option>
+                  {workGroups.map((g) => (
+                    <option
+                      key={g.Id || g.id || g.Name || g.name}
+                      value={g.Name || g.name || ""}
+                    >
+                      {g.Name || g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Date From</label>
+                <input
+                  type="date"
+                  value={filters.dateFrom}
+                  onChange={(e) =>
+                    setFilters({ ...filters, dateFrom: e.target.value })
+                  }
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Date To</label>
+                <input
+                  type="date"
+                  value={filters.dateTo}
+                  onChange={(e) =>
+                    setFilters({ ...filters, dateTo: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
       {/* ── Main: data table + presets sidebar ── */}
       <div className="admin-page-layout">
         <div className="admin-page-main">
@@ -566,17 +628,26 @@ const WorkOrders: React.FC = () => {
         {/* admin-page-main */}
         <FilterPresetsPanel
           storageKey="filterPresets_workOrders"
-          currentFilters={filters}
+          currentFilters={{
+            statuses: filters.statuses.join(","),
+            craft: filters.craft,
+            workGroup: filters.workGroup,
+            priorities: filters.priorities.join(","),
+            search: filters.search,
+            dateFrom: filters.dateFrom,
+            dateTo: filters.dateTo,
+          }}
           onApply={(f) => {
             const merged = {
-              status: "",
-              craft: "",
-              workGroup: "",
-              priority: "",
-              search: "",
-              dateFrom: "",
-              dateTo: "",
-              ...f,
+              statuses: f.statuses ? f.statuses.split(",").filter(Boolean) : [],
+              craft: f.craft || "",
+              workGroup: f.workGroup || "",
+              priorities: f.priorities
+                ? f.priorities.split(",").filter(Boolean)
+                : [],
+              search: f.search || "",
+              dateFrom: f.dateFrom || "",
+              dateTo: f.dateTo || "",
             };
             setFilters(merged);
             fetchWorkOrders(merged);
@@ -654,10 +725,7 @@ const WorkOrders: React.FC = () => {
                 className="btn-ghost"
                 onClick={() =>
                   generatePdf(
-                    buildWorkOrderTemplate(
-                      selectedOrder,
-                      pdfTemplateConfig,
-                    ),
+                    buildWorkOrderTemplate(selectedOrder, pdfTemplateConfig),
                   )
                 }
                 title="Download PDF"

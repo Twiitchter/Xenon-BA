@@ -24,6 +24,8 @@ export interface PdfField {
   value: string | number | null | undefined;
   /** If true the value spans the full width instead of sitting beside the label */
   fullWidth?: boolean;
+  /** Rendering style: column (default label+value row), full (full-width block), bubble (badge chip) */
+  layout?: "column" | "full" | "bubble";
 }
 
 export interface PdfSection {
@@ -57,7 +59,13 @@ export interface PdfSectionConfig {
 export interface PdfCustomSection {
   id: string;
   title: string;
-  content: string;
+  content?: string;
+  fields?: Array<{
+    id: string;
+    variable: string;
+    label: string;
+    layout: "column" | "full" | "bubble";
+  }>;
 }
 
 /** Shape stored in the database and returned by the API */
@@ -208,7 +216,7 @@ export function generatePdf(template: PdfTemplate): void {
     const val = formatValue(field.value);
     const isEven = rowIndex % 2 === 0;
 
-    if (field.fullWidth) {
+    if (field.fullWidth || field.layout === "full") {
       // Full-width value (e.g. description / supporting info)
       ensureSpace(ROW_H * 2 + 6);
       doc.setFont("helvetica", "bold");
@@ -257,6 +265,28 @@ export function generatePdf(template: PdfTemplate): void {
     y += ROW_H + ROW_PAD * 2;
   };
 
+  // ── Bubble / badge field ──────────────────────────────────────────────────
+  const drawBubbleField = (field: PdfField) => {
+    const val = formatValue(field.value);
+    ensureSpace(20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    setTextColor(doc, TEXT_MUTED);
+    doc.text(field.label.toUpperCase(), MARGIN, y + 4);
+    y += 5.5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    const padX = 5;
+    const textW = doc.getTextWidth(val);
+    const bubbleW = Math.min(textW + padX * 2, CONTENT_W);
+    const bubbleH = 7;
+    setFill(doc, BRAND_TEAL);
+    doc.roundedRect(MARGIN, y, bubbleW, bubbleH, 2, 2, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.text(val, MARGIN + padX, y + 4.8);
+    y += bubbleH + 5;
+  };
+
   // ── Page overflow guard ───────────────────────────────────────────────────
   const USABLE_BOTTOM = PAGE_H - FOOTER_H - 8;
 
@@ -281,7 +311,11 @@ export function generatePdf(template: PdfTemplate): void {
     }
 
     section.fields.forEach((field, idx) => {
-      drawField(field, idx);
+      if (field.layout === "bubble") {
+        drawBubbleField(field);
+      } else {
+        drawField(field, idx);
+      }
     });
 
     y += 4; // inter-section gap
@@ -315,6 +349,7 @@ export function generatePdf(template: PdfTemplate): void {
 function applyTemplateConfig(
   sectionMap: Record<string, PdfSection>,
   config: PdfTemplateConfig | undefined,
+  variableResolver?: (key: string) => string | null | undefined,
 ): PdfSection[] {
   if (!config) {
     return Object.values(sectionMap).filter(Boolean);
@@ -342,20 +377,33 @@ function applyTemplateConfig(
     }
   }
 
-  // Append admin custom free-text sections
+  // Append admin custom sections (variable fields and/or static text)
   for (const cs of config.customSections) {
-    if (!cs.content?.trim()) continue;
+    const hasFields = cs.fields && cs.fields.length > 0;
+    const hasContent = cs.content?.trim();
+    if (!hasFields && !hasContent) continue;
     const sectionTitle = cs.title || "Additional Notes";
-    result.push({
-      title: sectionTitle,
-      fields: [
-        {
-          label: sectionTitle,
-          value: cs.content,
-          fullWidth: true,
-        },
-      ],
-    });
+    const fields: PdfField[] = [];
+    if (hasFields && variableResolver) {
+      for (const f of cs.fields!) {
+        fields.push({
+          label: f.label,
+          value: variableResolver(f.variable) ?? null,
+          layout: f.layout,
+          fullWidth: f.layout === "full",
+        });
+      }
+    }
+    if (hasContent) {
+      fields.push({
+        label: sectionTitle,
+        value: cs.content!.trim(),
+        fullWidth: true,
+      });
+    }
+    if (fields.length > 0) {
+      result.push({ title: sectionTitle, fields });
+    }
   }
 
   return result;
@@ -447,13 +495,37 @@ export function buildWorkOrderTemplate(
     Object.entries(sectionMap).filter(([, v]) => v !== null),
   ) as Record<string, PdfSection>;
 
+  const woResolverMap: Record<string, string | null | undefined> = {
+    "wo.reference": woId,
+    "wo.wr_reference": fmt(wrId) ?? null,
+    "wo.title": fmt(wo.title) ?? null,
+    "wo.status": fmt(wo.status)?.replace(/_/g, " ").toUpperCase() ?? null,
+    "wo.priority": fmt(wo.priority)?.toUpperCase() ?? null,
+    "wo.craft": fmt(wo.craft) ?? null,
+    "wo.work_group": fmt(wo.work_group) ?? null,
+    "wo.assigned_to": fmt(wo.assigned_to_username) ?? null,
+    "wo.scheduled_date": fmtDate(wo.scheduled_date) ?? null,
+    "wo.created_at": fmtDate(wo.created_at) ?? null,
+    "wo.updated_at": fmtDate(wo.updated_at) ?? null,
+    "wo.description": fmt(wo.description) ?? null,
+    "wo.asset_name": fmt(wo.asset_name) ?? null,
+    "wo.asset_guid": fmt(wo.assetic_asset_guid) ?? null,
+    "wo.asset_location": fmt(wo.asset_location) ?? null,
+    "wo.request_title": fmt(wo.request_title) ?? null,
+    "wo.request_reference": fmt(wrId) ?? null,
+  };
+
   return {
     title: "Work Order",
     subtitle: woId,
     organisation: "XeonB Maintenance Portal",
     filename: `Work_Order_${woId}`,
     footer: `Work Order ${woId} — XeonB Maintenance Portal`,
-    sections: applyTemplateConfig(validSections, templateConfig),
+    sections: applyTemplateConfig(
+      validSections,
+      templateConfig,
+      (k) => woResolverMap[k],
+    ),
   };
 }
 
@@ -541,12 +613,34 @@ export function buildWorkRequestTemplate(
     Object.entries(sectionMap).filter(([, v]) => v !== null),
   ) as Record<string, PdfSection>;
 
+  const wrResolverMap: Record<string, string | null | undefined> = {
+    "wr.reference": wrId,
+    "wr.title": fmt(req.title) ?? null,
+    "wr.status": fmt(req.status)?.replace(/_/g, " ").toUpperCase() ?? null,
+    "wr.priority": fmt(req.priority)?.toUpperCase() ?? null,
+    "wr.category": fmt(req.category) ?? null,
+    "wr.location": fmt(req.location) ?? null,
+    "wr.submitted": fmtDate(req.created_at) ?? null,
+    "wr.description":
+      fmt(req.description || req.supporting_information) ?? null,
+    "wr.requestor_name": fmt(req.requestor_display_name) ?? null,
+    "wr.requestor_email": fmt(req.requestor_email) ?? null,
+    "wr.requestor_phone":
+      fmt(req.requestor_phone || req.requestor_mobile) ?? null,
+    "wr.asset_name": fmt(req.asset_display_name) ?? null,
+    "wr.asset_guid": fmt(req.assetic_asset_guid) ?? null,
+  };
+
   return {
     title: "Work Request",
     subtitle: wrId,
     organisation: "XeonB Maintenance Portal",
     filename: `Work_Request_${wrId}`,
     footer: `Work Request ${wrId} — XeonB Maintenance Portal`,
-    sections: applyTemplateConfig(validSections, templateConfig),
+    sections: applyTemplateConfig(
+      validSections,
+      templateConfig,
+      (k) => wrResolverMap[k],
+    ),
   };
 }

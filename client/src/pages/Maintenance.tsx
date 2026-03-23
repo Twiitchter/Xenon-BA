@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
-import { generatePdf, buildWorkRequestTemplate, type PdfTemplateConfig } from "../services/pdfService";
+import {
+  generatePdf,
+  buildWorkRequestTemplate,
+  type PdfTemplateConfig,
+} from "../services/pdfService";
 import Modal from "../components/Modal";
 import FilterPresetsPanel from "../components/FilterPresetsPanel";
 
@@ -44,6 +48,21 @@ const directionFromWorkGroup = (name: string): string => {
 const regionFromLocation = (location: string): string =>
   location ? location.split(" > ")[0].trim() : "";
 
+const STATUS_CHIPS = [
+  { value: "open", label: "Open", color: "#0ea5e9" },
+  { value: "pending", label: "Pending", color: "#94a3b8" },
+  { value: "in_progress", label: "In Progress", color: "#f59e0b" },
+  { value: "completed", label: "Completed", color: "#22c55e" },
+  { value: "cancelled", label: "Cancelled", color: "#64748b" },
+];
+
+const PRIORITY_CHIPS = [
+  { value: "critical", label: "Critical", color: "#ef4444" },
+  { value: "high", label: "High", color: "#f59e0b" },
+  { value: "medium", label: "Medium", color: "#0ea5e9" },
+  { value: "low", label: "Low", color: "#94a3b8" },
+];
+
 const WO_STATUS_MESSAGES = [
   "Creating work order…",
   "Registering resource in Assetic…",
@@ -57,14 +76,14 @@ const Maintenance: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({
-    status: "",
-    priority: "",
+    statuses: [] as string[],
+    priorities: [] as string[],
     search: "",
     dateFrom: "",
     dateTo: "",
   });
 
-  // Client-side filtered view (search + date applied locally)
+  // Client-side filtered view
   const requests = useMemo(() => {
     let list = allRequests;
     if (filters.search) {
@@ -78,6 +97,12 @@ const Maintenance: React.FC = () => {
           (r.location || "").toLowerCase().includes(s),
       );
     }
+    if (filters.statuses.length) {
+      list = list.filter((r) => filters.statuses.includes(r.status));
+    }
+    if (filters.priorities.length) {
+      list = list.filter((r) => filters.priorities.includes(r.priority));
+    }
     if (filters.dateFrom) {
       const from = new Date(filters.dateFrom);
       list = list.filter((r) => new Date(r.created_at) >= from);
@@ -87,7 +112,14 @@ const Maintenance: React.FC = () => {
       list = list.filter((r) => new Date(r.created_at) <= to);
     }
     return list;
-  }, [allRequests, filters.search, filters.dateFrom, filters.dateTo]);
+  }, [
+    allRequests,
+    filters.search,
+    filters.statuses,
+    filters.priorities,
+    filters.dateFrom,
+    filters.dateTo,
+  ]);
 
   // Selected request for detail panel
   const [selected, setSelected] = useState<any | null>(null);
@@ -113,7 +145,9 @@ const Maintenance: React.FC = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // PDF template config (fetched from server)
-  const [pdfTemplateConfig, setPdfTemplateConfig] = useState<PdfTemplateConfig | undefined>(undefined);
+  const [pdfTemplateConfig, setPdfTemplateConfig] = useState<
+    PdfTemplateConfig | undefined
+  >(undefined);
 
   useEffect(() => {
     fetchRequests();
@@ -132,21 +166,19 @@ const Maintenance: React.FC = () => {
 
   const fetchPdfTemplateConfig = async () => {
     try {
-      const data = await maintenanceService.getPdfTemplateConfig("work_request");
+      const data =
+        await maintenanceService.getPdfTemplateConfig("work_request");
       setPdfTemplateConfig(data.config as PdfTemplateConfig);
     } catch {
       // non-critical: PDF will fall back to default template
     }
   };
 
-  const fetchRequests = async (activeFilters = filters) => {
+  const fetchRequests = async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await maintenanceService.getRequests({
-        status: activeFilters.status || undefined,
-        priority: activeFilters.priority || undefined,
-      });
+      const data = await maintenanceService.getRequests();
       setAllRequests(data.requests || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch requests");
@@ -185,10 +217,7 @@ const Maintenance: React.FC = () => {
   };
 
   const refreshAndReselect = async (requestId: number) => {
-    const data = await maintenanceService.getRequests({
-      status: filters.status || undefined,
-      priority: filters.priority || undefined,
-    });
+    const data = await maintenanceService.getRequests();
     setAllRequests(data.requests || []);
     const updated = (data.requests || []).find((r: any) => r.id === requestId);
     if (updated) setSelected(updated);
@@ -271,126 +300,162 @@ const Maintenance: React.FC = () => {
     }
   };
 
+  const toggleStatus = (s: string) =>
+    setFilters((f) => ({
+      ...f,
+      statuses: f.statuses.includes(s)
+        ? f.statuses.filter((x) => x !== s)
+        : [...f.statuses, s],
+    }));
+
+  const togglePriority = (p: string) =>
+    setFilters((f) => ({
+      ...f,
+      priorities: f.priorities.includes(p)
+        ? f.priorities.filter((x) => x !== p)
+        : [...f.priorities, p],
+    }));
+
   const hasActiveFilters = !!(
-    filters.status ||
-    filters.priority ||
+    filters.statuses.length ||
+    filters.priorities.length ||
     filters.search ||
     filters.dateFrom ||
     filters.dateTo
   );
   const activeFilterCount = [
-    filters.status,
-    filters.priority,
+    filters.statuses.length > 0,
+    filters.priorities.length > 0,
     filters.dateFrom,
     filters.dateTo,
   ].filter(Boolean).length;
 
   return (
     <div className="container" style={{ maxWidth: "1600px" }}>
-      {/* ── Filter topbar ── */}
-      <div className="filter-topbar">
-        <h2>Requests</h2>
-        <div className="filter-topbar-controls">
-          <input
-            type="text"
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            placeholder="Search requests…"
-            className="filter-search"
-          />
-          <button
-            className={`filter-toggle-btn${
-              filtersOpen ? " filter-toggle-open" : ""
-            }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
-            onClick={() => setFiltersOpen((o) => !o)}
-          >
-            ⚙ Filters
-            {activeFilterCount > 0 && (
-              <span className="filter-badge">{activeFilterCount}</span>
-            )}
-          </button>
-          <button onClick={() => fetchRequests(filters)}>Refresh</button>
-          {hasActiveFilters && (
+      {/* ── Unified header card: title + search + collapsible filters ── */}
+      <div className="card filter-header-card">
+        <div className="filter-topbar">
+          <h2>Requests</h2>
+          <div className="filter-topbar-controls">
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value })
+              }
+              placeholder="Search requests…"
+              className="filter-search"
+            />
             <button
-              className="btn-ghost"
-              onClick={() => {
-                const cleared = {
-                  status: "",
-                  priority: "",
-                  search: "",
-                  dateFrom: "",
-                  dateTo: "",
-                };
-                setFilters(cleared);
-                fetchRequests(cleared);
-              }}
+              className={`filter-toggle-btn${
+                filtersOpen ? " filter-toggle-open" : ""
+              }${activeFilterCount > 0 ? " filter-toggle-active" : ""}`}
+              onClick={() => setFiltersOpen((o) => !o)}
             >
-              Clear
+              ⚙ Filters
+              {activeFilterCount > 0 && (
+                <span className="filter-badge">{activeFilterCount}</span>
+              )}
             </button>
-          )}
-        </div>
-      </div>
-      {/* ── Expandable filter panel ── */}
-      {filtersOpen && (
-        <div className="filter-panel card">
-          <div className="filter-grid">
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => {
-                  const f = { ...filters, status: e.target.value };
-                  setFilters(f);
-                  fetchRequests(f);
+            <button onClick={() => fetchRequests()}>Refresh</button>
+            {hasActiveFilters && (
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  setFilters({
+                    statuses: [],
+                    priorities: [],
+                    search: "",
+                    dateFrom: "",
+                    dateTo: "",
+                  });
                 }}
               >
-                <option value="">All Statuses</option>
-                <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Priority</label>
-              <select
-                value={filters.priority}
-                onChange={(e) => {
-                  const f = { ...filters, priority: e.target.value };
-                  setFilters(f);
-                  fetchRequests(f);
-                }}
-              >
-                <option value="">All Priorities</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Date From</label>
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) =>
-                  setFilters({ ...filters, dateFrom: e.target.value })
-                }
-              />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Date To</label>
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) =>
-                  setFilters({ ...filters, dateTo: e.target.value })
-                }
-              />
-            </div>
+                Clear
+              </button>
+            )}
           </div>
         </div>
-      )}
+        {/* ── Expandable filter panel ── */}
+        {filtersOpen && (
+          <div className="filter-expand">
+            <div className="filter-chip-row">
+              <label>Status</label>
+              <div className="filter-chip-group">
+                {STATUS_CHIPS.map(({ value, label, color }) => {
+                  const on = filters.statuses.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      className="filter-chip"
+                      style={
+                        on
+                          ? {
+                              background: color,
+                              borderColor: color,
+                              color: "#fff",
+                            }
+                          : {}
+                      }
+                      onClick={() => toggleStatus(value)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="filter-chip-row">
+              <label>Priority</label>
+              <div className="filter-chip-group">
+                {PRIORITY_CHIPS.map(({ value, label, color }) => {
+                  const on = filters.priorities.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      className="filter-chip"
+                      style={
+                        on
+                          ? {
+                              background: color,
+                              borderColor: color,
+                              color: "#fff",
+                            }
+                          : {}
+                      }
+                      onClick={() => togglePriority(value)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="filter-grid" style={{ marginTop: 4 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Date From</label>
+                <input
+                  type="date"
+                  value={filters.dateFrom}
+                  onChange={(e) =>
+                    setFilters({ ...filters, dateFrom: e.target.value })
+                  }
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Date To</label>
+                <input
+                  type="date"
+                  value={filters.dateTo}
+                  onChange={(e) =>
+                    setFilters({ ...filters, dateTo: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
       {/* ── Main: data table + presets sidebar ── */}
       <div className="admin-page-layout">
         <div className="admin-page-main">
@@ -557,18 +622,23 @@ const Maintenance: React.FC = () => {
         {/* admin-page-main */}
         <FilterPresetsPanel
           storageKey="filterPresets_requests"
-          currentFilters={filters}
+          currentFilters={{
+            statuses: filters.statuses.join(","),
+            priorities: filters.priorities.join(","),
+            search: filters.search,
+            dateFrom: filters.dateFrom,
+            dateTo: filters.dateTo,
+          }}
           onApply={(f) => {
-            const merged = {
-              status: "",
-              priority: "",
-              search: "",
-              dateFrom: "",
-              dateTo: "",
-              ...f,
-            };
-            setFilters(merged);
-            fetchRequests(merged);
+            setFilters({
+              statuses: f.statuses ? f.statuses.split(",").filter(Boolean) : [],
+              priorities: f.priorities
+                ? f.priorities.split(",").filter(Boolean)
+                : [],
+              search: f.search || "",
+              dateFrom: f.dateFrom || "",
+              dateTo: f.dateTo || "",
+            });
           }}
         />
       </div>{" "}
@@ -610,7 +680,11 @@ const Maintenance: React.FC = () => {
             >
               <button
                 className="btn-ghost"
-                onClick={() => generatePdf(buildWorkRequestTemplate(selected, pdfTemplateConfig))}
+                onClick={() =>
+                  generatePdf(
+                    buildWorkRequestTemplate(selected, pdfTemplateConfig),
+                  )
+                }
                 title="Download PDF"
                 style={{ fontSize: "13px" }}
               >

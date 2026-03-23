@@ -85,7 +85,38 @@ export async function ensureAsseticResource(
     if (profile?.phone) payload.Phone = profile.phone;
     if (profile?.mobile) payload.Mobile = profile.mobile;
 
-    const created = await asseticClient.createResource(payload);
+    let created: any;
+    try {
+      created = await asseticClient.createResource(payload);
+    } catch (createErr: any) {
+      // Assetic returns 500 when a resource with the same name already exists.
+      // In that case try to recover by looking up the existing record via email.
+      const errBody = createErr?.response?.data;
+      const errMsg: string =
+        (typeof errBody === "string"
+          ? errBody
+          : Object.values(errBody ?? {}).join(" ")) ?? "";
+      if (
+        createErr?.response?.status === 500 &&
+        errMsg.toLowerCase().includes("already exists") &&
+        profile?.email
+      ) {
+        console.warn(
+          `[asseticResourceService] Create failed (already exists) for user ${externalId} — falling back to email lookup`,
+        );
+        const byEmail = await asseticClient.getResourceByEmail(profile.email);
+        if (byEmail) {
+          const rawId2 = byEmail.Id ?? byEmail.id;
+          if (rawId2) {
+            const resourceId2 = String(rawId2);
+            await cacheResourceId(userId, resourceId2);
+            return resourceId2;
+          }
+        }
+      }
+      throw createErr;
+    }
+
     const rawCreatedId = created?.Id ?? created?.id;
     if (!rawCreatedId) {
       console.warn(

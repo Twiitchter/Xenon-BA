@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AdminHierarchyResponse, adminService, Contractor } from "../services/adminService";
+import {
+  AdminHierarchyResponse,
+  adminService,
+  Contractor,
+} from "../services/adminService";
 import PdfTemplateEditor from "../components/PdfTemplateEditor";
+import FailedRequests from "./FailedRequests";
+import FailedWorkOrders from "./FailedWorkOrders";
 
 interface SettingItem {
   id: number;
@@ -11,7 +17,18 @@ interface SettingItem {
   description: string | null;
 }
 
-const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email", "contractors", "pdf_templates"];
+const categories = [
+  "general",
+  "assetic",
+  "hierarchy",
+  "sync",
+  "sso",
+  "email",
+  "contractors",
+  "pdf_templates",
+  "failed_requests",
+  "failed_work_orders",
+];
 const categoryLabels: Record<string, string> = {
   general: "General",
   assetic: "Assetic API",
@@ -21,6 +38,8 @@ const categoryLabels: Record<string, string> = {
   email: "Email",
   contractors: "Contractors",
   pdf_templates: "PDF Templates",
+  failed_requests: "Failed Requests",
+  failed_work_orders: "Failed Work Orders",
 };
 
 const Settings: React.FC = () => {
@@ -49,7 +68,8 @@ const Settings: React.FC = () => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [contractorLoading, setContractorLoading] = useState(false);
   const [contractorSaving, setContractorSaving] = useState(false);
-  const [editingContractor, setEditingContractor] = useState<Partial<Contractor> | null>(null);
+  const [editingContractor, setEditingContractor] =
+    useState<Partial<Contractor> | null>(null);
   const [isNewContractor, setIsNewContractor] = useState(false);
   // tradesInput is a comma-separated string for the UI
   const [tradesInput, setTradesInput] = useState("");
@@ -69,7 +89,9 @@ const Settings: React.FC = () => {
       activeCategory === "hierarchy" ||
       activeCategory === "sync" ||
       activeCategory === "contractors" ||
-      activeCategory === "pdf_templates"
+      activeCategory === "pdf_templates" ||
+      activeCategory === "failed_requests" ||
+      activeCategory === "failed_work_orders"
         ? []
         : settings.filter((s) => s.category === activeCategory),
     [settings, activeCategory],
@@ -433,7 +455,9 @@ const Settings: React.FC = () => {
           activeCategory !== "hierarchy" &&
           activeCategory !== "sync" &&
           activeCategory !== "contractors" &&
-          activeCategory !== "pdf_templates" ? (
+          activeCategory !== "pdf_templates" &&
+          activeCategory !== "failed_requests" &&
+          activeCategory !== "failed_work_orders" ? (
             <div className="loading">Loading settings...</div>
           ) : activeCategory === "sync" ? (
             /* ── Asset Sync section ── */
@@ -763,7 +787,14 @@ const Settings: React.FC = () => {
           ) : activeCategory === "pdf_templates" ? (
             /* ── PDF Templates section ── */
             <PdfTemplateEditor />
-          ) : categorySettings.length === 0 && activeCategory !== "contractors" ? (
+          ) : activeCategory === "failed_requests" ? (
+            /* ── Failed Requests section ── */
+            <FailedRequests embedded />
+          ) : activeCategory === "failed_work_orders" ? (
+            /* ── Failed Work Orders section ── */
+            <FailedWorkOrders embedded />
+          ) : categorySettings.length === 0 &&
+            activeCategory !== "contractors" ? (
             <div className="settings-muted">
               No settings in this category yet.
             </div>
@@ -962,11 +993,11 @@ const Settings: React.FC = () => {
               {editingContractor && (
                 <div
                   style={{
-                    border: "1px solid var(--border, #444)",
+                    border: "1px solid var(--border)",
                     borderRadius: "8px",
                     padding: "16px 20px",
                     marginBottom: "20px",
-                    background: "var(--bg-tertiary, #1e1e1e)",
+                    background: "var(--bg-secondary)",
                   }}
                 >
                   <h4 style={{ margin: "0 0 14px" }}>
@@ -1106,7 +1137,9 @@ const Settings: React.FC = () => {
                       Optional custom HTML/text body. Leave blank to use the
                       default system template. Available variables:{" "}
                       <code>
-                        {"{{work_order_id}} {{title}} {{description}} {{location}} {{priority}} {{craft}} {{work_group}} {{requestor_name}} {{portal_url}} {{app_name}}"}
+                        {
+                          "{{work_order_id}} {{title}} {{description}} {{location}} {{priority}} {{craft}} {{work_group}} {{requestor_name}} {{portal_url}} {{app_name}}"
+                        }
                       </code>
                     </div>
                     <textarea
@@ -1139,7 +1172,9 @@ const Settings: React.FC = () => {
                     />
                   </div>
 
-                  <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                  <div
+                    style={{ display: "flex", gap: "10px", marginTop: "8px" }}
+                  >
                     <button
                       onClick={handleSaveContractor}
                       disabled={contractorSaving}
@@ -1174,8 +1209,8 @@ const Settings: React.FC = () => {
                     borderRadius: "8px",
                   }}
                 >
-                  No contractors yet. Click{" "}
-                  <strong>+ Add Contractor</strong> to get started.
+                  No contractors yet. Click <strong>+ Add Contractor</strong> to
+                  get started.
                 </div>
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1241,14 +1276,20 @@ const Settings: React.FC = () => {
                           )}
                         </td>
                         <td style={{ padding: "8px", fontSize: "12px" }}>
-                          {c.trades?.length
-                            ? c.trades.join(", ")
-                            : <span style={{ color: "var(--text-muted)" }}>All trades</span>}
+                          {c.trades?.length ? (
+                            c.trades.join(", ")
+                          ) : (
+                            <span style={{ color: "var(--text-muted)" }}>
+                              All trades
+                            </span>
+                          )}
                         </td>
                         <td style={{ padding: "8px", textAlign: "center" }}>
                           <span
                             className={
-                              c.receives_work_orders ? "badge badge-success" : "badge badge-muted"
+                              c.receives_work_orders
+                                ? "badge badge-success"
+                                : "badge badge-muted"
                             }
                           >
                             {c.receives_work_orders ? "Yes" : "No"}
@@ -1257,7 +1298,9 @@ const Settings: React.FC = () => {
                         <td style={{ padding: "8px", textAlign: "center" }}>
                           <span
                             className={
-                              c.is_active ? "badge badge-success" : "badge badge-muted"
+                              c.is_active
+                                ? "badge badge-success"
+                                : "badge badge-muted"
                             }
                           >
                             {c.is_active ? "Active" : "Inactive"}
@@ -1298,61 +1341,523 @@ const Settings: React.FC = () => {
               )}
             </>
           ) : activeCategory === "email" ? (
-            /* ── Email settings with test button ── */
-            <>
-              {categorySettings.map((setting) => (
-                <div
-                  className="form-group"
-                  key={setting.setting_key}
-                  style={{ marginBottom: "16px" }}
-                >
-                  <label>{formatKey(setting.setting_key)}</label>
-                  {setting.description && (
-                    <div className="settings-muted">{setting.description}</div>
-                  )}
-                  {renderInput(setting)}
-                </div>
-              ))}
+            /* ── Email settings – condensed smart form ── */
+            (() => {
+              const get = (key: string) => editedValues[key] ?? "";
+              const set = (key: string, val: string) =>
+                setEditedValues((prev) => ({ ...prev, [key]: val }));
 
-              <div
-                style={{
-                  borderTop: "1px solid var(--border, #444)",
-                  marginTop: "20px",
-                  paddingTop: "16px",
-                }}
-              >
-                <h4 style={{ margin: "0 0 8px" }}>Send Test Email</h4>
-                <p className="settings-muted">
-                  Save your settings then send a test email to verify the
-                  configuration.
-                </p>
-                <div
-                  style={{ display: "flex", gap: "10px", alignItems: "center" }}
-                >
-                  <input
-                    type="email"
-                    placeholder="Recipient email address"
-                    value={testEmailAddress}
-                    onChange={(e) => setTestEmailAddress(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    className="btn-outline"
-                    onClick={handleTestEmail}
-                    disabled={testingEmail}
-                    type="button"
+              const provider = get("email_provider") || "smtp";
+              const apiProvider = get("email_api_provider") || "sendgrid";
+
+              // SMTP presets: common providers
+              const smtpPresets: Record<
+                string,
+                { host: string; port: string; secure: string; label: string }
+              > = {
+                "": {
+                  host: "",
+                  port: "587",
+                  secure: "false",
+                  label: "— Custom —",
+                },
+                office365: {
+                  host: "smtp.office365.com",
+                  port: "587",
+                  secure: "false",
+                  label: "Office 365",
+                },
+                gmail: {
+                  host: "smtp.gmail.com",
+                  port: "587",
+                  secure: "false",
+                  label: "Gmail (App Password)",
+                },
+                sendgrid_smtp: {
+                  host: "smtp.sendgrid.net",
+                  port: "587",
+                  secure: "false",
+                  label: "SendGrid (SMTP)",
+                },
+                mailgun_smtp: {
+                  host: "smtp.mailgun.org",
+                  port: "587",
+                  secure: "false",
+                  label: "Mailgun (SMTP)",
+                },
+                ses: {
+                  host: "email-smtp.us-east-1.amazonaws.com",
+                  port: "587",
+                  secure: "false",
+                  label: "Amazon SES",
+                },
+              };
+
+              const applySmtpPreset = (key: string) => {
+                const p = smtpPresets[key];
+                if (!p) return;
+                set("email_smtp_host", p.host);
+                set("email_smtp_port", p.port);
+                set("email_smtp_secure", p.secure);
+              };
+
+              return (
+                <>
+                  {/* ── Provider Toggle ── */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px",
+                      marginBottom: "20px",
+                    }}
                   >
-                    {testingEmail ? "Sending..." : "Send Test"}
-                  </button>
-                </div>
-              </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Provider Type</label>
+                      <div className="settings-muted">How emails are sent</div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          marginTop: "6px",
+                        }}
+                      >
+                        {["smtp", "api"].map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => set("email_provider", p)}
+                            style={{
+                              flex: 1,
+                              padding: "8px",
+                              borderRadius: "6px",
+                              border: `2px solid ${provider === p ? "var(--accent, #0ea5e9)" : "var(--border, #444)"}`,
+                              background:
+                                provider === p
+                                  ? "var(--accent-subtle, rgba(14,165,233,0.1))"
+                                  : "transparent",
+                              color:
+                                provider === p
+                                  ? "var(--accent, #0ea5e9)"
+                                  : "var(--text-secondary)",
+                              fontWeight: provider === p ? 600 : 400,
+                              cursor: "pointer",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {p === "smtp" ? "SMTP" : "API"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                <button onClick={handleSave} disabled={saving}>
-                  {saving ? "Saving..." : "Save Settings"}
-                </button>
-              </div>
-            </>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>Notifications Enabled</label>
+                      <div className="settings-muted">
+                        Send email notifications
+                      </div>
+                      <select
+                        style={{ marginTop: "6px" }}
+                        value={get("email_notifications_enabled") || "true"}
+                        onChange={(e) =>
+                          set("email_notifications_enabled", e.target.value)
+                        }
+                      >
+                        <option value="true">Enabled</option>
+                        <option value="false">Disabled</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ── Common fields ── */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "12px",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>
+                        From Address{" "}
+                        <span style={{ color: "var(--error, #ef4444)" }}>
+                          *
+                        </span>
+                      </label>
+                      <div className="settings-muted">
+                        Default sender (From) email address
+                      </div>
+                      <input
+                        type="email"
+                        value={get("email_from_address")}
+                        onChange={(e) =>
+                          set("email_from_address", e.target.value)
+                        }
+                        placeholder="noreply@example.com"
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label>From Name</label>
+                      <div className="settings-muted">
+                        Default sender display name
+                      </div>
+                      <input
+                        type="text"
+                        value={get("email_from_name")}
+                        onChange={(e) => set("email_from_name", e.target.value)}
+                        placeholder="Facilities Management Portal"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: "20px" }}>
+                    <label>Portal URL</label>
+                    <div className="settings-muted">
+                      Public URL used in email links (e.g.
+                      https://portal.example.com)
+                    </div>
+                    <input
+                      type="url"
+                      value={get("email_portal_url")}
+                      onChange={(e) => set("email_portal_url", e.target.value)}
+                      placeholder="https://portal.example.com"
+                    />
+                  </div>
+
+                  {/* ── SMTP section ── */}
+                  {provider === "smtp" && (
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--border, #444)",
+                        paddingTop: "16px",
+                        marginBottom: "20px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        <h4 style={{ margin: 0 }}>SMTP Configuration</h4>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <label
+                            style={{
+                              fontSize: "12px",
+                              color: "var(--text-secondary)",
+                              marginBottom: 0,
+                            }}
+                          >
+                            Quick preset:
+                          </label>
+                          <select
+                            style={{
+                              fontSize: "12px",
+                              padding: "4px 8px",
+                              width: "auto",
+                            }}
+                            defaultValue=""
+                            onChange={(e) => applySmtpPreset(e.target.value)}
+                          >
+                            {Object.entries(smtpPresets).map(([key, val]) => (
+                              <option key={key} value={key}>
+                                {val.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "2fr 1fr",
+                          gap: "12px",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>
+                            SMTP Host{" "}
+                            <span style={{ color: "var(--error, #ef4444)" }}>
+                              *
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            value={get("email_smtp_host")}
+                            onChange={(e) =>
+                              set("email_smtp_host", e.target.value)
+                            }
+                            placeholder="smtp.example.com"
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Port</label>
+                          <input
+                            type="number"
+                            value={get("email_smtp_port")}
+                            onChange={(e) =>
+                              set("email_smtp_port", e.target.value)
+                            }
+                            placeholder="587"
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr 1fr",
+                          gap: "12px",
+                        }}
+                      >
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Username</label>
+                          <input
+                            type="text"
+                            value={get("email_smtp_user")}
+                            onChange={(e) =>
+                              set("email_smtp_user", e.target.value)
+                            }
+                            placeholder="SMTP username"
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Password</label>
+                          <input
+                            type="password"
+                            value={get("email_smtp_password")}
+                            onChange={(e) =>
+                              set("email_smtp_password", e.target.value)
+                            }
+                            placeholder="SMTP password"
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>Encryption</label>
+                          <select
+                            value={get("email_smtp_secure")}
+                            onChange={(e) =>
+                              set("email_smtp_secure", e.target.value)
+                            }
+                          >
+                            <option value="false">None / STARTTLS</option>
+                            <option value="true">TLS / SSL</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── API section ── */}
+                  {provider === "api" && (
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--border, #444)",
+                        paddingTop: "16px",
+                        marginBottom: "20px",
+                      }}
+                    >
+                      <h4 style={{ margin: "0 0 12px" }}>API Configuration</h4>
+
+                      <div
+                        className="form-group"
+                        style={{ marginBottom: "12px" }}
+                      >
+                        <label>
+                          API Provider{" "}
+                          <span style={{ color: "var(--error, #ef4444)" }}>
+                            *
+                          </span>
+                        </label>
+                        <div className="settings-muted">
+                          Choose your transactional email provider
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            marginTop: "6px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {[
+                            {
+                              id: "sendgrid",
+                              label: "SendGrid",
+                              hint: "Reliable, great deliverability",
+                            },
+                            {
+                              id: "mailgun",
+                              label: "Mailgun",
+                              hint: "Requires domain verification",
+                            },
+                          ].map((ap) => (
+                            <button
+                              key={ap.id}
+                              type="button"
+                              onClick={() => set("email_api_provider", ap.id)}
+                              title={ap.hint}
+                              style={{
+                                padding: "8px 16px",
+                                borderRadius: "6px",
+                                border: `2px solid ${apiProvider === ap.id ? "var(--accent, #0ea5e9)" : "var(--border, #444)"}`,
+                                background:
+                                  apiProvider === ap.id
+                                    ? "var(--accent-subtle, rgba(14,165,233,0.1))"
+                                    : "transparent",
+                                color:
+                                  apiProvider === ap.id
+                                    ? "var(--accent, #0ea5e9)"
+                                    : "var(--text-secondary)",
+                                fontWeight: apiProvider === ap.id ? 600 : 400,
+                                cursor: "pointer",
+                                fontSize: "13px",
+                              }}
+                            >
+                              {ap.label}
+                            </button>
+                          ))}
+                        </div>
+                        {apiProvider === "sendgrid" && (
+                          <div
+                            className="settings-muted"
+                            style={{ marginTop: "6px" }}
+                          >
+                            Get your API key from{" "}
+                            <span style={{ color: "var(--accent)" }}>
+                              app.sendgrid.com → Settings → API Keys
+                            </span>
+                          </div>
+                        )}
+                        {apiProvider === "mailgun" && (
+                          <div
+                            className="settings-muted"
+                            style={{ marginTop: "6px" }}
+                          >
+                            Get your API key from{" "}
+                            <span style={{ color: "var(--accent)" }}>
+                              app.mailgun.com → Sending → Domains → API Keys
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            apiProvider === "mailgun" ? "1fr 1fr" : "1fr",
+                          gap: "12px",
+                        }}
+                      >
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label>
+                            API Key{" "}
+                            <span style={{ color: "var(--error, #ef4444)" }}>
+                              *
+                            </span>
+                          </label>
+                          <input
+                            type="password"
+                            value={get("email_api_key")}
+                            onChange={(e) =>
+                              set("email_api_key", e.target.value)
+                            }
+                            placeholder={
+                              apiProvider === "sendgrid"
+                                ? "SG.xxxx..."
+                                : "key-xxxx..."
+                            }
+                          />
+                        </div>
+                        {apiProvider === "mailgun" && (
+                          <div
+                            className="form-group"
+                            style={{ marginBottom: 0 }}
+                          >
+                            <label>
+                              Mailgun Domain{" "}
+                              <span style={{ color: "var(--error, #ef4444)" }}>
+                                *
+                              </span>
+                            </label>
+                            <div className="settings-muted">
+                              Your verified sending domain
+                            </div>
+                            <input
+                              type="text"
+                              value={get("email_api_domain")}
+                              onChange={(e) =>
+                                set("email_api_domain", e.target.value)
+                              }
+                              placeholder="mg.yourdomain.com"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Test email + Save ── */}
+                  <div
+                    style={{
+                      borderTop: "1px solid var(--border, #444)",
+                      marginTop: "8px",
+                      paddingTop: "16px",
+                      display: "flex",
+                      gap: "12px",
+                      alignItems: "flex-end",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: "200px" }}>
+                      <label
+                        style={{
+                          fontSize: "13px",
+                          display: "block",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Test Email Address
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="Recipient for test email"
+                        value={testEmailAddress}
+                        onChange={(e) => setTestEmailAddress(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      className="btn-outline"
+                      onClick={handleTestEmail}
+                      disabled={testingEmail}
+                      type="button"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {testingEmail ? "Sending..." : "Send Test"}
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {saving ? "Saving..." : "Save Settings"}
+                    </button>
+                  </div>
+                </>
+              );
+            })()
           ) : (
             /* ── Normal category: show all settings inline ── */
             <>

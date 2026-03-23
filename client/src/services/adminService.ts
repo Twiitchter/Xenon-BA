@@ -11,10 +11,24 @@ export interface PdfSectionConfig {
   customTitle: string | null;
 }
 
+export type PdfFieldLayout = "column" | "full" | "bubble";
+
+export interface PdfFieldConfig {
+  id: string;
+  /** Variable key, e.g. "wo.status" */
+  variable: string;
+  /** Display label shown in the PDF */
+  label: string;
+  layout: PdfFieldLayout;
+}
+
 export interface PdfCustomSection {
   id: string;
   title: string;
-  content: string;
+  /** Static text content (optional, backward-compatible) */
+  content?: string;
+  /** Variable-driven field list */
+  fields?: PdfFieldConfig[];
 }
 
 export interface PdfTemplateConfig {
@@ -345,9 +359,13 @@ class AdminService {
   }
 
   async updateFailedWorkOrder(id: number, data: Record<string, any>) {
-    const response = await axios.put(`${API_URL}/failed-work-orders/${id}`, data, {
-      headers: authService.getAuthHeader(),
-    });
+    const response = await axios.put(
+      `${API_URL}/failed-work-orders/${id}`,
+      data,
+      {
+        headers: authService.getAuthHeader(),
+      },
+    );
     return response.data as { failed_work_order: any };
   }
 
@@ -383,16 +401,26 @@ class AdminService {
     const response = await axios.get(`${API_URL}/pdf-templates/${type}`, {
       headers: authService.getAuthHeader(),
     });
-    return response.data as { template_type: string; config: PdfTemplateConfig };
+    return response.data as {
+      template_type: string;
+      config: PdfTemplateConfig;
+    };
   }
 
-  async updatePdfTemplate(type: "work_order" | "work_request", config: PdfTemplateConfig) {
+  async updatePdfTemplate(
+    type: "work_order" | "work_request",
+    config: PdfTemplateConfig,
+  ) {
     const response = await axios.put(
       `${API_URL}/pdf-templates/${type}`,
       { config },
       { headers: authService.getAuthHeader() },
     );
-    return response.data as { message: string; template_type: string; config: PdfTemplateConfig };
+    return response.data as {
+      message: string;
+      template_type: string;
+      config: PdfTemplateConfig;
+    };
   }
 
   // ─── Email ────────────────────────────────────────────────────────
@@ -415,7 +443,9 @@ class AdminService {
     return response.data as { contractors: Contractor[] };
   }
 
-  async createContractor(data: Omit<Contractor, "id" | "created_at" | "updated_at">) {
+  async createContractor(
+    data: Omit<Contractor, "id" | "created_at" | "updated_at">,
+  ) {
     const response = await axios.post(`${API_URL}/contractors`, data, {
       headers: authService.getAuthHeader(),
     });

@@ -46,7 +46,9 @@ const statusBadge = (status: string) => {
   );
 };
 
-const FailedWorkOrders: React.FC = () => {
+const FailedWorkOrders: React.FC<{ embedded?: boolean }> = ({
+  embedded = false,
+}) => {
   const [records, setRecords] = useState<FailedWorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -116,7 +118,9 @@ const FailedWorkOrders: React.FC = () => {
         ),
       );
       setEditing((prev) =>
-        prev ? ({ ...prev, ...updated.failed_work_order } as FailedWorkOrder) : prev,
+        prev
+          ? ({ ...prev, ...updated.failed_work_order } as FailedWorkOrder)
+          : prev,
       );
       setSuccess("Changes saved.");
       setTimeout(() => setSuccess(""), 3000);
@@ -182,15 +186,17 @@ const FailedWorkOrders: React.FC = () => {
     }
   };
 
-  return (
-    <div className="container">
-      <div className="page-header">
-        <h2>Failed Work Orders</h2>
-        <p style={{ color: "var(--text-secondary)" }}>
-          Work order status transitions that failed in Assetic. Edit payload and
-          notes, retry, or dismiss.
-        </p>
-      </div>
+  const content = (
+    <>
+      {!embedded && (
+        <div className="page-header">
+          <h2>Failed Work Orders</h2>
+          <p style={{ color: "var(--text-secondary)" }}>
+            Work order status transitions that failed in Assetic. Edit payload
+            and notes, retry, or dismiss.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="error card" style={{ marginBottom: 16 }}>
@@ -238,21 +244,31 @@ const FailedWorkOrders: React.FC = () => {
       {loading ? (
         <div
           className="card"
-          style={{ padding: 32, textAlign: "center", color: "var(--text-secondary)" }}
+          style={{
+            padding: 32,
+            textAlign: "center",
+            color: "var(--text-secondary)",
+          }}
         >
           Loading...
         </div>
       ) : records.length === 0 ? (
         <div
           className="card"
-          style={{ padding: 32, textAlign: "center", color: "var(--text-secondary)" }}
+          style={{
+            padding: 32,
+            textAlign: "center",
+            color: "var(--text-secondary)",
+          }}
         >
           No{statusFilter !== "all" ? ` ${statusFilter}` : ""} failed work
           orders.
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}
+          >
             <thead>
               <tr
                 style={{
@@ -294,20 +310,29 @@ const FailedWorkOrders: React.FC = () => {
                   style={{
                     borderBottom: "1px solid var(--border)",
                     background:
-                      i % 2 === 0 ? "transparent" : "var(--bg-secondary, #f9fafb)",
+                      i % 2 === 0
+                        ? "transparent"
+                        : "var(--bg-secondary, #f9fafb)",
                   }}
                 >
                   <td style={{ padding: "10px 14px", maxWidth: 260 }}>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>
-                      {r.work_order_title || r.assetic_work_order_guid || "Unknown WO"}
+                      {r.work_order_title ||
+                        r.assetic_work_order_guid ||
+                        "Unknown WO"}
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    <div
+                      style={{ fontSize: 12, color: "var(--text-secondary)" }}
+                    >
                       Local #{r.work_order_id ?? "-"}
-                      {r.work_order_work_group ? ` | ${r.work_order_work_group}` : ""}
+                      {r.work_order_work_group
+                        ? ` | ${r.work_order_work_group}`
+                        : ""}
                     </div>
                   </td>
                   <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
-                    {(r.from_status || "?").toUpperCase()} {"->"} {(r.to_status || "?").toUpperCase()}
+                    {(r.from_status || "?").toUpperCase()} {"->"}{" "}
+                    {(r.to_status || "?").toUpperCase()}
                   </td>
                   <td
                     style={{
@@ -331,7 +356,9 @@ const FailedWorkOrders: React.FC = () => {
                   <td style={{ padding: "10px 14px", textAlign: "center" }}>
                     {r.retry_count}
                   </td>
-                  <td style={{ padding: "10px 14px" }}>{statusBadge(r.status)}</td>
+                  <td style={{ padding: "10px 14px" }}>
+                    {statusBadge(r.status)}
+                  </td>
                   <td
                     style={{
                       padding: "10px 14px",
@@ -345,7 +372,11 @@ const FailedWorkOrders: React.FC = () => {
                   <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
                     <button
                       className="btn btn-secondary"
-                      style={{ padding: "3px 10px", fontSize: 12, marginRight: 6 }}
+                      style={{
+                        padding: "3px 10px",
+                        fontSize: 12,
+                        marginRight: 6,
+                      }}
                       onClick={() => openEdit(r)}
                     >
                       Edit / Retry
@@ -399,11 +430,18 @@ const FailedWorkOrders: React.FC = () => {
               }}
             >
               <div>
-                <h3 style={{ margin: 0 }}>Edit Failed Work Order #{editing.id}</h3>
+                <h3 style={{ margin: 0 }}>
+                  Edit Failed Work Order #{editing.id}
+                </h3>
                 <div
-                  style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}
+                  style={{
+                    fontSize: 13,
+                    color: "var(--text-secondary)",
+                    marginTop: 4,
+                  }}
                 >
-                  {editing.from_status?.toUpperCase() || "?"} {"->"} {editing.to_status?.toUpperCase() || "?"}
+                  {editing.from_status?.toUpperCase() || "?"} {"->"}{" "}
+                  {editing.to_status?.toUpperCase() || "?"}
                   &nbsp;·&nbsp; {editing.retry_count} retr
                   {editing.retry_count === 1 ? "y" : "ies"}
                   &nbsp;·&nbsp; {statusBadge(editing.status)}
@@ -415,7 +453,10 @@ const FailedWorkOrders: React.FC = () => {
             </div>
 
             {(editing.error_message || editing.assetic_error_response) && (
-              <div className="error card" style={{ marginBottom: 16, fontSize: 13 }}>
+              <div
+                className="error card"
+                style={{ marginBottom: 16, fontSize: 13 }}
+              >
                 <div>
                   <strong>
                     Last error
@@ -428,7 +469,13 @@ const FailedWorkOrders: React.FC = () => {
                 </div>
                 {editing.assetic_error_response && (
                   <details style={{ marginTop: 8 }}>
-                    <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 12 }}>
+                    <summary
+                      style={{
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        fontSize: 12,
+                      }}
+                    >
                       Raw Assetic response body
                     </summary>
                     <pre
@@ -448,7 +495,9 @@ const FailedWorkOrders: React.FC = () => {
                       {(() => {
                         try {
                           return JSON.stringify(
-                            JSON.parse(editing.assetic_error_response as string),
+                            JSON.parse(
+                              editing.assetic_error_response as string,
+                            ),
                             null,
                             2,
                           );
@@ -514,7 +563,9 @@ const FailedWorkOrders: React.FC = () => {
                 rows={10}
                 value={editDraft.assetic_payload}
                 onChange={(e) =>
-                  setEditDraft((d) => (d ? { ...d, assetic_payload: e.target.value } : d))
+                  setEditDraft((d) =>
+                    d ? { ...d, assetic_payload: e.target.value } : d,
+                  )
                 }
                 style={{ width: "100%", fontFamily: "monospace", fontSize: 12 }}
               />
@@ -538,7 +589,9 @@ const FailedWorkOrders: React.FC = () => {
                 rows={4}
                 value={editDraft.admin_notes}
                 onChange={(e) =>
-                  setEditDraft((d) => (d ? { ...d, admin_notes: e.target.value } : d))
+                  setEditDraft((d) =>
+                    d ? { ...d, admin_notes: e.target.value } : d,
+                  )
                 }
                 style={{ width: "100%" }}
               />
@@ -552,7 +605,11 @@ const FailedWorkOrders: React.FC = () => {
                 borderTop: "1px solid var(--border)",
               }}
             >
-              <button className="btn btn-primary" disabled={saving} onClick={() => void handleSave()}>
+              <button
+                className="btn btn-primary"
+                disabled={saving}
+                onClick={() => void handleSave()}
+              >
                 {saving ? "Saving..." : "Save Changes"}
               </button>
               {editing.status !== "resolved" && (
@@ -560,7 +617,11 @@ const FailedWorkOrders: React.FC = () => {
                   className="btn btn-success"
                   disabled={retrying || saving}
                   onClick={() => void handleRetry()}
-                  style={{ background: "var(--success, #22c55e)", color: "#fff", border: "none" }}
+                  style={{
+                    background: "var(--success, #22c55e)",
+                    color: "#fff",
+                    border: "none",
+                  }}
                 >
                   {retrying ? "Retrying..." : "Retry -> Assetic"}
                 </button>
@@ -577,8 +638,10 @@ const FailedWorkOrders: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
+
+  return embedded ? content : <div className="container">{content}</div>;
 };
 
 export default FailedWorkOrders;
