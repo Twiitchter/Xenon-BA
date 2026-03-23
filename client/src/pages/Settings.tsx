@@ -763,7 +763,7 @@ const Settings: React.FC = () => {
           ) : activeCategory === "pdf_templates" ? (
             /* ── PDF Templates section ── */
             <PdfTemplateEditor />
-          ) : categorySettings.length === 0 ? (
+          ) : categorySettings.length === 0 && activeCategory !== "contractors" ? (
             <div className="settings-muted">
               No settings in this category yet.
             </div>
