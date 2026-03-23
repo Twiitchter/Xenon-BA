@@ -5,7 +5,7 @@ import db from "../database";
 import asseticClient from "../services/asseticClient";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import settingsService from "../services/settingsService";
-import { DEFAULT_PDF_TEMPLATES } from "../services/pdfTemplateDefaults";
+import { DEFAULT_PDF_TEMPLATES, type TemplateType } from "../services/pdfTemplateDefaults";
 import emailService from "../services/emailService";
 
 const router = Router();
@@ -2488,7 +2488,7 @@ router.get(
       }
 
       const row = await db("pdf_templates").where({ template_type: type }).first();
-      const config = row ? row.template_config : DEFAULT_PDF_TEMPLATES[type];
+      const config = row ? row.template_config : DEFAULT_PDF_TEMPLATES[type as TemplateType];
 
       res.json({ template_type: type, config });
     } catch (error) {
