@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import { body, validationResult } from "express-validator";
 import db from "../database";
 import { generateToken } from "../middleware/auth";
+import { triggerAsseticResourceProvisioning } from "../services/asseticResourceService";
 
 const router = Router();
 
@@ -83,6 +84,14 @@ router.post(
 
       const token = generateToken(user);
 
+      // Fire-and-forget: provision Assetic resource for the new user so it is
+      // ready before they submit their first work request.
+      triggerAsseticResourceProvisioning(user.id, {
+        firstName: user.first_name,
+        surname: user.last_name,
+        email: user.email,
+      });
+
       res.status(201).json({
         user: {
           id: user.id,
@@ -128,6 +137,16 @@ router.post(
         }
 
         const token = generateToken(user);
+
+        // Fire-and-forget: ensure Assetic resource is provisioned for this user.
+        triggerAsseticResourceProvisioning(user.id, {
+          displayName: user.display_name,
+          firstName: user.first_name,
+          surname: user.last_name,
+          email: user.contact_email || user.email,
+          phone: user.phone,
+          mobile: user.mobile,
+        });
 
         res.json({
           user: {
@@ -176,6 +195,18 @@ router.get(
   passport.authenticate("oauth2", { session: false }),
   (req: Request, res: Response) => {
     const token = generateToken(req.user);
+    // Fire-and-forget: provision Assetic resource for this SSO user.
+    const u: any = req.user;
+    if (u?.id) {
+      triggerAsseticResourceProvisioning(u.id, {
+        displayName: u.display_name,
+        firstName: u.first_name,
+        surname: u.last_name,
+        email: u.contact_email || u.email,
+        phone: u.phone,
+        mobile: u.mobile,
+      });
+    }
     // Redirect to frontend with token
     res.redirect(`/login/success?token=${token}`);
   },
@@ -196,6 +227,18 @@ router.post(
   passport.authenticate("saml", { session: false }),
   (req: Request, res: Response) => {
     const token = generateToken(req.user);
+    // Fire-and-forget: provision Assetic resource for this SAML user.
+    const u: any = req.user;
+    if (u?.id) {
+      triggerAsseticResourceProvisioning(u.id, {
+        displayName: u.display_name,
+        firstName: u.first_name,
+        surname: u.last_name,
+        email: u.contact_email || u.email,
+        phone: u.phone,
+        mobile: u.mobile,
+      });
+    }
     res.json({ token, user: req.user });
   },
 );
