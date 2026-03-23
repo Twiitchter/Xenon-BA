@@ -463,7 +463,26 @@ const Maintenance: React.FC = () => {
                       >
                         {req.assetic_friendly_id || `WR-${req.id}`}
                       </td>
-                      <td style={{ fontWeight: 500 }}>{req.title}</td>
+                      <td style={{ fontWeight: 500 }}>
+                        {req.title}
+                        {req.description && (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "var(--text-muted)",
+                              fontWeight: 400,
+                              marginTop: "2px",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              maxWidth: "320px",
+                            }}
+                            title={req.description}
+                          >
+                            {req.description}
+                          </div>
+                        )}
+                      </td>
                       <td
                         style={{
                           color: "var(--text-secondary)",
@@ -699,14 +718,33 @@ const Maintenance: React.FC = () => {
                 )}
 
                 {selected.supporting_information && (
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      color: "var(--text-muted)",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    {selected.supporting_information}
+                  <div style={{ marginTop: "8px" }}>
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "var(--text-muted)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.6px",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      Supporting Information
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--text-secondary)",
+                        lineHeight: "1.6",
+                        padding: "10px 12px",
+                        background: "var(--bg-secondary)",
+                        borderRadius: "var(--radius)",
+                        border: "1px solid var(--border)",
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {selected.supporting_information}
+                    </div>
                   </div>
                 )}
               </div>

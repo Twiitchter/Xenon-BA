@@ -265,6 +265,23 @@ const MyRequests: React.FC = () => {
                       />
                     )}
                     {item.title}
+                    {item.description && (
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-muted)",
+                          fontWeight: 400,
+                          marginTop: "2px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: "320px",
+                        }}
+                        title={item.description}
+                      >
+                        {item.description}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <span
@@ -383,6 +400,47 @@ const MyRequests: React.FC = () => {
                   overflowY: "auto",
                 }}
               >
+                <div style={{ marginBottom: "16px" }}>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.6px",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Description
+                  </div>
+                  {selectedItem.description ? (
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        color: "var(--text-secondary)",
+                        lineHeight: "1.6",
+                        padding: "10px 12px",
+                        background: "var(--bg-secondary)",
+                        borderRadius: "var(--radius)",
+                        border: "1px solid var(--border)",
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {selectedItem.description}
+                    </div>
+                  ) : (
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "var(--text-muted)",
+                        fontStyle: "italic",
+                        margin: 0,
+                      }}
+                    >
+                      No description provided
+                    </p>
+                  )}
+                </div>
                 <div
                   style={{
                     display: "grid",
@@ -391,12 +449,6 @@ const MyRequests: React.FC = () => {
                     marginBottom: "16px",
                   }}
                 >
-                  <div>
-                    <strong>Description:</strong>
-                    <p style={{ marginTop: "4px" }}>
-                      {selectedItem.description || "No description provided"}
-                    </p>
-                  </div>
                   <div>
                     <strong>Priority:</strong>
                     <p style={{ marginTop: "4px" }}>

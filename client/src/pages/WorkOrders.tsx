@@ -481,6 +481,23 @@ const WorkOrders: React.FC = () => {
                           />
                         )}
                         {wo.title}
+                        {wo.description && (
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              color: "var(--text-muted)",
+                              fontWeight: 400,
+                              marginTop: "2px",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              maxWidth: "320px",
+                            }}
+                            title={wo.description}
+                          >
+                            {wo.description}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span
@@ -606,12 +623,24 @@ const WorkOrders: React.FC = () => {
                 >
                   {selectedOrder.priority || "—"}
                 </span>
-                {selectedOrder.description && (
-                  <span style={{ marginLeft: "12px" }}>
-                    {selectedOrder.description}
-                  </span>
-                )}
               </div>
+              {selectedOrder.description && (
+                <div
+                  style={{
+                    fontSize: "14px",
+                    color: "var(--text-secondary)",
+                    lineHeight: "1.6",
+                    padding: "10px 12px",
+                    background: "var(--bg-secondary)",
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)",
+                    marginTop: "10px",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {selectedOrder.description}
+                </div>
+              )}
             </div>
             <div
               style={{
