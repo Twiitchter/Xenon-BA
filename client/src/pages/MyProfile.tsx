@@ -6,6 +6,7 @@ import LocationHierarchyPicker, {
   HierarchyTree,
   HierarchyRegion,
 } from "../components/LocationHierarchyPicker";
+import ThemeSelector from "../components/ThemeSelector";
 import { maintenanceService } from "../services/maintenanceService";
 import { authService } from "../services/authService";
 
@@ -311,6 +312,21 @@ const MyProfile: React.FC = () => {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="card">
+        <h3>Appearance</h3>
+        <p
+          style={{
+            color: "var(--text-muted)",
+            marginBottom: "4px",
+            fontSize: "14px",
+          }}
+        >
+          Choose a colour theme for the application. Your preference is saved
+          locally and takes effect immediately.
+        </p>
+        <ThemeSelector />
       </div>
 
       <div className="card">

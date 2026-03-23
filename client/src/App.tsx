@@ -20,7 +20,9 @@ import FailedRequests from "./pages/FailedRequests";
 import FailedWorkOrders from "./pages/FailedWorkOrders";
 import { authService } from "./services/authService";
 import { ToastProvider } from "./contexts/ToastContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import ToastContainer from "./components/ToastContainer";
+import ThemeSelector from "./components/ThemeSelector";
 import { useAsseticRateLimitMonitor } from "./components/useAsseticRateLimitMonitor";
 import DatabaseGate from "./components/DatabaseGate";
 
@@ -351,6 +353,11 @@ function AppContent() {
                 </div>
               </>
             )}
+
+            <div className="nav-section">
+              <div className="nav-section-title">Appearance</div>
+              <ThemeSelector compact />
+            </div>
           </nav>
 
           <div className="sidebar-footer">
@@ -530,9 +537,11 @@ function App() {
   return (
     <DatabaseGate>
       <Router>
-        <ToastProvider>
-          <AppContent />
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
+        </ThemeProvider>
       </Router>
     </DatabaseGate>
   );
