@@ -22,6 +22,21 @@ export interface PdfTemplateConfig {
   customSections: PdfCustomSection[];
 }
 
+export interface Contractor {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  trades: string[];
+  receives_work_orders: boolean;
+  is_active: boolean;
+  email_template?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface AdminHierarchyBuilding {
   id: string;
   name: string;
@@ -191,6 +206,19 @@ class AdminService {
     const response = await axios.delete(`${API_URL}/users/${id}`, {
       headers: authService.getAuthHeader(),
     });
+    return response.data;
+  }
+
+  async importUsers(csv: string): Promise<{
+    message: string;
+    created: string[];
+    skipped: { email: string; reason: string }[];
+  }> {
+    const response = await axios.post(
+      `${API_URL}/users/import`,
+      { csv },
+      { headers: authService.getAuthHeader() },
+    );
     return response.data;
   }
 
@@ -365,6 +393,47 @@ class AdminService {
       { headers: authService.getAuthHeader() },
     );
     return response.data as { message: string; template_type: string; config: PdfTemplateConfig };
+  }
+
+  // ─── Email ────────────────────────────────────────────────────────
+
+  async testEmail(to: string) {
+    const response = await axios.post(
+      `${API_URL}/settings/test-email`,
+      { to },
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data as { success: boolean; message: string };
+  }
+
+  // ─── Contractors ──────────────────────────────────────────────────
+
+  async getContractors() {
+    const response = await axios.get(`${API_URL}/contractors`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { contractors: Contractor[] };
+  }
+
+  async createContractor(data: Omit<Contractor, "id" | "created_at" | "updated_at">) {
+    const response = await axios.post(`${API_URL}/contractors`, data, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { contractor: Contractor };
+  }
+
+  async updateContractor(id: number, data: Partial<Omit<Contractor, "id">>) {
+    const response = await axios.put(`${API_URL}/contractors/${id}`, data, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { contractor: Contractor };
+  }
+
+  async deleteContractor(id: number) {
+    const response = await axios.delete(`${API_URL}/contractors/${id}`, {
+      headers: authService.getAuthHeader(),
+    });
+    return response.data as { message: string };
   }
 }
 

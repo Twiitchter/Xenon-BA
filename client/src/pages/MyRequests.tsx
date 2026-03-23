@@ -24,6 +24,7 @@ interface MyItem {
   display_status: string;
   assigned_to_username?: string;
   scheduled_date?: string;
+  unread_reporter?: boolean;
 }
 
 interface Message {
@@ -31,6 +32,7 @@ interface Message {
   sender_username: string;
   created_at: string;
   message: string;
+  is_staff?: boolean;
 }
 
 interface AttachmentRecord {
@@ -81,32 +83,33 @@ const MyRequests: React.FC = () => {
   const openDetail = async (item: MyItem) => {
     setSelectedItem(item);
     setAttachments([]);
+    setMessages([]);
 
-    // Fetch attachments for the request
-    if (item.item_type === "request" || item.item_type) {
-      try {
-        const attachData = await maintenanceService.getAttachments(item.id);
-        setAttachments(attachData.attachments || []);
-      } catch {
-        // Non-critical — silently ignore
-      }
+    // Fetch attachments
+    try {
+      const attachData = await maintenanceService.getAttachments(item.id);
+      setAttachments(attachData.attachments || []);
+    } catch {
+      // Non-critical
     }
 
-    // Fetch messages if there's a work order
-    const workOrderId =
-      item.work_order_id || (item.item_type === "work_order" ? item.id : null);
-    if (workOrderId) {
-      setMessagesLoading(true);
-      try {
-        const data = await maintenanceService.getMessages(workOrderId);
-        setMessages(data.messages || []);
-      } catch (err: any) {
-        setError(err.response?.data?.error || "Failed to fetch messages");
-      } finally {
-        setMessagesLoading(false);
-      }
-    } else {
-      setMessages([]);
+    // Always load request-level messages (available even before a WO exists)
+    setMessagesLoading(true);
+    try {
+      const data = await maintenanceService.getRequestMessages(item.id);
+      setMessages(data.messages || []);
+      // Mark as read for the reporter
+      maintenanceService.markRequestMessagesRead(item.id).catch(() => {});
+      // Optimistically clear unread flag in local list
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id ? { ...i, unread_reporter: false } : i,
+        ),
+      );
+    } catch {
+      // Non-critical
+    } finally {
+      setMessagesLoading(false);
     }
   };
 
@@ -114,20 +117,10 @@ const MyRequests: React.FC = () => {
     e.preventDefault();
     if (!selectedItem || !newMessage.trim()) return;
 
-    const workOrderId =
-      selectedItem.work_order_id ||
-      (selectedItem.item_type === "work_order" ? selectedItem.id : null);
-    if (!workOrderId) {
-      setError(
-        "Cannot send message - no work order associated with this request yet",
-      );
-      return;
-    }
-
     try {
-      await maintenanceService.sendMessage(workOrderId, newMessage);
+      await maintenanceService.sendRequestMessage(selectedItem.id, newMessage);
       setNewMessage("");
-      const data = await maintenanceService.getMessages(workOrderId);
+      const data = await maintenanceService.getRequestMessages(selectedItem.id);
       setMessages(data.messages || []);
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to send message");
@@ -264,7 +257,15 @@ const MyRequests: React.FC = () => {
                       <>WR-{item.id}</>
                     )}
                   </td>
-                  <td>{item.title}</td>
+                  <td>
+                    {item.unread_reporter && (
+                      <span
+                        className="unread-dot"
+                        title="New update from the team"
+                      />
+                    )}
+                    {item.title}
+                  </td>
                   <td>
                     <span
                       className={`badge ${getPriorityBadgeClass(item.priority)}`}
@@ -356,7 +357,7 @@ const MyRequests: React.FC = () => {
               {!selectedItem.work_order_id &&
                 selectedItem.display_status !== "completed" &&
                 selectedItem.display_status !== "cancelled" &&
-                "◎ Your request is awaiting review — we’ll notify you when a work order is raised and work begins."}
+                "◎ Your request is awaiting review — we'll notify you when a work order is raised and work begins."}
               {selectedItem.work_order_id &&
                 selectedItem.work_order_status === "pending" &&
                 "⏳ A work order has been created for your request — our team will schedule the work shortly."}
@@ -370,220 +371,251 @@ const MyRequests: React.FC = () => {
                 "This request has been cancelled."}
             </div>
 
-            <div style={{ marginBottom: "20px" }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
-                <div>
-                  <strong>Description:</strong>
-                  <p style={{ marginTop: "4px" }}>
-                    {selectedItem.description || "No description provided"}
-                  </p>
-                </div>
-                <div>
-                  <strong>Priority:</strong>
-                  <p style={{ marginTop: "4px" }}>
-                    <span
-                      className={`badge ${getPriorityBadgeClass(selectedItem.priority)}`}
-                    >
-                      {selectedItem.priority}
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <strong>Status:</strong>
-                  <p style={{ marginTop: "4px" }}>
-                    <span
-                      className={`badge ${getStatusBadgeClass(selectedItem.display_status)}`}
-                    >
-                      {selectedItem.display_status}
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <strong>Category/Craft:</strong>
-                  <p style={{ marginTop: "4px" }}>
-                    {selectedItem.work_order_craft ||
-                      selectedItem.category ||
-                      "N/A"}
-                  </p>
-                </div>
-                {selectedItem.location && (
-                  <div>
-                    <strong>Location:</strong>
-                    <p style={{ marginTop: "4px" }}>{selectedItem.location}</p>
-                  </div>
-                )}
-                {selectedItem.assigned_to_username && (
-                  <div>
-                    <strong>Assigned To:</strong>
-                    <p style={{ marginTop: "4px" }}>
-                      {selectedItem.assigned_to_username}
-                    </p>
-                  </div>
-                )}
-                {selectedItem.scheduled_date && (
-                  <div>
-                    <strong>Scheduled Date:</strong>
-                    <p style={{ marginTop: "4px" }}>
-                      {new Date(
-                        selectedItem.scheduled_date,
-                      ).toLocaleDateString()}
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <strong>Created:</strong>
-                  <p style={{ marginTop: "4px" }}>
-                    {new Date(selectedItem.created_at).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
+            {/* Two-column: left = request info | right = communication log */}
+            <div style={{ display: "flex", gap: "0", minHeight: "340px" }}>
 
-            {/* Attachments section */}
-            {attachments.length > 0 && (
+              {/* ── LEFT COLUMN: request details ── */}
               <div
                 style={{
-                  borderTop: "1px solid var(--border)",
-                  paddingTop: "16px",
-                  marginBottom: "4px",
+                  flex: "0 0 44%",
+                  paddingRight: "20px",
+                  borderRight: "1px solid var(--border)",
+                  overflowY: "auto",
                 }}
               >
-                <h4 style={{ marginBottom: "10px" }}>Attachments</h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                  {attachments.map((att) => (
-                    <div
-                      key={att.id}
-                      style={{
-                        border: "1px solid var(--border)",
-                        borderRadius: "6px",
-                        padding: "8px 12px",
-                        background: "var(--surface)",
-                        minWidth: "160px",
-                        maxWidth: "220px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "20px",
-                          marginBottom: "4px",
-                          textAlign: "center",
-                        }}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <div>
+                    <strong>Description:</strong>
+                    <p style={{ marginTop: "4px" }}>
+                      {selectedItem.description || "No description provided"}
+                    </p>
+                  </div>
+                  <div>
+                    <strong>Priority:</strong>
+                    <p style={{ marginTop: "4px" }}>
+                      <span
+                        className={`badge ${getPriorityBadgeClass(selectedItem.priority)}`}
                       >
-                        {att.mime_type?.startsWith("image/") ? "🖼️" : "📄"}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 500,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={att.original_filename}
+                        {selectedItem.priority}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <strong>Status:</strong>
+                    <p style={{ marginTop: "4px" }}>
+                      <span
+                        className={`badge ${getStatusBadgeClass(selectedItem.display_status)}`}
                       >
-                        {att.original_filename}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--text-muted)",
-                          marginTop: "2px",
-                        }}
-                      >
-                        {att.file_size != null
-                          ? att.file_size > 1048576
-                            ? `${(att.file_size / 1048576).toFixed(1)} MB`
-                            : `${Math.ceil(att.file_size / 1024)} KB`
-                          : att.mime_type || ""}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          marginTop: "4px",
-                          color:
-                            att.assetic_upload_status === "uploaded"
-                              ? "var(--success, #16a34a)"
-                              : att.assetic_upload_status === "failed"
-                                ? "var(--danger, #dc2626)"
-                                : "var(--text-muted)",
-                        }}
-                      >
-                        {att.assetic_upload_status === "uploaded"
-                          ? "✓ Synced"
-                          : att.assetic_upload_status === "failed"
-                            ? "⚠ Sync failed"
-                            : "⏳ Pending"}
-                      </div>
+                        {selectedItem.display_status}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <strong>Category/Craft:</strong>
+                    <p style={{ marginTop: "4px" }}>
+                      {selectedItem.work_order_craft ||
+                        selectedItem.category ||
+                        "N/A"}
+                    </p>
+                  </div>
+                  {selectedItem.location && (
+                    <div>
+                      <strong>Location:</strong>
+                      <p style={{ marginTop: "4px" }}>{selectedItem.location}</p>
                     </div>
-                  ))}
+                  )}
+                  {selectedItem.assigned_to_username && (
+                    <div>
+                      <strong>Assigned To:</strong>
+                      <p style={{ marginTop: "4px" }}>
+                        {selectedItem.assigned_to_username}
+                      </p>
+                    </div>
+                  )}
+                  {selectedItem.scheduled_date && (
+                    <div>
+                      <strong>Scheduled Date:</strong>
+                      <p style={{ marginTop: "4px" }}>
+                        {new Date(
+                          selectedItem.scheduled_date,
+                        ).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <strong>Created:</strong>
+                    <p style={{ marginTop: "4px" }}>
+                      {new Date(selectedItem.created_at).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
+
+                {/* Attachments */}
+                {attachments.length > 0 && (
+                  <div
+                    style={{
+                      borderTop: "1px solid var(--border)",
+                      paddingTop: "12px",
+                    }}
+                  >
+                    <h4 style={{ marginBottom: "10px" }}>Attachments</h4>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {attachments.map((att) => (
+                        <div
+                          key={att.id}
+                          style={{
+                            border: "1px solid var(--border)",
+                            borderRadius: "6px",
+                            padding: "8px 10px",
+                            background: "var(--surface)",
+                            minWidth: "120px",
+                            maxWidth: "160px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "18px",
+                              marginBottom: "4px",
+                              textAlign: "center",
+                            }}
+                          >
+                            {att.mime_type?.startsWith("image/") ? "🖼️" : "📄"}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 500,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={att.original_filename}
+                          >
+                            {att.original_filename}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "10px",
+                              color: "var(--text-muted)",
+                              marginTop: "2px",
+                            }}
+                          >
+                            {att.file_size != null
+                              ? att.file_size > 1048576
+                                ? `${(att.file_size / 1048576).toFixed(1)} MB`
+                                : `${Math.ceil(att.file_size / 1024)} KB`
+                              : att.mime_type || ""}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "10px",
+                              marginTop: "3px",
+                              color:
+                                att.assetic_upload_status === "uploaded"
+                                  ? "var(--success, #16a34a)"
+                                  : att.assetic_upload_status === "failed"
+                                    ? "var(--danger, #dc2626)"
+                                    : "var(--text-muted)",
+                            }}
+                          >
+                            {att.assetic_upload_status === "uploaded"
+                              ? "✓ Synced"
+                              : att.assetic_upload_status === "failed"
+                                ? "⚠ Sync failed"
+                                : "⏳ Pending"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            <div
-              style={{
-                borderTop: "1px solid var(--border)",
-                paddingTop: "20px",
-              }}
-            >
-              <h4>Updates & Comments</h4>
-              {selectedItem.work_order_id ||
-              selectedItem.item_type === "work_order" ? (
-                <>
-                  {messagesLoading ? (
-                    <div className="loading">Loading messages...</div>
-                  ) : (
-                    <>
-                      <div
-                        className="messages-box"
-                        style={{ marginBottom: "16px" }}
-                      >
-                        {messages.length === 0 ? (
-                          <p style={{ color: "var(--text-muted)" }}>
-                            No updates yet.
-                          </p>
-                        ) : (
-                          messages.map((msg) => (
-                            <div key={msg.id} className="message-bubble">
-                              <strong>{msg.sender_username || "System"}</strong>
+
+              {/* ── RIGHT COLUMN: communication log ── */}
+              <div
+                style={{
+                  flex: "1 1 56%",
+                  paddingLeft: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Updates &amp; Communication
+                </div>
+                {messagesLoading ? (
+                  <div className="loading">Loading messages...</div>
+                ) : (
+                  <>
+                    <div
+                      className="messages-box"
+                      style={{ flex: 1, marginBottom: "12px" }}
+                    >
+                      {messages.length === 0 ? (
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            fontStyle: "italic",
+                            fontSize: "13px",
+                          }}
+                        >
+                          No messages yet. Leave a note below and the team will
+                          respond here.
+                        </p>
+                      ) : (
+                        messages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`message-bubble${msg.is_staff ? " message-bubble-staff" : " message-bubble-reporter"}`}
+                          >
+                            <div className="message-bubble-header">
+                              <strong>
+                                {msg.is_staff
+                                  ? msg.sender_username || "Support Team"
+                                  : "You"}
+                              </strong>
                               <span className="message-meta">
                                 {new Date(msg.created_at).toLocaleString()}
                               </span>
-                              <p style={{ margin: "4px 0 0 0" }}>
-                                {msg.message}
-                              </p>
                             </div>
-                          ))
-                        )}
-                      </div>
-                      <form
-                        onSubmit={handleSendMessage}
-                        style={{ display: "flex", gap: "10px" }}
-                      >
-                        <input
-                          type="text"
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          placeholder="Add a comment or update..."
-                          style={{ flex: 1 }}
-                          required
-                        />
-                        <button type="submit">Send</button>
-                      </form>
-                    </>
-                  )}
-                </>
-              ) : (
-                <p style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
-                  Comments will be available once a work order is created for
-                  this request.
-                </p>
-              )}
+                            <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <form
+                      onSubmit={handleSendMessage}
+                      style={{ display: "flex", gap: "8px" }}
+                    >
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Leave a note or question for the team..."
+                        style={{ flex: 1 }}
+                        required
+                      />
+                      <button type="submit">Send</button>
+                    </form>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </Modal>

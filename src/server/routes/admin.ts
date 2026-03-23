@@ -10,6 +10,7 @@ import asseticApiLogger from "../services/asseticApiLogger";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import asseticAssetSyncService from "../services/asseticAssetSyncService";
 import { VALID_TEMPLATE_TYPES, DEFAULT_PDF_TEMPLATES, type TemplateType } from "../services/pdfTemplateDefaults";
+import emailService from "../services/emailService";
 
 const router = Router();
 
@@ -794,6 +795,183 @@ router.post(
 );
 
 /**
+ * POST /api/admin/users/import
+ * Bulk-create users from a CSV string.
+ * Expected JSON body: { csv: "<csv text>" }
+ * CSV columns (header row required):
+ *   email (required), password (required), username, role,
+ *   first_name, last_name, department, phone, display_name
+ * Passwords are hashed with bcrypt at 10 salt rounds.
+ */
+router.post("/users/import", async (req: AuthRequest, res: Response) => {
+  try {
+    const { csv } = req.body;
+    if (!csv || typeof csv !== "string" || csv.trim() === "") {
+      return res.status(400).json({ error: "csv field is required" });
+    }
+
+    const lines = csv
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length < 2) {
+      return res
+        .status(400)
+        .json({
+          error: "CSV must contain a header row and at least one data row",
+        });
+    }
+
+    // Parse CSV helper: handles quoted fields
+    const parseCsvLine = (line: string): string[] => {
+      const fields: string[] = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === "," && !inQuotes) {
+          fields.push(current.trim());
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+      fields.push(current.trim());
+      return fields;
+    };
+
+    const headers = parseCsvLine(lines[0]).map((h) =>
+      h.toLowerCase().replace(/\s+/g, "_"),
+    );
+
+    const colIdx = (names: string[]): number => {
+      for (const name of names) {
+        const idx = headers.indexOf(name);
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    const emailIdx = colIdx(["email"]);
+    const passwordIdx = colIdx(["password"]);
+
+    if (emailIdx === -1 || passwordIdx === -1) {
+      return res
+        .status(400)
+        .json({ error: "CSV must include 'email' and 'password' columns" });
+    }
+
+    const usernameIdx = colIdx(["username"]);
+    const roleIdx = colIdx(["role"]);
+    const firstNameIdx = colIdx(["first_name", "firstname"]);
+    const lastNameIdx = colIdx(["last_name", "lastname"]);
+    const departmentIdx = colIdx(["department"]);
+    const phoneIdx = colIdx(["phone"]);
+    const displayNameIdx = colIdx(["display_name", "displayname"]);
+
+    const created: string[] = [];
+    const skipped: { email: string; reason: string }[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const fields = parseCsvLine(lines[i]);
+      const email = emailIdx !== -1 ? fields[emailIdx] || "" : "";
+      const password = passwordIdx !== -1 ? fields[passwordIdx] || "" : "";
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        skipped.push({
+          email: email || `row ${i + 1}`,
+          reason: "Invalid or missing email",
+        });
+        continue;
+      }
+      if (!password || password.length < 8) {
+        skipped.push({
+          email,
+          reason: "Password must be at least 8 characters",
+        });
+        continue;
+      }
+
+      const existing = await db("users").where("email", email).first();
+      if (existing) {
+        skipped.push({ email, reason: "Email already exists" });
+        continue;
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const username =
+        usernameIdx !== -1 && fields[usernameIdx]
+          ? fields[usernameIdx]
+          : email.split("@")[0];
+      const role =
+        roleIdx !== -1 &&
+        fields[roleIdx] &&
+        ["admin", "manager", "user"].includes(fields[roleIdx])
+          ? fields[roleIdx]
+          : "user";
+
+      const [inserted] = await db("users")
+        .insert({
+          username,
+          email,
+          password_hash: passwordHash,
+          first_name:
+            firstNameIdx !== -1 && fields[firstNameIdx]
+              ? fields[firstNameIdx]
+              : null,
+          last_name:
+            lastNameIdx !== -1 && fields[lastNameIdx]
+              ? fields[lastNameIdx]
+              : null,
+          role,
+          auth_provider: "local",
+          is_active: true,
+          department:
+            departmentIdx !== -1 && fields[departmentIdx]
+              ? fields[departmentIdx]
+              : null,
+          phone: phoneIdx !== -1 && fields[phoneIdx] ? fields[phoneIdx] : null,
+          display_name:
+            displayNameIdx !== -1 && fields[displayNameIdx]
+              ? fields[displayNameIdx]
+              : null,
+        })
+        .returning("*");
+
+      let user = inserted;
+      if (typeof user === "number" || !user?.id) {
+        user = await db("users").where("email", email).first();
+      }
+
+      await activityService.log({
+        entity_type: "user",
+        entity_id: user.id,
+        action: "create",
+        performed_by: req.user.id,
+      });
+
+      created.push(email);
+    }
+
+    res.status(207).json({
+      message: `Import complete: ${created.length} created, ${skipped.length} skipped`,
+      created,
+      skipped,
+    });
+  } catch (error) {
+    console.error("Error importing users from CSV:", error);
+    res.status(500).json({ error: "Failed to import users" });
+  }
+});
+
+/**
  * PUT /api/admin/users/:id
  * Update a user
  */
@@ -1507,12 +1685,19 @@ router.put(
             ? assetic_payload
             : JSON.stringify(assetic_payload);
       }
-      if (status !== undefined && ["pending", "resolved", "dismissed"].includes(status)) {
+      if (
+        status !== undefined &&
+        ["pending", "resolved", "dismissed"].includes(status)
+      ) {
         updateFields.status = status;
       }
 
-      await db("failed_assetic_status_changes").where({ id }).update(updateFields);
-      const updated = await db("failed_assetic_status_changes").where({ id }).first();
+      await db("failed_assetic_status_changes")
+        .where({ id })
+        .update(updateFields);
+      const updated = await db("failed_assetic_status_changes")
+        .where({ id })
+        .first();
       res.json({ failed_work_order: updated });
     } catch (error) {
       console.error("Error updating failed work order status change:", error);
@@ -1531,12 +1716,16 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
-      const record = await db("failed_assetic_status_changes").where({ id }).first();
+      const record = await db("failed_assetic_status_changes")
+        .where({ id })
+        .first();
       if (!record) {
         return res.status(404).json({ error: "Not found" });
       }
       if (!record.assetic_work_order_guid) {
-        return res.status(422).json({ error: "No Assetic work order GUID stored — cannot retry." });
+        return res
+          .status(422)
+          .json({ error: "No Assetic work order GUID stored — cannot retry." });
       }
 
       let payload: any;
@@ -1562,7 +1751,10 @@ router.post(
 
       // Attempt the PUT to Assetic
       try {
-        await asseticClient.updateWorkOrder(record.assetic_work_order_guid, payload);
+        await asseticClient.updateWorkOrder(
+          record.assetic_work_order_guid,
+          payload,
+        );
       } catch (asseticErr: any) {
         const errData = asseticErr?.response?.data;
         const httpStatus = asseticErr?.response?.status ?? null;
@@ -1581,7 +1773,9 @@ router.post(
             assetic_http_status: httpStatus,
             updated_at: new Date(),
           });
-        return res.status(502).json({ error: `Assetic rejected the retry: ${msg}` });
+        return res
+          .status(502)
+          .json({ error: `Assetic rejected the retry: ${msg}` });
       }
 
       // Success — mark resolved
@@ -1615,7 +1809,9 @@ router.delete(
   async (req: AuthRequest, res: Response) => {
     try {
       const { id } = req.params;
-      const deleted = await db("failed_assetic_status_changes").where({ id }).delete();
+      const deleted = await db("failed_assetic_status_changes")
+        .where({ id })
+        .delete();
       if (!deleted) {
         return res.status(404).json({ error: "Not found" });
       }
@@ -1724,6 +1920,147 @@ router.put("/pdf-templates/:type", async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("Error updating PDF template:", error);
     res.status(500).json({ error: "Failed to update PDF template" });
+  }
+});
+
+/**
+ * POST /api/admin/settings/test-email
+ * Send a test email to verify email configuration.
+ */
+router.post(
+  "/settings/test-email",
+  [body("to").isEmail()],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { to } = req.body;
+      await emailService.sendTestEmail(to);
+      res.json({ success: true, message: `Test email sent to ${to}` });
+    } catch (error: any) {
+      console.error("Test email failed:", error);
+      res.json({
+        success: false,
+        message: error?.message || "Failed to send test email",
+      });
+    }
+  },
+);
+
+// ─── Contractors ──────────────────────────────────────────────────────────
+
+/**
+ * GET /api/admin/contractors
+ */
+router.get("/contractors", async (req: AuthRequest, res: Response) => {
+  try {
+    const contractors = await db("contractors").orderBy("name");
+    res.json({ contractors });
+  } catch (error) {
+    console.error("Error fetching contractors:", error);
+    res.status(500).json({ error: "Failed to fetch contractors" });
+  }
+});
+
+/**
+ * POST /api/admin/contractors
+ */
+router.post(
+  "/contractors",
+  [
+    body("name").isLength({ min: 1 }).trim(),
+    body("email").isEmail().normalizeEmail(),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return res.status(400).json({ errors: errors.array() });
+    try {
+      const {
+        name,
+        email,
+        phone,
+        company,
+        trades,
+        receives_work_orders,
+        email_template,
+        notes,
+      } = req.body;
+      const [contractor] = await db("contractors")
+        .insert({
+          name,
+          email,
+          phone: phone || null,
+          company: company || null,
+          trades: JSON.stringify(Array.isArray(trades) ? trades : []),
+          receives_work_orders: !!receives_work_orders,
+          email_template: email_template || null,
+          notes: notes || null,
+        })
+        .returning("*");
+      res.status(201).json({ contractor });
+    } catch (error) {
+      console.error("Error creating contractor:", error);
+      res.status(500).json({ error: "Failed to create contractor" });
+    }
+  },
+);
+
+/**
+ * PUT /api/admin/contractors/:id
+ */
+router.put("/contractors/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      email,
+      phone,
+      company,
+      trades,
+      receives_work_orders,
+      is_active,
+      email_template,
+      notes,
+    } = req.body;
+    const [contractor] = await db("contractors")
+      .where("id", id)
+      .update({
+        name,
+        email,
+        phone: phone || null,
+        company: company || null,
+        trades: JSON.stringify(Array.isArray(trades) ? trades : []),
+        receives_work_orders: !!receives_work_orders,
+        is_active: is_active !== undefined ? !!is_active : true,
+        email_template: email_template || null,
+        notes: notes || null,
+        updated_at: new Date(),
+      })
+      .returning("*");
+    if (!contractor)
+      return res.status(404).json({ error: "Contractor not found" });
+    res.json({ contractor });
+  } catch (error) {
+    console.error("Error updating contractor:", error);
+    res.status(500).json({ error: "Failed to update contractor" });
+  }
+});
+
+/**
+ * DELETE /api/admin/contractors/:id
+ */
+router.delete("/contractors/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    await db("contractors").where("id", id).delete();
+    res.json({ message: "Contractor deleted" });
+  } catch (error) {
+    console.error("Error deleting contractor:", error);
+    res.status(500).json({ error: "Failed to delete contractor" });
   }
 });
 

@@ -167,6 +167,12 @@ const WorkOrders: React.FC = () => {
     try {
       const data = await maintenanceService.getMessages(wo.id);
       setMessages(data.messages || []);
+      // Mark as read for staff
+      maintenanceService.markWorkOrderMessagesRead(wo.id).catch(() => {});
+      // Optimistically clear the unread flag in the local list
+      setAllWorkOrders((prev) =>
+        prev.map((w) => (w.id === wo.id ? { ...w, unread_staff: false } : w)),
+      );
     } catch {
       // non-critical
     } finally {
@@ -222,6 +228,12 @@ const WorkOrders: React.FC = () => {
       setNewMessage("");
       const data = await maintenanceService.getMessages(selectedOrder.id);
       setMessages(data.messages || []);
+      // Mark own unread flag clear immediately (staff just sent, no self-unread)
+      setAllWorkOrders((prev) =>
+        prev.map((w) =>
+          w.id === selectedOrder.id ? { ...w, unread_staff: false } : w,
+        ),
+      );
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to send message");
     }
@@ -461,7 +473,15 @@ const WorkOrders: React.FC = () => {
                       >
                         {wo.assetic_friendly_id || `#${wo.id}`}
                       </td>
-                      <td style={{ fontWeight: 500 }}>{wo.title}</td>
+                      <td style={{ fontWeight: 500 }}>
+                        {wo.unread_staff && (
+                          <span
+                            className="unread-dot"
+                            title="New message from requester"
+                          />
+                        )}
+                        {wo.title}
+                      </td>
                       <td>
                         <span
                           className={`badge ${priorityBadgeClass(wo.priority)}`}
@@ -655,227 +675,257 @@ const WorkOrders: React.FC = () => {
               </div>
             )}
 
-            {/* Two-column: details + edit */}
-            <div
-              style={{
-                display: "flex",
-                gap: "24px",
-                flexWrap: "wrap",
-                marginBottom: "24px",
-              }}
-            >
-              {/* Left — summary */}
-              <div style={{ flex: "1 1 220px" }}>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.6px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  Details
-                </div>
-                {selectedOrder.craft && (
-                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
-                    <span style={{ color: "var(--text-muted)" }}>Craft: </span>
-                    <span>{selectedOrder.craft}</span>
-                  </div>
-                )}
-                {selectedOrder.work_group && (
-                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
-                    <span style={{ color: "var(--text-muted)" }}>
-                      Work Group:{" "}
-                    </span>
-                    <span>{selectedOrder.work_group}</span>
-                  </div>
-                )}
-                {selectedOrder.assigned_to_username && (
-                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
-                    <span style={{ color: "var(--text-muted)" }}>
-                      Assigned:{" "}
-                    </span>
-                    <span>{selectedOrder.assigned_to_username}</span>
-                  </div>
-                )}
-                {selectedOrder.scheduled_date && (
-                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
-                    <span style={{ color: "var(--text-muted)" }}>
-                      Scheduled:{" "}
-                    </span>
-                    <span>
-                      {new Date(
-                        selectedOrder.scheduled_date,
-                      ).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-                <div style={{ marginBottom: "8px", fontSize: "14px" }}>
-                  <span style={{ color: "var(--text-muted)" }}>Created: </span>
-                  <span>
-                    {new Date(selectedOrder.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Right — edit */}
-              <div style={{ flex: "1 1 280px" }}>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.6px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  Update
-                </div>
-                <div
-                  style={{ display: "flex", gap: "10px", marginBottom: "10px" }}
-                >
-                  <div
-                    className="form-group"
-                    style={{ flex: 1, marginBottom: 0 }}
-                  >
-                    <label style={{ fontSize: "12px" }}>Status</label>
-                    <select
-                      value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value)}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
-                  <div
-                    className="form-group"
-                    style={{ flex: 1, marginBottom: 0 }}
-                  >
-                    <label style={{ fontSize: "12px" }}>Scheduled Date</label>
-                    <input
-                      type="date"
-                      value={editScheduled}
-                      onChange={(e) => setEditScheduled(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="form-group" style={{ marginBottom: "10px" }}>
-                  <label style={{ fontSize: "12px" }}>Craft / Trade</label>
-                  <input
-                    type="text"
-                    value={editCraft}
-                    onChange={(e) => setEditCraft(e.target.value)}
-                    placeholder="e.g. Plumbing, HVAC"
-                    list="craft-options"
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: "10px" }}>
-                  <label style={{ fontSize: "12px" }}>Work Group</label>
-                  <select
-                    value={editWorkGroup}
-                    onChange={(e) => {
-                      const wg = e.target.value;
-                      setEditWorkGroup(wg);
-                      const derived = deriveCraftFromWorkGroup(wg);
-                      if (derived) setEditCraft(derived);
-                    }}
-                  >
-                    <option value="">— Select work group —</option>
-                    {workGroups.map((g) => (
-                      <option
-                        key={g.Id || g.id || g.Name || g.name}
-                        value={g.Name || g.name || ""}
-                      >
-                        {g.Name || g.name}
-                      </option>
-                    ))}
-                  </select>
-                  {editWorkGroup && deriveCraftFromWorkGroup(editWorkGroup) && (
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--text-muted)",
-                        marginTop: "3px",
-                      }}
-                    >
-                      Craft auto-set to &ldquo;
-                      {deriveCraftFromWorkGroup(editWorkGroup)}&rdquo;
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={handleUpdateOrder}
-                  disabled={updating}
-                  style={{ width: "100%" }}
-                >
-                  {updating ? "Saving…" : "Save Changes"}
-                </button>
-              </div>
-            </div>
-
-            {/* Messages */}
-            <div
-              style={{
-                borderTop: "1px solid var(--border)",
-                paddingTop: "16px",
-              }}
-            >
+            {/* Two-column: left = details+edit | right = communication log */}
+            <div style={{ display: "flex", gap: "0", minHeight: "380px" }}>
+              {/* ── LEFT COLUMN: details + edit ── */}
               <div
                 style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "var(--text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.6px",
-                  marginBottom: "10px",
+                  flex: "0 0 44%",
+                  paddingRight: "20px",
+                  borderRight: "1px solid var(--border)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "16px",
                 }}
               >
-                Messages
-              </div>
-              {messagesLoading ? (
-                <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
-                  Loading messages…
-                </div>
-              ) : (
-                <>
-                  <div className="messages-box">
-                    {messages.length === 0 ? (
-                      <p style={{ color: "var(--text-muted)" }}>
-                        No messages yet.
-                      </p>
-                    ) : (
-                      messages.map((msg) => (
-                        <div key={msg.id} className="message-bubble">
-                          <strong>{msg.sender_username || "Unknown"}</strong>
-                          <span className="message-meta">
-                            {new Date(msg.created_at).toLocaleString()}
-                          </span>
-                          <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <form
-                    onSubmit={handleSendMessage}
-                    style={{ display: "flex", gap: "10px" }}
+                <div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.6px",
+                      marginBottom: "10px",
+                    }}
                   >
+                    Details
+                  </div>
+                  {selectedOrder.craft && (
+                    <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Craft:{" "}
+                      </span>
+                      <span>{selectedOrder.craft}</span>
+                    </div>
+                  )}
+                  {selectedOrder.work_group && (
+                    <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Work Group:{" "}
+                      </span>
+                      <span>{selectedOrder.work_group}</span>
+                    </div>
+                  )}
+                  {selectedOrder.assigned_to_username && (
+                    <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Assigned:{" "}
+                      </span>
+                      <span>{selectedOrder.assigned_to_username}</span>
+                    </div>
+                  )}
+                  {selectedOrder.scheduled_date && (
+                    <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Scheduled:{" "}
+                      </span>
+                      <span>
+                        {new Date(
+                          selectedOrder.scheduled_date,
+                        ).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: "8px", fontSize: "14px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      Created:{" "}
+                    </span>
+                    <span>
+                      {new Date(selectedOrder.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.6px",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    Update
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    <div
+                      className="form-group"
+                      style={{ flex: 1, marginBottom: 0 }}
+                    >
+                      <label style={{ fontSize: "12px" }}>Status</label>
+                      <select
+                        value={editStatus}
+                        onChange={(e) => setEditStatus(e.target.value)}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div
+                      className="form-group"
+                      style={{ flex: 1, marginBottom: 0 }}
+                    >
+                      <label style={{ fontSize: "12px" }}>Scheduled Date</label>
+                      <input
+                        type="date"
+                        value={editScheduled}
+                        onChange={(e) => setEditScheduled(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: "10px" }}>
+                    <label style={{ fontSize: "12px" }}>Craft / Trade</label>
                     <input
                       type="text"
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Add a note or update…"
-                      style={{ flex: 1 }}
-                      required
+                      value={editCraft}
+                      onChange={(e) => setEditCraft(e.target.value)}
+                      placeholder="e.g. Plumbing, HVAC"
+                      list="craft-options"
                     />
-                    <button type="submit">Send</button>
-                  </form>
-                </>
-              )}
+                  </div>
+                  <div className="form-group" style={{ marginBottom: "10px" }}>
+                    <label style={{ fontSize: "12px" }}>Work Group</label>
+                    <select
+                      value={editWorkGroup}
+                      onChange={(e) => {
+                        const wg = e.target.value;
+                        setEditWorkGroup(wg);
+                        const derived = deriveCraftFromWorkGroup(wg);
+                        if (derived) setEditCraft(derived);
+                      }}
+                    >
+                      <option value="">— Select work group —</option>
+                      {workGroups.map((g) => (
+                        <option
+                          key={g.Id || g.id || g.Name || g.name}
+                          value={g.Name || g.name || ""}
+                        >
+                          {g.Name || g.name}
+                        </option>
+                      ))}
+                    </select>
+                    {editWorkGroup &&
+                      deriveCraftFromWorkGroup(editWorkGroup) && (
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-muted)",
+                            marginTop: "3px",
+                          }}
+                        >
+                          Craft auto-set to &ldquo;
+                          {deriveCraftFromWorkGroup(editWorkGroup)}&rdquo;
+                        </div>
+                      )}
+                  </div>
+                  <button
+                    onClick={handleUpdateOrder}
+                    disabled={updating}
+                    style={{ width: "100%" }}
+                  >
+                    {updating ? "Saving…" : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+
+              {/* ── RIGHT COLUMN: communication log ── */}
+              <div
+                style={{
+                  flex: "1 1 56%",
+                  paddingLeft: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  Communication Log
+                </div>
+                {messagesLoading ? (
+                  <div style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+                    Loading messages…
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className="messages-box"
+                      style={{ flex: 1, marginBottom: "12px" }}
+                    >
+                      {messages.length === 0 ? (
+                        <p
+                          style={{
+                            color: "var(--text-muted)",
+                            fontSize: "13px",
+                          }}
+                        >
+                          No messages yet. Use this thread to communicate
+                          updates with the requester.
+                        </p>
+                      ) : (
+                        messages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`message-bubble${msg.is_staff ? " message-bubble-staff" : " message-bubble-reporter"}`}
+                          >
+                            <div className="message-bubble-header">
+                              <strong>
+                                {msg.sender_username || "Unknown"}
+                              </strong>
+                              <span className="message-meta">
+                                {new Date(msg.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                            <p style={{ margin: "4px 0 0 0" }}>{msg.message}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <form
+                      onSubmit={handleSendMessage}
+                      style={{ display: "flex", gap: "8px" }}
+                    >
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Add a note or update…"
+                        style={{ flex: 1 }}
+                        required
+                      />
+                      <button type="submit">Send</button>
+                    </form>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </Modal>

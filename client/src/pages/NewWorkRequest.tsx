@@ -32,7 +32,7 @@ const NewWorkRequest: React.FC = () => {
   const [attachmentStatus, setAttachmentStatus] = useState<string>("");
   const [formData, setFormData] = useState({
     title: "",
-    priority: "medium",
+    priority: "low",
     category: "",
     location: "",
     requestorDisplayName: "",
@@ -187,6 +187,31 @@ const NewWorkRequest: React.FC = () => {
               aria-required="true"
             />
           </div>
+          <div className="form-group">
+            <label>Description</label>
+            <textarea
+              value={formData.supportingInformation}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  supportingInformation: e.target.value,
+                })
+              }
+              rows={4}
+              placeholder="Describe the issue in detail — what is happening, where exactly, and how long it has been occurring"
+            />
+          </div>
+          <div className="form-group">
+            <label>Brief Location</label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) =>
+                setFormData({ ...formData, location: e.target.value })
+              }
+              placeholder="e.g. Room 101, opposite reception"
+            />
+          </div>
           <h4
             style={{
               marginTop: "20px",
@@ -263,34 +288,6 @@ const NewWorkRequest: React.FC = () => {
             Request Details
           </h4>
 
-          <div style={{ display: "flex", gap: "10px" }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Priority</label>
-              <select
-                value={formData.priority}
-                onChange={(e) =>
-                  setFormData({ ...formData, priority: e.target.value })
-                }
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Category</label>
-              <input
-                type="text"
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-                placeholder="e.g. Plumbing, Electrical"
-              />
-            </div>
-          </div>
-
           <h4
             style={{
               marginTop: "20px",
@@ -329,32 +326,6 @@ const NewWorkRequest: React.FC = () => {
               )}
             </>
           )}
-          <div className="form-group">
-            <label>Additional Location Details</label>
-            <input
-              type="text"
-              value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
-              placeholder="e.g. Room 101, opposite reception"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Description</label>
-            <textarea
-              value={formData.supportingInformation}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  supportingInformation: e.target.value,
-                })
-              }
-              rows={4}
-              placeholder="Describe the issue in detail — what is happening, where exactly, and how long it has been occurring"
-            />
-          </div>
 
           <h4
             style={{
