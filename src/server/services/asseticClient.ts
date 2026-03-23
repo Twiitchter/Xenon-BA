@@ -583,6 +583,63 @@ class AsseticClient {
     );
   }
 
+  /**
+   * Find a single work group by exact name.
+   * Returns the first matching record or null.
+   */
+  async getWorkgroupByName(name: string): Promise<any | null> {
+    return this.call(async (c) => {
+      try {
+        const esc = (s: string) => s.replace(/'/g, "''");
+        const resp = await c.get("/workgroup", {
+          params: {
+            "requestParams.filters": `Name~eq~'${esc(name)}'`,
+            "requestParams.pageSize": 1,
+          },
+        });
+        const data = resp.data;
+        const items: any[] = Array.isArray(data)
+          ? data
+          : data?.ResourceList ||
+            data?.Data ||
+            data?.Results ||
+            data?.results ||
+            [];
+        return items.length > 0 ? items[0] : null;
+      } catch (err: any) {
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }
+    }, `GET /workgroup?Name=${name}`);
+  }
+
+  /**
+   * Get the craft slots (GroupCrafts) for a work group by its numeric ID.
+   * Returns the array of craft entries or [] on failure.
+   */
+  async getWorkgroupCrafts(
+    workgroupId: string | number,
+    params?: AsseticQueryParams,
+  ): Promise<any[]> {
+    return this.call(async (c) => {
+      try {
+        const resp = await c.get(`/workgroup/${workgroupId}/craft`, {
+          params: toAsseticParams(params),
+        });
+        const data = resp.data;
+        return Array.isArray(data)
+          ? data
+          : data?.ResourceList ||
+              data?.Data ||
+              data?.Results ||
+              data?.results ||
+              [];
+      } catch {
+        return [];
+      }
+    }, `GET /workgroup/${workgroupId}/craft`);
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // FUNCTIONAL LOCATIONS  (for building / floor / room drill-down)
   // ═══════════════════════════════════════════════════════════════════

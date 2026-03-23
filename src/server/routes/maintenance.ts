@@ -866,7 +866,7 @@ async function resolveIncidentTypeId(
 }
 
 type ResolvedLabourAssignment = {
-  resourceId: string;
+  resourceId: string | null;
   plannedGroupCraftId?: string;
   assignedGroupCraftId?: string;
   groupCraftId?: string;
@@ -949,8 +949,14 @@ function parseLabourAssignmentFromRow(row: any): ResolvedLabourAssignment {
 /**
  * Resolve the best labour assignment for a work group and craft.
  *
- * Some Assetic tenants require Resource plus group-craft linkage.
- * Prefer direct work-group-scoped lookups to avoid long, sequential scans.
+ * Resolution order:
+ *  1. Look up the work group by name → get its GroupCrafts (craft slots).
+ *     Filter by craft text if provided; use the first craft slot otherwise.
+ *     The craft slot Id is the PlannedGroupCraftId / GroupCraftId Assetic needs.
+ *  2. Fallback: find a resource whose DisplayName contains the craft text,
+ *     then call GET /resource/{id}/craft to get that resource's GroupCraftids.
+ *  3. Last resort: return resourceId only (labour row is written but not linked
+ *     to a GroupCraft — Assetic will still accept it).
  */
 async function resolveLabourAssignment(
   workGroup: string | null,
@@ -959,30 +965,129 @@ async function resolveLabourAssignment(
   if (!workGroup && !craft) return null;
 
   const esc = (s: string) => s.replace(/'/g, "''");
-  const craftText = (craft || "").trim().toLowerCase();
+  // Extract the craft suffix from the work group name if needed
+  // e.g. "North West - Carpenter" → "Carpenter"
+  const craftFromWg =
+    workGroup && workGroup.includes(" - ")
+      ? workGroup.slice(workGroup.lastIndexOf(" - ") + 3).trim()
+      : "";
+  const craftSearch = (craft || craftFromWg || "").trim().toLowerCase();
 
-  // ManagedResource endpoint and WorkGroupName resource filters are disabled
-  // in this tenant (405), so rely on broad resource lookup with optional
-  // craft text matching.
-  let data: any;
+  // ── 1. Work group GroupCrafts lookup ─────────────────────────────────────
+  if (workGroup) {
+    try {
+      const wg = await asseticClient.getWorkgroupByName(workGroup);
+      const wgId = wg?.Id ?? wg?.id;
 
-  // Query resources directly by work group and optional craft text.
-  try {
-    const params: any = { page: 1, pageSize: 500 };
-    if (craftText) {
-      params.filters = `DisplayName~contains~'${esc(craft || "")}'`;
+      if (wgId) {
+        // Work group found — get its craft slots
+        const crafts: any[] = await asseticClient.getWorkgroupCrafts(wgId, {
+          page: 1,
+          pageSize: 50,
+        });
+
+        if (crafts.length) {
+          // Find the best matching craft slot; fall back to first
+          let matched = crafts[0];
+          if (craftSearch) {
+            const byName = crafts.find((c: any) =>
+              (c.Craft ?? c.CraftName ?? c.Name ?? "")
+                .toLowerCase()
+                .includes(craftSearch),
+            );
+            if (byName) matched = byName;
+          }
+
+          const groupCraftId =
+            matched.Id ?? matched.GroupCraftId ?? matched.PlannedGroupCraftId;
+          // Try to also pick up a resource from the craft slot itself
+          const resourceId = matched.ResourceId ?? matched.Resource?.Id ?? null;
+
+          console.log(
+            `Labour assignment via workgroup craft: groupCraftId=${groupCraftId}` +
+              ` resourceId=${resourceId ?? "(none)"} craft="${matched.Craft ?? matched.CraftName ?? ""}"`,
+          );
+
+          return {
+            resourceId: resourceId ? String(resourceId) : null!,
+            plannedGroupCraftId: groupCraftId
+              ? String(groupCraftId)
+              : undefined,
+            groupCraftId: groupCraftId ? String(groupCraftId) : undefined,
+            assignedGroupCraftId: groupCraftId
+              ? String(groupCraftId)
+              : undefined,
+          } as ResolvedLabourAssignment;
+        }
+      }
+    } catch (e: any) {
+      console.warn(
+        `[resolveLabourAssignment] WorkGroup craft lookup failed (non-fatal): ${e?.message}`,
+      );
     }
+  }
 
-    data = await asseticClient.getResources(params);
+  // ── 2. Resource + resource-craft lookup ──────────────────────────────────
+  let resourceId: string | null = null;
+  try {
+    const params: any = { page: 1, pageSize: 20 };
+    if (craftSearch) {
+      params.filters = `DisplayName~contains~'${esc(craft || craftFromWg)}'`;
+    }
+    const data = await asseticClient.getResources(params);
     const rows: any[] = Array.isArray(data)
       ? data
       : data?.ResourceList || data?.Results || data?.results || [];
-    if (rows.length) {
-      const assignment = parseLabourAssignmentFromRow(rows[0]);
-      if (assignment) return assignment;
-    }
+    if (rows[0]?.Id) resourceId = String(rows[0].Id);
   } catch {
-    // keep falling through
+    // keep trying
+  }
+
+  if (resourceId) {
+    // Try to get GroupCraftId from this resource's craft assignments
+    try {
+      const craftData = await asseticClient.getResourceCrafts(resourceId, {
+        page: 1,
+        pageSize: 50,
+      });
+      const craftRows: any[] = Array.isArray(craftData)
+        ? craftData
+        : craftData?.ResourceList ||
+          craftData?.Results ||
+          craftData?.results ||
+          [];
+
+      if (craftRows.length) {
+        let matched = craftRows[0];
+        if (craftSearch) {
+          const byName = craftRows.find((c: any) =>
+            (c.Craft ?? c.CraftName ?? c.Name ?? "")
+              .toLowerCase()
+              .includes(craftSearch),
+          );
+          if (byName) matched = byName;
+        }
+        const groupCraftId =
+          matched.Id ?? matched.GroupCraftId ?? matched.PlannedGroupCraftId;
+
+        console.log(
+          `Labour assignment via resource craft: resourceId=${resourceId}` +
+            ` groupCraftId=${groupCraftId} craft="${matched.Craft ?? matched.CraftName ?? ""}"`,
+        );
+
+        return {
+          resourceId,
+          plannedGroupCraftId: groupCraftId ? String(groupCraftId) : undefined,
+          groupCraftId: groupCraftId ? String(groupCraftId) : undefined,
+          assignedGroupCraftId: groupCraftId ? String(groupCraftId) : undefined,
+        };
+      }
+    } catch {
+      // non-fatal
+    }
+
+    // Return with just the resourceId if craft lookup failed
+    return { resourceId };
   }
 
   return null;
@@ -1561,33 +1666,44 @@ router.post(
             };
           }
 
-          // Always add a labour entry for duration/resource tracking
+          // Build Labour entry for the RFE transition.
+          // If we have a GroupCraftId (from work group craft slot), use it for
+          // both PlannedGroupCraftId on the labour and GroupCraftId on the
+          // resource slot. If we also have an explicit resource ID, add it.
+          // If we only have a resourceId (no craft IDs), use StatusId: 1 with
+          // the resource directly.
           {
             const labour: any = {
               QuantityRequired: 1,
               HoursRequired: durationHours,
             };
-            if (labourAssignment?.resourceId) {
-              labour.MaintenanceResources = [
-                {
-                  Resource: { Id: labourAssignment.resourceId },
-                  StatusId: 1,
-                },
-              ];
 
-              if (labourAssignment.plannedGroupCraftId) {
-                labour.PlannedGroupCraftId =
-                  labourAssignment.plannedGroupCraftId;
-              }
+            if (labourAssignment?.plannedGroupCraftId) {
+              labour.PlannedGroupCraftId = labourAssignment.plannedGroupCraftId;
+            }
+
+            const resourceEntry: any = {};
+            if (labourAssignment?.groupCraftId) {
+              resourceEntry.GroupCraftId = labourAssignment.groupCraftId;
+              resourceEntry.StatusId = 5; // Unassigned pool slot
+            }
+            if (labourAssignment?.resourceId) {
+              resourceEntry.Resource = { Id: labourAssignment.resourceId };
+              resourceEntry.StatusId = 1; // Assigned
               if (labourAssignment.assignedGroupCraftId) {
-                labour.MaintenanceResources[0].AssignedGroupCraftId =
+                resourceEntry.AssignedGroupCraftId =
                   labourAssignment.assignedGroupCraftId;
               }
-              if (labourAssignment.groupCraftId) {
-                labour.MaintenanceResources[0].GroupCraftId =
-                  labourAssignment.groupCraftId;
-              }
             }
+
+            // Only include MaintenanceResources if we have something meaningful
+            if (
+              Object.keys(resourceEntry).length > 0 &&
+              resourceEntry.StatusId !== undefined
+            ) {
+              labour.MaintenanceResources = [resourceEntry];
+            }
+
             rfePayload.Labours = [labour];
           }
 
