@@ -10,6 +10,10 @@
  *
  * Templates are fully data-driven so any page (work order, work request,
  * report) can produce a PDF without touching this file.
+ *
+ * Admin-configurable template configs (PdfTemplateConfig) are fetched from
+ * the server and passed to the factory functions to control which sections
+ * appear, reorder them, and append custom free-text sections.
  */
 import jsPDF from "jspdf";
 
@@ -40,6 +44,26 @@ export interface PdfTemplate {
   footer?: string;
   /** Filename to save as (no extension required) */
   filename?: string;
+}
+
+// ── Admin template config types ──────────────────────────────────────────────
+
+export interface PdfSectionConfig {
+  id: string;
+  enabled: boolean;
+  customTitle: string | null;
+}
+
+export interface PdfCustomSection {
+  id: string;
+  title: string;
+  content: string;
+}
+
+/** Shape stored in the database and returned by the API */
+export interface PdfTemplateConfig {
+  sections: PdfSectionConfig[];
+  customSections: PdfCustomSection[];
 }
 
 // ── Colour palette ───────────────────────────────────────────────────────────
@@ -281,10 +305,66 @@ export function generatePdf(template: PdfTemplate): void {
 
 // ── Pre-built template factories ─────────────────────────────────────────────
 
+/**
+ * Apply an admin PdfTemplateConfig to a map of candidate sections.
+ * - Sections listed in config.sections are included/excluded based on `enabled`.
+ * - customTitle overrides the section title when non-null.
+ * - Sections not in the config are included by default.
+ * - config.customSections are appended as free-text sections at the end.
+ */
+function applyTemplateConfig(
+  sectionMap: Record<string, PdfSection>,
+  config: PdfTemplateConfig | undefined,
+): PdfSection[] {
+  if (!config) {
+    return Object.values(sectionMap).filter(Boolean);
+  }
+
+  const result: PdfSection[] = [];
+  const configuredIds = new Set(config.sections.map((s) => s.id));
+
+  // Walk sections in the order defined by the config
+  for (const sc of config.sections) {
+    if (!sc.enabled) continue;
+    const section = sectionMap[sc.id];
+    if (!section) continue;
+    if (sc.customTitle) {
+      result.push({ ...section, title: sc.customTitle });
+    } else {
+      result.push(section);
+    }
+  }
+
+  // Append any sections not mentioned in the config (enabled by default)
+  for (const [id, section] of Object.entries(sectionMap)) {
+    if (!configuredIds.has(id) && section) {
+      result.push(section);
+    }
+  }
+
+  // Append admin custom free-text sections
+  for (const cs of config.customSections) {
+    if (!cs.content?.trim()) continue;
+    const sectionTitle = cs.title || "Additional Notes";
+    result.push({
+      title: sectionTitle,
+      fields: [
+        {
+          label: sectionTitle,
+          value: cs.content,
+          fullWidth: true,
+        },
+      ],
+    });
+  }
+
+  return result;
+}
+
 /** Build a work order PDF template from a work order data object */
 export function buildWorkOrderTemplate(
   wo: any,
-  extraSection?: { title: string; content: string },
+  templateConfig?: PdfTemplateConfig,
 ): PdfTemplate {
   const fmt = (v: any) => (v ? String(v) : undefined);
   const fmtDate = (v: any) => {
@@ -307,89 +387,81 @@ export function buildWorkOrderTemplate(
     wo.assetic_work_request_id ||
     (wo.request_id ? `WR-${wo.request_id}` : null);
 
+  // Build candidate sections keyed by id
+  const sectionMap: Record<string, PdfSection | null> = {
+    details: {
+      title: "Work Order Details",
+      fields: [
+        { label: "WO Reference", value: woId },
+        { label: "WR Reference", value: fmt(wrId) },
+        { label: "Title", value: fmt(wo.title) },
+        {
+          label: "Status",
+          value: fmt(wo.status)?.replace(/_/g, " ").toUpperCase(),
+        },
+        { label: "Priority", value: fmt(wo.priority)?.toUpperCase() },
+        { label: "Craft", value: fmt(wo.craft) },
+        { label: "Work Group", value: fmt(wo.work_group) },
+        { label: "Assigned To", value: fmt(wo.assigned_to_username) },
+        { label: "Scheduled Date", value: fmtDate(wo.scheduled_date) },
+        { label: "Created", value: fmtDate(wo.created_at) },
+        { label: "Last Updated", value: fmtDate(wo.updated_at) },
+      ],
+    },
+    description: wo.description
+      ? {
+          title: "Description",
+          fields: [
+            {
+              label: "Description",
+              value: fmt(wo.description),
+              fullWidth: true,
+            },
+          ],
+        }
+      : null,
+    asset:
+      wo.asset_name || wo.assetic_asset_guid
+        ? {
+            title: "Asset Information",
+            fields: [
+              { label: "Asset Name", value: fmt(wo.asset_name) },
+              { label: "Asset GUID", value: fmt(wo.assetic_asset_guid) },
+              { label: "Location", value: fmt(wo.asset_location) },
+            ],
+          }
+        : null,
+    originating_request: wo.request_title
+      ? {
+          title: "Originating Work Request",
+          fields: [
+            { label: "WR Title", value: fmt(wo.request_title) },
+            { label: "WR Reference", value: fmt(wrId) },
+          ],
+        }
+      : null,
+  };
+
+  // Filter out nulls for non-configured path
+  const validSections = Object.fromEntries(
+    Object.entries(sectionMap).filter(([, v]) => v !== null),
+  ) as Record<string, PdfSection>;
+
   return {
     title: "Work Order",
     subtitle: woId,
     organisation: "XeonB Maintenance Portal",
     filename: `Work_Order_${woId}`,
     footer: `Work Order ${woId} — XeonB Maintenance Portal`,
-    sections: [
-      {
-        title: "Work Order Details",
-        fields: [
-          { label: "WO Reference", value: woId },
-          { label: "WR Reference", value: fmt(wrId) },
-          { label: "Title", value: fmt(wo.title) },
-          {
-            label: "Status",
-            value: fmt(wo.status)?.replace(/_/g, " ").toUpperCase(),
-          },
-          { label: "Priority", value: fmt(wo.priority)?.toUpperCase() },
-          { label: "Craft", value: fmt(wo.craft) },
-          { label: "Work Group", value: fmt(wo.work_group) },
-          { label: "Assigned To", value: fmt(wo.assigned_to_username) },
-          { label: "Scheduled Date", value: fmtDate(wo.scheduled_date) },
-          { label: "Created", value: fmtDate(wo.created_at) },
-          { label: "Last Updated", value: fmtDate(wo.updated_at) },
-        ],
-      },
-      ...(wo.description
-        ? [
-            {
-              title: "Description",
-              fields: [
-                {
-                  label: "Description",
-                  value: fmt(wo.description),
-                  fullWidth: true,
-                },
-              ],
-            },
-          ]
-        : []),
-      ...(wo.asset_name || wo.assetic_asset_guid
-        ? [
-            {
-              title: "Asset Information",
-              fields: [
-                { label: "Asset Name", value: fmt(wo.asset_name) },
-                { label: "Asset GUID", value: fmt(wo.assetic_asset_guid) },
-                { label: "Location", value: fmt(wo.asset_location) },
-              ],
-            },
-          ]
-        : []),
-      ...(wo.request_title
-        ? [
-            {
-              title: "Originating Work Request",
-              fields: [
-                { label: "WR Title", value: fmt(wo.request_title) },
-                { label: "WR Reference", value: fmt(wrId) },
-              ],
-            },
-          ]
-        : []),
-      ...(extraSection && extraSection.content.trim()
-        ? [
-            {
-              title: extraSection.title || "Additional Notes",
-              fields: [
-                {
-                  label: extraSection.title || "Additional Notes",
-                  value: extraSection.content,
-                  fullWidth: true,
-                },
-              ],
-            },
-          ]
-        : []),
-    ],
+    sections: applyTemplateConfig(validSections, templateConfig),
   };
 }
 
 /** Build a work request PDF template from a maintenance request data object */
-export function buildWorkRequestTemplate(req: any): PdfTemplate {
+export function buildWorkRequestTemplate(
+  req: any,
+  templateConfig?: PdfTemplateConfig,
+): PdfTemplate {
   const fmt = (v: any) => (v ? String(v) : undefined);
   const fmtDate = (v: any) => {
     if (!v) return undefined;
@@ -408,68 +480,73 @@ export function buildWorkRequestTemplate(req: any): PdfTemplate {
 
   const wrId = req.assetic_friendly_id || `WR-${req.id}`;
 
+  // Build candidate sections keyed by id
+  const sectionMap: Record<string, PdfSection | null> = {
+    details: {
+      title: "Request Details",
+      fields: [
+        { label: "WR Reference", value: wrId },
+        { label: "Title", value: fmt(req.title) },
+        {
+          label: "Status",
+          value: fmt(req.status)?.replace(/_/g, " ").toUpperCase(),
+        },
+        { label: "Priority", value: fmt(req.priority)?.toUpperCase() },
+        { label: "Category", value: fmt(req.category) },
+        { label: "Location", value: fmt(req.location) },
+        { label: "Submitted", value: fmtDate(req.created_at) },
+      ],
+    },
+    description:
+      req.description || req.supporting_information
+        ? {
+            title: "Description",
+            fields: [
+              {
+                label: "Description",
+                value: fmt(req.description || req.supporting_information),
+                fullWidth: true,
+              },
+            ],
+          }
+        : null,
+    requestor:
+      req.requestor_display_name || req.requestor_email
+        ? {
+            title: "Requestor",
+            fields: [
+              { label: "Name", value: fmt(req.requestor_display_name) },
+              { label: "Email", value: fmt(req.requestor_email) },
+              {
+                label: "Phone",
+                value: fmt(req.requestor_phone || req.requestor_mobile),
+              },
+            ],
+          }
+        : null,
+    asset:
+      req.asset_display_name || req.assetic_asset_guid
+        ? {
+            title: "Asset Information",
+            fields: [
+              { label: "Asset", value: fmt(req.asset_display_name) },
+              { label: "Asset GUID", value: fmt(req.assetic_asset_guid) },
+            ],
+          }
+        : null,
+  };
+
+  // Filter out nulls for non-configured path
+  const validSections = Object.fromEntries(
+    Object.entries(sectionMap).filter(([, v]) => v !== null),
+  ) as Record<string, PdfSection>;
+
   return {
     title: "Work Request",
     subtitle: wrId,
     organisation: "XeonB Maintenance Portal",
     filename: `Work_Request_${wrId}`,
     footer: `Work Request ${wrId} — XeonB Maintenance Portal`,
-    sections: [
-      {
-        title: "Request Details",
-        fields: [
-          { label: "WR Reference", value: wrId },
-          { label: "Title", value: fmt(req.title) },
-          {
-            label: "Status",
-            value: fmt(req.status)?.replace(/_/g, " ").toUpperCase(),
-          },
-          { label: "Priority", value: fmt(req.priority)?.toUpperCase() },
-          { label: "Category", value: fmt(req.category) },
-          { label: "Location", value: fmt(req.location) },
-          { label: "Submitted", value: fmtDate(req.created_at) },
-        ],
-      },
-      ...(req.description || req.supporting_information
-        ? [
-            {
-              title: "Description",
-              fields: [
-                {
-                  label: "Description",
-                  value: fmt(req.description || req.supporting_information),
-                  fullWidth: true,
-                },
-              ],
-            },
-          ]
-        : []),
-      ...(req.requestor_display_name || req.requestor_email
-        ? [
-            {
-              title: "Requestor",
-              fields: [
-                { label: "Name", value: fmt(req.requestor_display_name) },
-                { label: "Email", value: fmt(req.requestor_email) },
-                {
-                  label: "Phone",
-                  value: fmt(req.requestor_phone || req.requestor_mobile),
-                },
-              ],
-            },
-          ]
-        : []),
-      ...(req.asset_display_name || req.assetic_asset_guid
-        ? [
-            {
-              title: "Asset Information",
-              fields: [
-                { label: "Asset", value: fmt(req.asset_display_name) },
-                { label: "Asset GUID", value: fmt(req.assetic_asset_guid) },
-              ],
-            },
-          ]
-        : []),
-    ],
+    sections: applyTemplateConfig(validSections, templateConfig),
   };
 }

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { authService } from "./authService";
+import type { PdfTemplateConfig } from "./adminService";
 
 const API_URL = "/api";
 
@@ -365,6 +366,14 @@ class MaintenanceService {
       },
     );
     return response.data;
+  }
+
+  async getPdfTemplateConfig(type: "work_order" | "work_request") {
+    const response = await axios.get(
+      `${API_URL}/maintenance/pdf-templates/${type}`,
+      { headers: authService.getAuthHeader() },
+    );
+    return response.data as { template_type: string; config: PdfTemplateConfig };
   }
 }
 

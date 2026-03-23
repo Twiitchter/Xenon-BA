@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AdminHierarchyResponse, adminService, Contractor } from "../services/adminService";
+import PdfTemplateEditor from "../components/PdfTemplateEditor";
 
 interface SettingItem {
   id: number;
@@ -10,7 +11,7 @@ interface SettingItem {
   description: string | null;
 }
 
-const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email", "contractors"];
+const categories = ["general", "assetic", "hierarchy", "sync", "sso", "email", "contractors", "pdf_templates"];
 const categoryLabels: Record<string, string> = {
   general: "General",
   assetic: "Assetic API",
@@ -19,6 +20,7 @@ const categoryLabels: Record<string, string> = {
   sso: "SSO / Authentication",
   email: "Email",
   contractors: "Contractors",
+  pdf_templates: "PDF Templates",
 };
 
 const Settings: React.FC = () => {
@@ -64,7 +66,10 @@ const Settings: React.FC = () => {
 
   const categorySettings = useMemo(
     () =>
-      activeCategory === "hierarchy"
+      activeCategory === "hierarchy" ||
+      activeCategory === "sync" ||
+      activeCategory === "contractors" ||
+      activeCategory === "pdf_templates"
         ? []
         : settings.filter((s) => s.category === activeCategory),
     [settings, activeCategory],
@@ -426,7 +431,9 @@ const Settings: React.FC = () => {
         <section className="card settings-panel">
           {loading &&
           activeCategory !== "hierarchy" &&
-          activeCategory !== "sync" ? (
+          activeCategory !== "sync" &&
+          activeCategory !== "contractors" &&
+          activeCategory !== "pdf_templates" ? (
             <div className="loading">Loading settings...</div>
           ) : activeCategory === "sync" ? (
             /* ── Asset Sync section ── */
@@ -753,6 +760,9 @@ const Settings: React.FC = () => {
                   </div>
                 )}
             </>
+          ) : activeCategory === "pdf_templates" ? (
+            /* ── PDF Templates section ── */
+            <PdfTemplateEditor />
           ) : categorySettings.length === 0 ? (
             <div className="settings-muted">
               No settings in this category yet.

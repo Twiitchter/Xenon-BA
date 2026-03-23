@@ -5,6 +5,7 @@ import db from "../database";
 import asseticClient from "../services/asseticClient";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import settingsService from "../services/settingsService";
+import { DEFAULT_PDF_TEMPLATES } from "../services/pdfTemplateDefaults";
 import emailService from "../services/emailService";
 
 const router = Router();
@@ -2463,6 +2464,36 @@ router.get(
       res
         .status(500)
         .json({ error: "Failed to fetch work request sources from Assetic" });
+    }
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════════════
+// PDF TEMPLATE (public — any authenticated user)
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/maintenance/pdf-templates/:type
+ * Returns the active PDF template config for the given type.
+ * Accessible by any authenticated user (used during client-side PDF generation).
+ */
+router.get(
+  "/pdf-templates/:type",
+  authenticateToken,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { type } = req.params;
+      if (!["work_order", "work_request"].includes(type)) {
+        return res.status(400).json({ error: "Invalid template type" });
+      }
+
+      const row = await db("pdf_templates").where({ template_type: type }).first();
+      const config = row ? row.template_config : DEFAULT_PDF_TEMPLATES[type];
+
+      res.json({ template_type: type, config });
+    } catch (error) {
+      console.error("Error fetching PDF template config:", error);
+      res.status(500).json({ error: "Failed to fetch PDF template config" });
     }
   },
 );

@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { maintenanceService } from "../services/maintenanceService";
-import { generatePdf, buildWorkOrderTemplate } from "../services/pdfService";
+import { generatePdf, buildWorkOrderTemplate, type PdfTemplateConfig } from "../services/pdfService";
 import Modal from "../components/Modal";
 import FilterPresetsPanel from "../components/FilterPresetsPanel";
-import WorkOrderPDFEditor, {
-  loadWorkOrderPDFSection,
-  type WorkOrderPDFSection,
-} from "../components/WorkOrderPDFEditor";
 
 const priorityBadgeClass = (p: string) => {
   const map: Record<string, string> = {
@@ -107,16 +103,14 @@ const WorkOrders: React.FC = () => {
   const [cloning, setCloning] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // PDF custom section state
-  const [pdfEditorOpen, setPdfEditorOpen] = useState(false);
-  const [pdfSection, setPdfSection] = useState<WorkOrderPDFSection>(() =>
-    loadWorkOrderPDFSection(),
-  );
+  // PDF template config (fetched from server)
+  const [pdfTemplateConfig, setPdfTemplateConfig] = useState<PdfTemplateConfig | undefined>(undefined);
 
   useEffect(() => {
     fetchWorkOrders();
     fetchCrafts();
     fetchWorkGroups();
+    fetchPdfTemplateConfig();
   }, []);
 
   const fetchWorkOrders = async (activeFilters = filters) => {
@@ -150,6 +144,15 @@ const WorkOrders: React.FC = () => {
       setWorkGroups(data.workGroups || []);
     } catch {
       // non-critical: work groups are used for display/filter only
+    }
+  };
+
+  const fetchPdfTemplateConfig = async () => {
+    try {
+      const data = await maintenanceService.getPdfTemplateConfig("work_order");
+      setPdfTemplateConfig(data.config as PdfTemplateConfig);
+    } catch {
+      // non-critical: PDF will fall back to default template
     }
   };
 
@@ -624,7 +627,7 @@ const WorkOrders: React.FC = () => {
                   generatePdf(
                     buildWorkOrderTemplate(
                       selectedOrder,
-                      pdfSection.content.trim() ? pdfSection : undefined,
+                      pdfTemplateConfig,
                     ),
                   )
                 }
@@ -632,14 +635,6 @@ const WorkOrders: React.FC = () => {
                 style={{ fontSize: "13px" }}
               >
                 ↓ PDF
-              </button>
-              <button
-                className="btn-ghost"
-                onClick={() => setPdfEditorOpen(true)}
-                title="Edit PDF custom section"
-                style={{ fontSize: "13px" }}
-              >
-                ⚙ PDF
               </button>
               <button
                 className="btn-ghost"
@@ -934,13 +929,6 @@ const WorkOrders: React.FC = () => {
             </div>
           </div>
         </Modal>
-      )}
-      {/* ── PDF Custom Section Editor ── */}
-      {pdfEditorOpen && (
-        <WorkOrderPDFEditor
-          onClose={() => setPdfEditorOpen(false)}
-          onSave={(section) => setPdfSection(section)}
-        />
       )}
     </div>
   );
