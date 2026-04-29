@@ -153,4 +153,4 @@ XeonB/
 
 ## License
 
-ISC
+Standard MIT license Applies. As at 29-April-2026
