@@ -96,6 +96,51 @@ interface FetchAllPagesResult {
 class AsseticLocationHierarchyService {
   private cache: AsseticLocationHierarchy | null = null;
   private refreshInFlight: Promise<AsseticLocationHierarchy> | null = null;
+  private overloadUntilTs = 0;
+  private readonly OVERLOAD_COOLDOWN_MS = 60_000;
+
+  private isUpstreamOverload(error: any): boolean {
+    const status = error?.response?.status ?? error?.status;
+    return status === 503 || status === 429;
+  }
+
+  private activateOverloadCooldown(): number {
+    const until = Date.now() + this.OVERLOAD_COOLDOWN_MS;
+    this.overloadUntilTs = Math.max(this.overloadUntilTs, until);
+    return Math.max(0, this.overloadUntilTs - Date.now());
+  }
+
+  private getOverloadCooldownRemainingMs(): number {
+    return Math.max(0, this.overloadUntilTs - Date.now());
+  }
+
+  private createOverloadCooldownError(remainingMs: number, cause?: any): Error {
+    const retryAfterSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+    const message =
+      "Assetic hierarchy refresh is temporarily throttled after upstream overload. Please retry shortly.";
+    const err = new Error(message) as Error & {
+      code?: string;
+      status?: number;
+      retryAfterSeconds?: number;
+      response?: any;
+      cause?: any;
+    };
+
+    err.code = "ASSETIC_HIERARCHY_COOLDOWN";
+    err.status = 503;
+    err.retryAfterSeconds = retryAfterSeconds;
+    err.response = {
+      status: 503,
+      data: {
+        message,
+        Message: message,
+      },
+    };
+    if (cause) {
+      err.cause = cause;
+    }
+    return err;
+  }
 
   getSnapshot(): AsseticLocationHierarchy | null {
     return this.cache;
@@ -628,10 +673,41 @@ class AsseticLocationHierarchyService {
         );
       }
 
+      const remainingMs = this.getOverloadCooldownRemainingMs();
+      if (remainingMs > 0) {
+        if (this.cache) {
+          console.warn(
+            `[AsseticHierarchy] Upstream overload cooldown active (${Math.ceil(remainingMs / 1000)}s). Serving cached hierarchy.`,
+          );
+          return this.cache;
+        }
+        throw this.createOverloadCooldownError(remainingMs);
+      }
+
       // Fall back to live API strategies
-      const hierarchy = await this.buildFromAssetic();
-      this.cache = hierarchy;
-      return hierarchy;
+      try {
+        const hierarchy = await this.buildFromAssetic();
+        this.cache = hierarchy;
+        return hierarchy;
+      } catch (err) {
+        if (this.isUpstreamOverload(err)) {
+          const cooldownMs = this.activateOverloadCooldown();
+          const overloadErr = err as {
+            response?: { status?: number };
+            status?: number;
+          };
+          const overloadStatus =
+            overloadErr.response?.status ?? overloadErr.status;
+          console.warn(
+            `[AsseticHierarchy] Upstream overload detected (status ${overloadStatus ?? "unknown"}). Entering cooldown for ${Math.ceil(cooldownMs / 1000)}s.`,
+          );
+          if (this.cache) {
+            return this.cache;
+          }
+          throw this.createOverloadCooldownError(cooldownMs, err);
+        }
+        throw err;
+      }
     })().finally(() => {
       this.refreshInFlight = null;
     });
@@ -648,6 +724,13 @@ class AsseticLocationHierarchyService {
     let records: any[] = [];
     let source: "functionallocations" | "assets" = "functionallocations";
     let pagination: FetchAllPagesResult | null = null;
+    let firstOverloadError: any = null;
+
+    const trackOverload = (error: any) => {
+      if (!firstOverloadError && this.isUpstreamOverload(error)) {
+        firstOverloadError = error;
+      }
+    };
 
     // ── Strategy 1: OData discovery → /functionallocations with attributes ──
     // The OData $metadata endpoint reveals internal field names.
@@ -708,6 +791,7 @@ class AsseticLocationHierarchyService {
         console.log("[AsseticHierarchy] OData returned no relevant fields.");
       }
     } catch (error) {
+      trackOverload(error);
       console.warn(
         "[AsseticHierarchy] OData discovery failed (non-fatal):",
         (error as any)?.message || error,
@@ -749,6 +833,7 @@ class AsseticLocationHierarchyService {
           );
         }
       } catch (error) {
+        trackOverload(error);
         console.warn(
           "[AsseticHierarchy] /functionallocations with OData attrs failed:",
           (error as any)?.message || error,
@@ -850,6 +935,7 @@ class AsseticLocationHierarchyService {
         );
       }
     } catch (error) {
+      trackOverload(error);
       console.warn(
         "[AsseticHierarchy] OData direct query failed (non-fatal):",
         (error as any)?.message || error,
@@ -942,6 +1028,7 @@ class AsseticLocationHierarchyService {
         );
       }
     } catch (error) {
+      trackOverload(error);
       console.warn(
         "[AsseticHierarchy] OData /assets query failed (non-fatal):",
         (error as any)?.message || error,
@@ -1092,6 +1179,7 @@ class AsseticLocationHierarchyService {
         }
       }
     } catch (error) {
+      trackOverload(error);
       console.warn(
         "[AsseticHierarchy] /functionallocations failed:",
         (error as any)?.message || error,
@@ -1123,10 +1211,15 @@ class AsseticLocationHierarchyService {
         }
       }
     } catch (error) {
+      trackOverload(error);
       console.warn(
         "[AsseticHierarchy] /assets service-area fallback failed:",
         (error as any)?.message || error,
       );
+    }
+
+    if (firstOverloadError) {
+      throw firstOverloadError;
     }
 
     throw new Error("No hierarchy records returned by Assetic");

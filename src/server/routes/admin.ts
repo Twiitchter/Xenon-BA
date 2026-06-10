@@ -9,7 +9,11 @@ import asseticClient from "../services/asseticClient";
 import asseticApiLogger from "../services/asseticApiLogger";
 import asseticLocationHierarchyService from "../services/asseticLocationHierarchyService";
 import asseticAssetSyncService from "../services/asseticAssetSyncService";
-import { VALID_TEMPLATE_TYPES, DEFAULT_PDF_TEMPLATES, type TemplateType } from "../services/pdfTemplateDefaults";
+import {
+  VALID_TEMPLATE_TYPES,
+  DEFAULT_PDF_TEMPLATES,
+  type TemplateType,
+} from "../services/pdfTemplateDefaults";
 import emailService from "../services/emailService";
 
 const router = Router();
@@ -66,6 +70,15 @@ function buildAsseticHierarchyError(error: any): {
   const status = error?.response?.status;
   const upstream =
     error?.response?.data?.Message || error?.response?.data?.message;
+
+  if (status === 503 || error?.code === "ASSETIC_HIERARCHY_COOLDOWN") {
+    return {
+      status: 503,
+      message:
+        "Assetic hierarchy import is temporarily unavailable due to upstream load. Please retry shortly.",
+      log: `Assetic hierarchy temporary overload (503)${upstream ? `: ${upstream}` : ""}`,
+    };
+  }
 
   if (status === 401 || status === 403) {
     return {
@@ -295,6 +308,9 @@ router.get(
     } catch (error: any) {
       const mapped = buildAsseticHierarchyError(error);
       console.error(`Error fetching Assetic location hierarchy: ${mapped.log}`);
+      if (mapped.status === 503 && error?.retryAfterSeconds) {
+        res.setHeader("Retry-After", String(error.retryAfterSeconds));
+      }
       res.status(mapped.status).json({ error: mapped.message });
     }
   },
@@ -815,11 +831,9 @@ router.post("/users/import", async (req: AuthRequest, res: Response) => {
       .map((l) => l.trim())
       .filter(Boolean);
     if (lines.length < 2) {
-      return res
-        .status(400)
-        .json({
-          error: "CSV must contain a header row and at least one data row",
-        });
+      return res.status(400).json({
+        error: "CSV must contain a header row and at least one data row",
+      });
     }
 
     // Parse CSV helper: handles quoted fields
@@ -1833,7 +1847,12 @@ router.delete(
  */
 router.get("/pdf-templates", async (_req: AuthRequest, res: Response) => {
   try {
-    const rows = await db("pdf_templates").select("template_type", "template_config", "updated_at", "updated_by");
+    const rows = await db("pdf_templates").select(
+      "template_type",
+      "template_config",
+      "updated_at",
+      "updated_by",
+    );
     const result: Record<string, object> = {};
 
     for (const type of VALID_TEMPLATE_TYPES) {
@@ -1859,7 +1878,9 @@ router.get("/pdf-templates/:type", async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "Invalid template type" });
     }
 
-    const row = await db("pdf_templates").where({ template_type: type }).first();
+    const row = await db("pdf_templates")
+      .where({ template_type: type })
+      .first();
     const config = row ? row.template_config : DEFAULT_PDF_TEMPLATES[type];
 
     res.json({ template_type: type, config });
@@ -1886,19 +1907,27 @@ router.put("/pdf-templates/:type", async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: "config object required" });
     }
     if (!Array.isArray(config.sections)) {
-      return res.status(400).json({ error: "config.sections must be an array" });
+      return res
+        .status(400)
+        .json({ error: "config.sections must be an array" });
     }
     if (!Array.isArray(config.customSections)) {
-      return res.status(400).json({ error: "config.customSections must be an array" });
+      return res
+        .status(400)
+        .json({ error: "config.customSections must be an array" });
     }
 
-    const existing = await db("pdf_templates").where({ template_type: type }).first();
+    const existing = await db("pdf_templates")
+      .where({ template_type: type })
+      .first();
     if (existing) {
-      await db("pdf_templates").where({ template_type: type }).update({
-        template_config: JSON.stringify(config),
-        updated_at: new Date(),
-        updated_by: req.user.id,
-      });
+      await db("pdf_templates")
+        .where({ template_type: type })
+        .update({
+          template_config: JSON.stringify(config),
+          updated_at: new Date(),
+          updated_by: req.user.id,
+        });
     } else {
       await db("pdf_templates").insert({
         template_type: type,

@@ -86,6 +86,15 @@ function buildAsseticHierarchyError(error: any): {
   const upstream =
     error?.response?.data?.Message || error?.response?.data?.message;
 
+  if (status === 503 || error?.code === "ASSETIC_HIERARCHY_COOLDOWN") {
+    return {
+      status: 503,
+      message:
+        "Assetic hierarchy import is temporarily unavailable due to upstream load. Please retry shortly.",
+      log: `Assetic hierarchy temporary overload (503)${upstream ? `: ${upstream}` : ""}`,
+    };
+  }
+
   if (status === 401 || status === 403) {
     return {
       status: 502,
@@ -2541,6 +2550,9 @@ router.get(
     } catch (error: any) {
       const mapped = buildAsseticHierarchyError(error);
       console.error(`Error fetching Assetic location hierarchy: ${mapped.log}`);
+      if (mapped.status === 503 && error?.retryAfterSeconds) {
+        res.setHeader("Retry-After", String(error.retryAfterSeconds));
+      }
       res.status(mapped.status).json({ error: mapped.message });
     }
   },
