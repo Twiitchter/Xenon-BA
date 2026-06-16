@@ -356,21 +356,27 @@ class AsseticClient {
   }
 
   async createWorkRequest(data: any) {
-    // Sanitize numeric fields that Assetic requires to be integers, not null
     const sanitized = { ...data };
 
-    // WorkRequestTypeId is required to be an integer in Assetic's JSON schema
-    // (PATCH /v2/workrequest/{id} returns: Error converting value {null} to type 'System.Int32')
+    // Preserve null/undefined for create payloads. Assetic create requests
+    // can omit WorkRequestTypeId or WorkRequestSubTypeId, and sending 0 may
+    // be rejected as an invalid relationship.
     if (
-      sanitized.WorkRequestTypeId === null ||
-      sanitized.WorkRequestTypeId === undefined
+      sanitized.WorkRequestTypeId != null &&
+      sanitized.WorkRequestTypeId !== "" &&
+      typeof sanitized.WorkRequestTypeId !== "number"
     ) {
-      sanitized.WorkRequestTypeId = 0;
+      const parsed = Number(sanitized.WorkRequestTypeId);
+      if (!Number.isNaN(parsed)) sanitized.WorkRequestTypeId = parsed;
     }
 
-    // WorkRequestSubTypeId should also be an integer if provided
-    if (sanitized.WorkRequestSubTypeId === null) {
-      sanitized.WorkRequestSubTypeId = 0;
+    if (
+      sanitized.WorkRequestSubTypeId != null &&
+      sanitized.WorkRequestSubTypeId !== "" &&
+      typeof sanitized.WorkRequestSubTypeId !== "number"
+    ) {
+      const parsed = Number(sanitized.WorkRequestSubTypeId);
+      if (!Number.isNaN(parsed)) sanitized.WorkRequestSubTypeId = parsed;
     }
 
     return this.loggedCall({
@@ -816,6 +822,13 @@ class AsseticClient {
           .get("/resource", { params: toAsseticParams(params) })
           .then((r) => r.data),
       "GET /resource",
+    );
+  }
+
+  async getResourceById(resourceId: string): Promise<any> {
+    return this.call(
+      (c) => c.get(`/resource/${resourceId}`).then((r) => r.data),
+      `GET /resource/${resourceId}`,
     );
   }
 

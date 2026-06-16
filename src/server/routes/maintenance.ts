@@ -415,8 +415,10 @@ router.post(
           WorkRequestSubTypeId: null,
           // Automatically set the Incident type based on direction extracted from
           // the location path (e.g. "North", "South", "North West").
-          // Default to 0 if no matching type found (Assetic requires integer, not null)
-          WorkRequestTypeId: (await resolveIncidentTypeId(location, null)) || 0,
+          // Omit if not detectable instead of sending an invalid 0 value.
+          ...((await resolveIncidentTypeId(location, null)) !== null
+            ? { WorkRequestTypeId: await resolveIncidentTypeId(location, null) }
+            : {}),
           // WorkRequestPhysicalLocation is mandatory per the Assetic API.
           // Address.Country defaults to "Australia" to satisfy Assetic's country
           // validation. When no real street address is provided, StreetAddress
@@ -451,16 +453,21 @@ router.post(
         if (requestorPhone) requestor.Phone = requestorPhone;
         if (requestorMobile) requestor.Mobile = requestorMobile;
 
-        // Always use "Customer" type (Type string, not Id integer)
-        requestor.Types = [{ Type: "Customer" }];
+        if (requestorTypeId) {
+          const typeId = Number(requestorTypeId);
+          if (!Number.isNaN(typeId)) {
+            requestor.Types = [{ Id: typeId }];
+          }
+        }
 
         // ── Ensure the reporter exists as an Assetic Resource ────────────────
         // Uses a DB-cached resource ID to avoid a redundant GET /resource API
         // call on every submission.  On first submission the service does the
         // GET/POST round-trip and caches the result for future requests.
         const reporterExternalId = String(req.user.id);
+        let reporterResourceId: string | null = null;
         try {
-          await ensureAsseticResource(req.user.id, {
+          reporterResourceId = await ensureAsseticResource(req.user.id, {
             displayName: requestorDisplayName,
             firstName: requestorFirstName,
             surname: requestorSurname,
@@ -479,6 +486,9 @@ router.post(
 
         // Set the ExternalID on the requestor so Assetic can link back to the resource
         requestor.ExternalID = reporterExternalId;
+        if (reporterResourceId) {
+          asseticPayload.RequestorId = reporterResourceId;
+        }
 
         if (Object.keys(requestor).length > 0) {
           asseticPayload.Requestor = requestor;
