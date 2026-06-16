@@ -808,6 +808,16 @@ class AsseticAssetSyncService {
             fl.FunctionalLocationType || fl.functionalLocationType || null,
           fl_type_id:
             fl.FunctionalLocationTypeId || fl.functionalLocationTypeId || null,
+          parent_fl_guid:
+            fl.ParentId ||
+            fl.parentId ||
+            fl.ParentGuid ||
+            fl.parentGuid ||
+            fl.ParentFunctionalLocationId ||
+            fl.parentFunctionalLocationId ||
+            fl.FunctionalLocationParentId ||
+            fl.functionalLocationParentId ||
+            null,
           fl_data: JSON.stringify(fl),
           synced_at: now,
         };
