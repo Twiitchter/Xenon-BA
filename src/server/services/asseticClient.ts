@@ -356,13 +356,30 @@ class AsseticClient {
   }
 
   async createWorkRequest(data: any) {
+    // Sanitize numeric fields that Assetic requires to be integers, not null
+    const sanitized = { ...data };
+
+    // WorkRequestTypeId is required to be an integer in Assetic's JSON schema
+    // (PATCH /v2/workrequest/{id} returns: Error converting value {null} to type 'System.Int32')
+    if (
+      sanitized.WorkRequestTypeId === null ||
+      sanitized.WorkRequestTypeId === undefined
+    ) {
+      sanitized.WorkRequestTypeId = 0;
+    }
+
+    // WorkRequestSubTypeId should also be an integer if provided
+    if (sanitized.WorkRequestSubTypeId === null) {
+      sanitized.WorkRequestSubTypeId = 0;
+    }
+
     return this.loggedCall({
       method: "POST",
       endpoint: "/workrequest",
       description: "POST /workrequest",
       entityType: "work_request",
-      requestBody: data,
-      fn: (c) => c.post("/workrequest/", data),
+      requestBody: sanitized,
+      fn: (c) => c.post("/workrequest/", sanitized),
     });
   }
 

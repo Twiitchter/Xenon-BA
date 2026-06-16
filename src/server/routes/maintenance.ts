@@ -415,7 +415,8 @@ router.post(
           WorkRequestSubTypeId: null,
           // Automatically set the Incident type based on direction extracted from
           // the location path (e.g. "North", "South", "North West").
-          WorkRequestTypeId: await resolveIncidentTypeId(location, null),
+          // Default to 0 if no matching type found (Assetic requires integer, not null)
+          WorkRequestTypeId: (await resolveIncidentTypeId(location, null)) || 0,
           // WorkRequestPhysicalLocation is mandatory per the Assetic API.
           // Address.Country defaults to "Australia" to satisfy Assetic's country
           // validation. When no real street address is provided, StreetAddress
