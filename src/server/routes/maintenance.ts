@@ -14,6 +14,14 @@ import { ensureAsseticResource } from "../services/asseticResourceService";
 
 const router = Router();
 
+// Rate limiter for hierarchy refresh: track last refresh time per user
+// to prevent rapid successive refresh attempts that flood the API
+const hierarchyRefreshLimiter = new Map<
+  number,
+  { timestamp: number; pendingPromise: Promise<any> | null }
+>();
+const HIERARCHY_REFRESH_MIN_INTERVAL_MS = 30_000; // 30 seconds between refreshes per user
+
 /**
  * Extract the most informative human-readable message from an Assetic API
  * error response. Handles multiple formats:
@@ -2528,6 +2536,9 @@ router.get("/crafts", async (_req: AuthRequest, res: Response) => {
  * GET /api/maintenance/assetic/location-hierarchy
  * Returns cached Assetic hierarchy structured as regions -> sites -> buildings.
  * Pass ?refresh=true to force a re-fetch from Assetic.
+ *
+ * Rate limited: max 1 refresh per 30s per user to prevent flooding the API
+ * during upstream overload conditions.
  */
 router.get(
   "/assetic/location-hierarchy",
@@ -2542,9 +2553,68 @@ router.get(
 
       const forceRefresh =
         String(req.query.refresh || "").toLowerCase() === "true";
-      const hierarchy = forceRefresh
-        ? await asseticLocationHierarchyService.refreshFromAssetic()
-        : await asseticLocationHierarchyService.getOrRefresh();
+
+      let hierarchy;
+
+      if (forceRefresh) {
+        const userId = req.user?.id ?? 0;
+        const now = Date.now();
+        const entry = hierarchyRefreshLimiter.get(userId) || {
+          timestamp: 0,
+          pendingPromise: null,
+        };
+        const timeSinceLastRefresh = now - entry.timestamp;
+
+        // If a refresh is already pending for this user, return that promise
+        if (entry.pendingPromise) {
+          console.log(
+            `[HierarchyRefresh] User ${userId}: refresh already in flight, awaiting...`,
+          );
+          hierarchy = await entry.pendingPromise;
+        }
+        // If too soon since last refresh, reject to prevent flooding
+        else if (timeSinceLastRefresh < HIERARCHY_REFRESH_MIN_INTERVAL_MS) {
+          const waitSecs = Math.ceil(
+            (HIERARCHY_REFRESH_MIN_INTERVAL_MS - timeSinceLastRefresh) / 1000,
+          );
+          console.warn(
+            `[HierarchyRefresh] User ${userId}: refresh rate-limited. Next refresh available in ${waitSecs}s`,
+          );
+          return res.status(429).json({
+            error: "Hierarchy refresh rate limited",
+            message: `Please wait ${waitSecs} seconds before requesting another refresh`,
+            retryAfterSeconds: waitSecs,
+          });
+        }
+        // Allow refresh, but record the request and store the promise
+        else {
+          const refreshPromise =
+            asseticLocationHierarchyService.refreshFromAssetic();
+          hierarchyRefreshLimiter.set(userId, {
+            timestamp: now,
+            pendingPromise: refreshPromise,
+          });
+
+          try {
+            hierarchy = await refreshPromise;
+            // Clear the pending promise after successful completion
+            const current = hierarchyRefreshLimiter.get(userId);
+            if (current) {
+              current.pendingPromise = null;
+            }
+          } catch (err) {
+            // Clear the pending promise on error too, but keep the timestamp
+            // so they still have to wait the min interval before retrying
+            const current = hierarchyRefreshLimiter.get(userId);
+            if (current) {
+              current.pendingPromise = null;
+            }
+            throw err;
+          }
+        }
+      } else {
+        hierarchy = await asseticLocationHierarchyService.getOrRefresh();
+      }
 
       res.json(hierarchy);
     } catch (error: any) {

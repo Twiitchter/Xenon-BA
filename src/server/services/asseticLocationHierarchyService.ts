@@ -1230,13 +1230,53 @@ class AsseticLocationHierarchyService {
     maxPages: number = 500,
   ): Promise<FetchAllPagesResult> {
     const pageSize = 500;
+    const MAX_RETRIES = 3;
+    const BASE_RETRY_DELAY_MS = 1000; // 1 second initial backoff
 
     const allRows: any[] = [];
     let pagesFetched = 0;
     let lastTotalCount: number | undefined;
 
     for (let page = 1; page <= maxPages; page += 1) {
-      const response = await fetchPage({ page, pageSize });
+      let response: any;
+      let lastError: any;
+
+      // Retry loop with exponential backoff for 503/429 errors
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          response = await fetchPage({ page, pageSize });
+          lastError = null;
+          break; // Success — exit retry loop
+        } catch (error: any) {
+          lastError = error;
+          const status = error?.response?.status ?? error?.status;
+
+          // Only retry on 503 or 429; fail immediately on other errors
+          if (status !== 503 && status !== 429) {
+            throw error;
+          }
+
+          // If this was the last attempt, throw the error
+          if (attempt === MAX_RETRIES) {
+            throw error;
+          }
+
+          // Calculate exponential backoff: 1s, 2s, 4s
+          const delayMs = BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+          console.warn(
+            `[AsseticHierarchy] Page ${page} returned ${status}. Retrying in ${delayMs}ms (attempt ${attempt}/${MAX_RETRIES})`,
+          );
+
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+
+      // If all retries failed, throw the last error
+      if (lastError) {
+        throw lastError;
+      }
+
       const rows = this.extractRows(response);
       pagesFetched = page;
 
